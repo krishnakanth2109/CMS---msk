@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    /* This enables the dynamic toggle */
+    @apply bg-white text-slate-900 dark:bg-[#050505] dark:text-white transition-colors duration-300 antialiased font-sans overflow-x-hidden;
+  }
+}
+
+/* --- CUSTOM SCROLLBAR THAT ADAPTS TO THEME --- */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 dark:bg-white/10 rounded-full border-2 border-transparent bg-clip-content;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-primary-500;
+}
+
+/* Glass Utility for smoother cards */
+.glass {
+  @apply bg-white/70 dark:bg-[#050505]/70 backdrop-blur-xl border border-gray-200 dark:border-white/10;
+}
+
+
+@layer base {
+  body {
+    @apply antialiased text-slate-900 dark:text-white bg-white dark:bg-bg-950;
+  }
+}
+
+/* Custom scrollbar for a premium feel */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 dark:bg-white/10 rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-primary-500;
+}

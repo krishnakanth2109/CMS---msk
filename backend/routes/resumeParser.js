@@ -1,0 +1,251 @@
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+
+// --- CHANGED LINES BELOW ---
+// We use 'require' instead of 'import' for these libraries
+const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
+// ---------------------------
+
+/**
+ * Parse Resume and Extract Candidate Information
+ */
+export const parseResume = async (fileBuffer, mimetype) => {
+  try {
+    let text = '';
+
+    // Extract text based on file type
+    if (mimetype === 'application/pdf') {
+      const pdfData = await pdfParse(fileBuffer);
+      text = pdfData.text;
+    } else if (
+      mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      mimetype === 'application/msword'
+    ) {
+      const result = await mammoth.extractRawText({ buffer: fileBuffer });
+      text = result.value;
+    } else {
+      throw new Error('Unsupported file format');
+    }
+
+    // Extract information from text
+    const extractedData = extractInformation(text);
+    
+    return {
+      success: true,
+      data: extractedData,
+      rawText: text
+    };
+  } catch (error) {
+    console.error('Resume parsing error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+/**
+ * Extract structured information from resume text
+ */
+const extractInformation = (text) => {
+  const lines = text.split('\n').filter(line => line.trim());
+  
+  return {
+    name: extractName(lines),
+    email: extractEmail(text),
+    contact: extractPhone(text),
+    skills: extractSkills(text),
+    totalExperience: extractExperience(text),
+    education: extractEducation(text),
+    currentCompany: extractCurrentCompany(text),
+    currentLocation: extractLocation(text),
+  };
+};
+
+/**
+ * Extract name (usually first non-empty line)
+ */
+const extractName = (lines) => {
+  for (let line of lines) {
+    const trimmed = line.trim();
+    // Name is typically 2-4 words, starts with capital letter
+    if (trimmed.length > 3 && trimmed.length < 50 && /^[A-Z]/.test(trimmed)) {
+      const words = trimmed.split(/\s+/);
+      if (words.length >= 2 && words.length <= 4) {
+        // Check if it's not a section header
+        if (!/(resume|curriculum|vitae|profile|summary|objective|experience|education|skills)/i.test(trimmed)) {
+          return trimmed;
+        }
+      }
+    }
+  }
+  return '';
+};
+
+/**
+ * Extract email address
+ */
+const extractEmail = (text) => {
+  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+  const emails = text.match(emailRegex);
+  return emails ? emails[0] : '';
+};
+
+/**
+ * Extract phone number
+ */
+const extractPhone = (text) => {
+  // Indian phone number patterns
+  const patterns = [
+    /(\+91[\s-]?)?[6-9]\d{9}/g, // Indian mobile with optional +91
+    /\b\d{10}\b/g, // 10 digit number
+    /\(\d{3}\)\s*\d{3}[-.\s]?\d{4}/g, // (123) 456-7890
+  ];
+  
+  for (let pattern of patterns) {
+    const matches = text.match(pattern);
+    if (matches) {
+      let phone = matches[0].replace(/[\s()-]/g, '');
+      // If starts with +91, remove it
+      if (phone.startsWith('+91')) {
+        phone = phone.substring(3);
+      } else if (phone.startsWith('91') && phone.length === 12) {
+        phone = phone.substring(2);
+      }
+      return phone;
+    }
+  }
+  return '';
+};
+
+/**
+ * Extract skills
+ */
+const extractSkills = (text) => {
+  const commonSkills = [
+    'JavaScript', 'Java', 'Python', 'C++', 'C#', 'Ruby', 'PHP', 'Swift', 'Kotlin', 'Go',
+    'React', 'Angular', 'Vue', 'Node.js', 'Express', 'Django', 'Flask', 'Spring', 'ASP.NET',
+    'HTML', 'CSS', 'SASS', 'TypeScript', 'jQuery', 'Bootstrap', 'Tailwind',
+    'MongoDB', 'MySQL', 'PostgreSQL', 'Oracle', 'SQL Server', 'Redis', 'Cassandra',
+    'AWS', 'Azure', 'GCP', 'Docker', 'Kubernetes', 'Jenkins', 'Git', 'CI/CD',
+    'REST API', 'GraphQL', 'Microservices', 'Agile', 'Scrum', 'JIRA',
+    'Machine Learning', 'AI', 'Data Science', 'TensorFlow', 'PyTorch',
+    'Salesforce', 'SAP', 'Oracle ERP', 'Power BI', 'Tableau',
+    'Selenium', 'JUnit', 'Jest', 'Mocha', 'Cypress',
+  ];
+
+  const foundSkills = [];
+  const textLower = text.toLowerCase();
+
+  for (let skill of commonSkills) {
+    const skillLower = skill.toLowerCase();
+    // Use word boundary to match whole words
+    const regex = new RegExp(`\\b${skillLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    if (regex.test(textLower)) {
+      foundSkills.push(skill);
+    }
+  }
+
+  return foundSkills.join(', ');
+};
+
+/**
+ * Extract total years of experience
+ */
+const extractExperience = (text) => {
+  const patterns = [
+    /(\d+\.?\d*)\+?\s*(?:years?|yrs?)(?:\s+of)?\s+(?:experience|exp)/gi,
+    /experience[:\s]+(\d+\.?\d*)\+?\s*(?:years?|yrs?)/gi,
+    /(\d+\.?\d*)\+?\s*(?:years?|yrs?)/gi,
+  ];
+
+  for (let pattern of patterns) {
+    const matches = text.match(pattern);
+    if (matches) {
+      const numbers = matches[0].match(/\d+\.?\d*/);
+      if (numbers) {
+        return numbers[0];
+      }
+    }
+  }
+
+  // Try to calculate from date ranges
+  const yearPattern = /(?:19|20)\d{2}/g;
+  const years = text.match(yearPattern);
+  if (years && years.length >= 2) {
+    const sortedYears = years.map(y => parseInt(y)).sort((a, b) => a - b);
+    const experience = new Date().getFullYear() - sortedYears[0];
+    if (experience > 0 && experience < 50) {
+      return experience.toString();
+    }
+  }
+
+  return '';
+};
+
+/**
+ * Extract education
+ */
+const extractEducation = (text) => {
+  const degrees = [
+    'B.Tech', 'B.E', 'M.Tech', 'M.E', 'MBA', 'MCA', 'BCA',
+    'Bachelor', 'Master', 'PhD', 'Doctorate',
+    'B.Sc', 'M.Sc', 'B.Com', 'M.Com', 'BBA',
+  ];
+
+  for (let degree of degrees) {
+    const regex = new RegExp(`${degree}[^\\n]{0,100}`, 'i');
+    const match = text.match(regex);
+    if (match) {
+      return match[0].trim();
+    }
+  }
+
+  return '';
+};
+
+/**
+ * Extract current company
+ */
+const extractCurrentCompany = (text) => {
+  const patterns = [
+    /(?:currently working|current(?:ly)?\s+at|working\s+at|employed\s+at)[:\s]+([^\n]+)/gi,
+    /(?:present|current)[^\n]*?(?:company|organization|employer)[:\s]+([^\n]+)/gi,
+  ];
+
+  for (let pattern of patterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      return match[1].trim().split(/[,\n]/)[0].trim();
+    }
+  }
+
+  return '';
+};
+
+/**
+ * Extract location
+ */
+const extractLocation = (text) => {
+  const indianCities = [
+    'Mumbai', 'Delhi', 'Bangalore', 'Bengaluru', 'Hyderabad', 'Chennai', 'Kolkata',
+    'Pune', 'Ahmedabad', 'Jaipur', 'Surat', 'Lucknow', 'Kanpur', 'Nagpur',
+    'Indore', 'Thane', 'Bhopal', 'Visakhapatnam', 'Pimpri', 'Patna',
+    'Vadodara', 'Ghaziabad', 'Ludhiana', 'Agra', 'Nashik', 'Faridabad',
+    'Meerut', 'Rajkot', 'Varanasi', 'Srinagar', 'Aurangabad', 'Dhanbad',
+    'Amritsar', 'Navi Mumbai', 'Allahabad', 'Ranchi', 'Howrah', 'Coimbatore',
+    'Jabalpur', 'Gwalior', 'Vijayawada', 'Jodhpur', 'Madurai', 'Raipur',
+    'Kota', 'Chandigarh', 'Guwahati', 'Noida', 'Gurugram', 'Gurgaon'
+  ];
+
+  const textLower = text.toLowerCase();
+  
+  for (let city of indianCities) {
+    if (textLower.includes(city.toLowerCase())) {
+      return city;
+    }
+  }
+
+  return '';
+};
