@@ -15,7 +15,7 @@ export const getJobs = async (req, res) => {
 // @route   POST /api/jobs
 export const createJob = async (req, res) => {
   try {
-    // CRITICAL FIX: Attach the logged-in user's ID to the job data
+    // Attach the logged-in user's ID to the job data
     const jobData = {
       ...req.body,
       createdBy: req.user._id // derived from the 'protect' middleware
@@ -24,7 +24,7 @@ export const createJob = async (req, res) => {
     const job = await Job.create(jobData);
     res.status(201).json(job);
   } catch (error) {
-    console.error("Create Job Error:", error); // Added logging
+    console.error("Create Job Error:", error); 
     res.status(400).json({ message: error.message });
   }
 };

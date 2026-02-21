@@ -1,18 +1,14 @@
 import Candidate from '../models/Candidate.js';
 import User from '../models/User.js';
 
-// @desc    Get all candidates (Admin: All, Recruiter: Own)
+// @desc    Get all candidates
 // @route   GET /api/candidates
-// @access  Private
 export const getCandidates = async (req, res) => {
   try {
     let query = {};
-    
-    // If user is NOT admin, only show their candidates
     if (req.user.role !== 'admin') {
       query.recruiterId = req.user._id;
     }
-
     const candidates = await Candidate.find(query).sort({ createdAt: -1 });
     res.json(candidates);
   } catch (error) {
@@ -22,52 +18,34 @@ export const getCandidates = async (req, res) => {
 
 // @desc    Create a candidate
 // @route   POST /api/candidates
-// @access  Private
 export const createCandidate = async (req, res) => {
   try {
-    const { 
-      name, email, contact, position, skills, client, status,
-      totalExperience, relevantExperience, ctc, ectc, takeHomeSalary, 
-      noticePeriod, // Legacy field
-      
-      // NEW FIELDS
-      offersInHand, offerPackage, 
-      servingNoticePeriod, noticePeriodDays,
+    const body = { ...req.body };
 
-      assignedJobId, reasonForChange, dateAdded, active, 
-      recruiterId 
-    } = req.body;
+    // Set name based on First & Last
+    body.name = `${body.firstName || ''} ${body.lastName || ''}`.trim();
 
-    // Determine Recruiter: If Admin sent an ID, use it. Otherwise use logged-in user.
+    // Skills handling
+    if (typeof body.skills === 'string') {
+      body.skills = body.skills.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    // Recruiter Assignment logic
     let targetRecruiterId = req.user._id;
     let targetRecruiterName = req.user.name;
 
-    if (req.user.role === 'admin' && recruiterId) {
-      const assignedRecruiter = await User.findById(recruiterId);
+    if (req.user.role === 'admin' && body.recruiterId) {
+      const assignedRecruiter = await User.findById(body.recruiterId);
       if (assignedRecruiter) {
         targetRecruiterId = assignedRecruiter._id;
         targetRecruiterName = assignedRecruiter.name;
       }
     }
 
-    const candidate = await Candidate.create({
-      name, email, contact, position, 
-      skills: Array.isArray(skills) ? skills : skills.split(',').map(s => s.trim()),
-      client, status,
-      totalExperience, relevantExperience, ctc, ectc, takeHomeSalary, 
-      
-      // Mapped New Fields
-      noticePeriod, 
-      offersInHand, 
-      offerPackage, 
-      servingNoticePeriod, 
-      noticePeriodDays,
+    body.recruiterId = targetRecruiterId;
+    body.recruiterName = targetRecruiterName;
 
-      assignedJobId, reasonForChange, dateAdded, active,
-      recruiterId: targetRecruiterId,
-      recruiterName: targetRecruiterName
-    });
-
+    const candidate = await Candidate.create(body);
     res.status(201).json(candidate);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -76,23 +54,25 @@ export const createCandidate = async (req, res) => {
 
 // @desc    Update candidate
 // @route   PUT /api/candidates/:id
-// @access  Private
 export const updateCandidate = async (req, res) => {
   try {
     const candidate = await Candidate.findById(req.params.id);
+    if (!candidate) return res.status(404).json({ message: 'Candidate not found' });
 
-    if (!candidate) {
-      return res.status(404).json({ message: 'Candidate not found' });
-    }
-
-    // Check ownership if not admin
     if (req.user.role !== 'admin' && candidate.recruiterId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
+    const body = { ...req.body };
+    body.name = `${body.firstName || ''} ${body.lastName || ''}`.trim();
+
+    if (typeof body.skills === 'string') {
+      body.skills = body.skills.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
     const updatedCandidate = await Candidate.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      body,
       { new: true }
     );
 
@@ -104,16 +84,11 @@ export const updateCandidate = async (req, res) => {
 
 // @desc    Delete candidate
 // @route   DELETE /api/candidates/:id
-// @access  Private
 export const deleteCandidate = async (req, res) => {
   try {
     const candidate = await Candidate.findById(req.params.id);
+    if (!candidate) return res.status(404).json({ message: 'Candidate not found' });
 
-    if (!candidate) {
-      return res.status(404).json({ message: 'Candidate not found' });
-    }
-
-    // Check ownership if not admin
     if (req.user.role !== 'admin' && candidate.recruiterId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized' });
     }

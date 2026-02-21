@@ -27,8 +27,8 @@ const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').repla
 const API_URL  = `${BASE_URL}/api`;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const getInitials = (name = '') =>
-  name.split(' ').map((n) => n[0]).join('').toUpperCase().substring(0, 2);
+const getInitials = (fName = '', lName = '') =>
+  `${fName.charAt(0)}${lName.charAt(0)}`.toUpperCase();
 
 // ═════════════════════════════════════════════════════════════════════════════
 export default function AdminRecruiters() {
@@ -80,7 +80,7 @@ export default function AdminRecruiters() {
   // ── Form State ────────────────────────────────────────────────────────────
   // Fields match backend recruiterController.js / User model exactly
   const EMPTY_RECRUITER = {
-    recruiterId: "", name: "", email: "", phone: "",
+    recruiterId: "", firstName: "", lastName: "", email: "", phone: "",
     username: "", password: "", profilePicture: "", role: "recruiter",
   };
 
@@ -127,10 +127,10 @@ export default function AdminRecruiters() {
   useEffect(() => { fetchData(); }, []);
 
   // ── Validation ────────────────────────────────────────────────────────────
-  // Only name & email truly required; everything else optional per backend
   const validateForm = (data, isEdit = false) => {
     const e = {};
-    if (!data.name.trim()) e.name = "Name is required";
+    if (!data.firstName.trim()) e.firstName = "First name is required";
+    if (!data.lastName.trim()) e.lastName = "Last name is required";
     if (!data.email.trim()) e.email = "Email is required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = "Invalid email";
     if (data.phone && !/^\d{10}$/.test(data.phone)) e.phone = "Phone must be 10 digits";
@@ -234,7 +234,8 @@ export default function AdminRecruiters() {
   // ── Modal openers ─────────────────────────────────────────────────────────
   const openEditModal = (r) => {
     setEditRecruiter({
-      id: r.id, recruiterId: r.recruiterId || "", name: r.name,
+      id: r.id, recruiterId: r.recruiterId || "", 
+      firstName: r.firstName, lastName: r.lastName,
       email: r.email, phone: r.phone || "", username: r.username || "",
       profilePicture: r.profilePicture || "", role: "recruiter", password: "",
     });
@@ -290,7 +291,8 @@ export default function AdminRecruiters() {
   const filteredRecruiters = recruiters
     .filter((r) => {
       const q = searchTerm.toLowerCase();
-      return (r.name || '').toLowerCase().includes(q) ||
+      const fullName = `${r.firstName || ''} ${r.lastName || ''}`.toLowerCase();
+      return fullName.includes(q) ||
              (r.email || '').toLowerCase().includes(q) ||
              (r.username || '').toLowerCase().includes(q) ||
              (r.recruiterId || '').toLowerCase().includes(q);
@@ -299,7 +301,7 @@ export default function AdminRecruiters() {
       const sa = calcStats(a.id), sb = calcStats(b.id);
       let av = '', bv = '';
       switch (sortField) {
-        case 'name':      av = a.name;  bv = b.name; break;
+        case 'name':      av = a.firstName;  bv = b.firstName; break;
         case 'email':     av = a.email; bv = b.email; break;
         case 'id':        av = a.recruiterId || ''; bv = b.recruiterId || ''; break;
         case 'total':     av = sa.total;    bv = sb.total;    break;
@@ -362,13 +364,13 @@ export default function AdminRecruiters() {
   const downloadPDF = () => {
     if (!selectedRecruiter || !performanceData.length) return;
     const doc = new jsPDF();
-    doc.text(`Performance Report: ${selectedRecruiter.name}`, 14, 20);
+    doc.text(`Performance Report: ${selectedRecruiter.firstName} ${selectedRecruiter.lastName}`, 14, 20);
     autoTable(doc, {
       startY: 30,
       head:   [["Date", "Submissions", "Turnups", "Joined"]],
       body:   performanceData.map((d) => [d.date, d.submissions, d.turnups, d.joined]),
     });
-    doc.save(`${selectedRecruiter.name}-report.pdf`);
+    doc.save(`${selectedRecruiter.firstName}_${selectedRecruiter.lastName}_report.pdf`);
   };
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -475,10 +477,10 @@ export default function AdminRecruiters() {
                               flex items-center justify-center text-white font-bold overflow-hidden">
                               {r.profilePicture
                                 ? <img src={r.profilePicture} className="w-full h-full object-cover" alt="pfp" />
-                                : getInitials(r.name)}
+                                : getInitials(r.firstName, r.lastName)}
                             </div>
                             <div>
-                              <CardTitle className="text-base">{r.name}</CardTitle>
+                              <CardTitle className="text-base">{r.firstName} {r.lastName}</CardTitle>
                               <div className="flex flex-wrap items-center gap-1.5 mt-1">
                                 {r.recruiterId && <Badge variant="outline" className="text-xs">{r.recruiterId}</Badge>}
                                 <StatusBadge recruiter={r} />
@@ -498,7 +500,7 @@ export default function AdminRecruiters() {
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => {
                                 setSelectedRecruiter(r);
-                                setCandidatesModalTitle(`All Candidates — ${r.name}`);
+                                setCandidatesModalTitle(`All Candidates — ${r.firstName} ${r.lastName}`);
                                 setCandidateFilterType(null);
                                 setShowCandidatesModal(true);
                               }}>
@@ -535,7 +537,7 @@ export default function AdminRecruiters() {
                                 className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded p-1 transition`}
                                 onClick={() => {
                                   setSelectedRecruiter(r);
-                                  setCandidatesModalTitle(`${label} — ${r.name}`);
+                                  setCandidatesModalTitle(`${label} — ${r.firstName} ${r.lastName}`);
                                   setCandidateFilterType(filter);
                                   setShowCandidatesModal(true);
                                 }}>
@@ -588,10 +590,10 @@ export default function AdminRecruiters() {
                                   <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold overflow-hidden flex-shrink-0">
                                     {r.profilePicture
                                       ? <img src={r.profilePicture} className="w-full h-full object-cover rounded-full" alt="pfp" />
-                                      : getInitials(r.name)}
+                                      : getInitials(r.firstName, r.lastName)}
                                   </div>
                                   <div>
-                                    <div className="font-medium">{r.name}</div>
+                                    <div className="font-medium">{r.firstName} {r.lastName}</div>
                                     <div className="text-xs text-gray-500">{r.email}</div>
                                   </div>
                                 </div>
@@ -599,16 +601,16 @@ export default function AdminRecruiters() {
                               <td className="px-4 py-3 text-gray-500">{r.recruiterId || '-'}</td>
                               <td className="px-4 py-3"><StatusBadge recruiter={r} /></td>
                               <td className="px-4 py-3 text-center font-bold text-blue-600 cursor-pointer hover:underline"
-                                onClick={() => { setSelectedRecruiter(r); setCandidatesModalTitle(`All — ${r.name}`); setCandidateFilterType(null); setShowCandidatesModal(true); }}>
+                                onClick={() => { setSelectedRecruiter(r); setCandidatesModalTitle(`All — ${r.firstName} ${r.lastName}`); setCandidateFilterType(null); setShowCandidatesModal(true); }}>
                                 {st.total}
                               </td>
                               <td className="px-4 py-3 text-center font-bold text-teal-600">{st.turnups}</td>
                               <td className="px-4 py-3 text-center font-bold text-purple-600 cursor-pointer hover:underline"
-                                onClick={() => { setSelectedRecruiter(r); setCandidatesModalTitle(`Selected — ${r.name}`); setCandidateFilterType('selected'); setShowCandidatesModal(true); }}>
+                                onClick={() => { setSelectedRecruiter(r); setCandidatesModalTitle(`Selected — ${r.firstName} ${r.lastName}`); setCandidateFilterType('selected'); setShowCandidatesModal(true); }}>
                                 {st.selected}
                               </td>
                               <td className="px-4 py-3 text-center font-bold text-green-600 cursor-pointer hover:underline"
-                                onClick={() => { setSelectedRecruiter(r); setCandidatesModalTitle(`Joined — ${r.name}`); setCandidateFilterType('joined'); setShowCandidatesModal(true); }}>
+                                onClick={() => { setSelectedRecruiter(r); setCandidatesModalTitle(`Joined — ${r.firstName} ${r.lastName}`); setCandidateFilterType('joined'); setShowCandidatesModal(true); }}>
                                 {st.joined}
                               </td>
                               <td className="px-4 py-3 text-right">
@@ -676,12 +678,22 @@ export default function AdminRecruiters() {
                         onChange={(e) => handleInputChange('recruiterId', e.target.value, false)}
                         placeholder="e.g. REC001" />
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-sm font-medium">Full Name <span className="text-red-500">*</span></label>
-                      <Input value={newRecruiter.name}
-                        onChange={(e) => handleInputChange('name', e.target.value, false)}
-                        className={errors.name ? "border-red-500" : ""} />
-                      {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+                      <label className="text-sm font-medium">First Name <span className="text-red-500">*</span></label>
+                      <Input value={newRecruiter.firstName}
+                        onChange={(e) => handleInputChange('firstName', e.target.value, false)}
+                        className={errors.firstName ? "border-red-500" : ""} />
+                      {errors.firstName && <p className="text-xs text-red-500 mt-1">{errors.firstName}</p>}
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Last Name <span className="text-red-500">*</span></label>
+                      <Input value={newRecruiter.lastName}
+                        onChange={(e) => handleInputChange('lastName', e.target.value, false)}
+                        className={errors.lastName ? "border-red-500" : ""} />
+                      {errors.lastName && <p className="text-xs text-red-500 mt-1">{errors.lastName}</p>}
                     </div>
                   </div>
 
@@ -765,12 +777,22 @@ export default function AdminRecruiters() {
                       <Input value={editRecruiter.recruiterId}
                         onChange={(e) => handleInputChange('recruiterId', e.target.value, true)} />
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-sm font-medium">Full Name <span className="text-red-500">*</span></label>
-                      <Input value={editRecruiter.name}
-                        onChange={(e) => handleInputChange('name', e.target.value, true)}
-                        className={errors.name ? "border-red-500" : ""} />
-                      {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+                      <label className="text-sm font-medium">First Name <span className="text-red-500">*</span></label>
+                      <Input value={editRecruiter.firstName}
+                        onChange={(e) => handleInputChange('firstName', e.target.value, true)}
+                        className={errors.firstName ? "border-red-500" : ""} />
+                      {errors.firstName && <p className="text-xs text-red-500 mt-1">{errors.firstName}</p>}
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Last Name <span className="text-red-500">*</span></label>
+                      <Input value={editRecruiter.lastName}
+                        onChange={(e) => handleInputChange('lastName', e.target.value, true)}
+                        className={errors.lastName ? "border-red-500" : ""} />
+                      {errors.lastName && <p className="text-xs text-red-500 mt-1">{errors.lastName}</p>}
                     </div>
                   </div>
 
@@ -838,7 +860,7 @@ export default function AdminRecruiters() {
                   <AlertTriangle className="h-5 w-5" /> Confirm Deletion
                 </DialogTitle>
                 <p className="mt-2 text-gray-600 dark:text-gray-300">
-                  Delete <strong>{recruiterToDelete?.name}</strong>? This cannot be undone.
+                  Delete <strong>{recruiterToDelete?.firstName} {recruiterToDelete?.lastName}</strong>? This cannot be undone.
                 </p>
                 <div className="flex justify-end gap-2 mt-4">
                   <Button variant="outline" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
@@ -854,7 +876,7 @@ export default function AdminRecruiters() {
             <div className="fixed inset-0 flex items-center justify-center p-4">
               <DialogPanel className="bg-white dark:bg-gray-900 w-full max-w-3xl rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
                 <DialogTitle className="text-xl font-bold mb-4">
-                  Performance Report — {selectedRecruiter?.name}
+                  Performance Report — {selectedRecruiter?.firstName} {selectedRecruiter?.lastName}
                 </DialogTitle>
                 <div className="space-y-4">
                   <div className="grid grid-cols-3 gap-4">
@@ -928,10 +950,10 @@ export default function AdminRecruiters() {
                         <div className="h-9 w-9 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold overflow-hidden">
                           {r.profilePicture
                             ? <img src={r.profilePicture} className="w-full h-full object-cover" alt="pfp" />
-                            : getInitials(r.name)}
+                            : getInitials(r.firstName, r.lastName)}
                         </div>
                         <div>
-                          <div className="font-medium">{r.name}</div>
+                          <div className="font-medium">{r.firstName} {r.lastName}</div>
                           <div className="text-xs text-gray-500">{r.email}</div>
                         </div>
                       </div>

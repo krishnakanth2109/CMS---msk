@@ -37,8 +37,8 @@ router.get('/active-list', async (req, res) => {
     const recruiters = await User.find({ 
       active: true 
     })
-    .select('_id name email role')
-    .sort({ name: 1 });
+    .select('_id firstName lastName email role')
+    .sort({ firstName: 1, lastName: 1 });
     
     res.json(recruiters);
   } catch (error) {

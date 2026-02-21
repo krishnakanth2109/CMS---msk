@@ -29,7 +29,8 @@ export const updateUserProfile = async (req, res) => {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    user.name           = req.body.name           || user.name;
+    user.firstName      = req.body.firstName      || user.firstName;
+    user.lastName       = req.body.lastName       || user.lastName;
     user.email          = req.body.email          || user.email;
     user.phone          = req.body.phone          || user.phone;
     user.location       = req.body.location       || user.location;
@@ -68,7 +69,10 @@ export const updateUserProfile = async (req, res) => {
 
     const updatedUser = await user.save();
     res.json({
-      _id: updatedUser._id, name: updatedUser.name, email: updatedUser.email,
+      _id: updatedUser._id, 
+      firstName: updatedUser.firstName, 
+      lastName: updatedUser.lastName, 
+      email: updatedUser.email,
       phone: updatedUser.phone, location: updatedUser.location,
       specialization: updatedUser.specialization, experience: updatedUser.experience,
       bio: updatedUser.bio, profilePicture: updatedUser.profilePicture,
@@ -95,23 +99,12 @@ export const getRecruiters = async (req, res) => {
 // @desc    Create a new recruiter
 // @route   POST /api/recruiters
 // @access  Private/Admin
-//
-// ROOT CAUSE OF 401 BUG:
-//   The old code only created users in MongoDB (with bcrypt password).
-//   The protect middleware verifies Firebase tokens and looks users up by
-//   firebaseUid. Without a firebaseUid in MongoDB, every request from a
-//   recruiter gets: "User not found → 401".
-//
-// FIX:
-//   1. Create user in Firebase Auth first → get firebaseUid
-//   2. Store firebaseUid in MongoDB
-//   3. Never store passwords in MongoDB — Firebase owns auth
 // ─────────────────────────────────────────────────────────────────────────────
 export const createRecruiter = async (req, res) => {
-  const { name, email, password, recruiterId, phone, role, username, profilePicture } = req.body;
+  const { firstName, lastName, email, password, recruiterId, phone, role, username, profilePicture } = req.body;
 
-  if (!email || !password || !name) {
-    return res.status(400).json({ message: 'Name, email, and password are required.' });
+  if (!email || !password || !firstName || !lastName) {
+    return res.status(400).json({ message: 'First name, last name, email, and password are required.' });
   }
 
   let firebaseUid = null;
@@ -129,7 +122,11 @@ export const createRecruiter = async (req, res) => {
     // Step 1: Create user in Firebase (gives us the firebaseUid)
     let firebaseUser;
     try {
-      firebaseUser = await admin.auth().createUser({ email, password, displayName: name });
+      firebaseUser = await admin.auth().createUser({ 
+        email, 
+        password, 
+        displayName: `${firstName} ${lastName}` 
+      });
     } catch (fbError) {
       if (fbError.code === 'auth/email-already-exists') {
         // Reuse existing Firebase account
@@ -143,7 +140,8 @@ export const createRecruiter = async (req, res) => {
     // Step 2: Save to MongoDB WITH firebaseUid — no password needed here
     const user = await User.create({
       firebaseUid,
-      name,
+      firstName,
+      lastName,
       email,
       recruiterId,
       phone,
@@ -154,7 +152,7 @@ export const createRecruiter = async (req, res) => {
     });
 
     res.status(201).json({
-      _id: user._id, name: user.name, email: user.email,
+      _id: user._id, firstName: user.firstName, lastName: user.lastName, email: user.email,
       recruiterId: user.recruiterId, role: user.role, firebaseUid: user.firebaseUid,
     });
 
@@ -192,7 +190,12 @@ export const updateRecruiter = async (req, res) => {
       const fbUpdates = {};
       if (req.body.password) fbUpdates.password = req.body.password;
       if (req.body.email && req.body.email !== user.email) fbUpdates.email = req.body.email;
-      if (req.body.name  && req.body.name  !== user.name)  fbUpdates.displayName = req.body.name;
+      if (req.body.firstName || req.body.lastName) {
+        const fName = req.body.firstName || user.firstName;
+        const lName = req.body.lastName || user.lastName;
+        fbUpdates.displayName = `${fName} ${lName}`;
+      }
+      
       if (Object.keys(fbUpdates).length > 0) {
         try { await admin.auth().updateUser(user.firebaseUid, fbUpdates); } catch (e) {
           console.error('Firebase update error (non-fatal):', e.message);
@@ -200,7 +203,8 @@ export const updateRecruiter = async (req, res) => {
       }
     }
 
-    user.name           = req.body.name           || user.name;
+    user.firstName      = req.body.firstName      || user.firstName;
+    user.lastName       = req.body.lastName       || user.lastName;
     user.email          = req.body.email          || user.email;
     user.phone          = req.body.phone          || user.phone;
     user.role           = req.body.role           || user.role;
@@ -209,7 +213,7 @@ export const updateRecruiter = async (req, res) => {
     user.profilePicture = req.body.profilePicture || user.profilePicture;
 
     const updatedUser = await user.save();
-    res.json({ _id: updatedUser._id, name: updatedUser.name, email: updatedUser.email, role: updatedUser.role, recruiterId: updatedUser.recruiterId });
+    res.json({ _id: updatedUser._id, firstName: updatedUser.firstName, lastName: updatedUser.lastName, email: updatedUser.email, role: updatedUser.role, recruiterId: updatedUser.recruiterId });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

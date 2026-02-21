@@ -29,12 +29,18 @@ export { admin };
 export const protect = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
+  // Ensure header exists and starts with Bearer
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ message: 'Not authorized, no token provided.' });
   }
 
   try {
     const token = authHeader.split(' ')[1];
+
+    // 🔴 THE FIX: Prevent literal string "null" or "undefined" from hitting Firebase
+    if (!token || token === 'null' || token === 'undefined') {
+      return res.status(401).json({ message: 'Not authorized, invalid token provided.' });
+    }
 
     // Verify the Firebase ID token
     const decodedToken = await admin.auth().verifyIdToken(token);

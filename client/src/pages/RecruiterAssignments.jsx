@@ -259,12 +259,7 @@ export default function RecruiterAssignments() {
               <p className="text-gray-500 mt-1">Manage clients, post requirements, and assign recruiters</p>
             </div>
             <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setIsClientModalOpen(true)}>
-                <BuildingOfficeIcon className="w-4 h-4 mr-2"/> Add Client
-              </Button>
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={openCreateModal}>
-                <PlusIcon className="w-4 h-4 mr-2"/> Post Requirement
-              </Button>
+           
             </div>
           </div>
 

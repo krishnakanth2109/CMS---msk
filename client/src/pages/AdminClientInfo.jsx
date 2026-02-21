@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BuildingOfficeIcon,
@@ -13,79 +13,90 @@ import {
   NoSymbolIcon,
 } from "@heroicons/react/24/outline";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, '');
+const API_URL  = `${BASE_URL}/api`;
 
-const inputCls = "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 dark:text-white";
+// Sleek Grey Input Styling
+const inputCls = "w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-zinc-500 bg-white dark:bg-zinc-900 dark:text-zinc-100 transition-shadow placeholder-zinc-400";
 
 /* ---------------- DETAIL MODAL ---------------- */
-
 const ClientDetailCard = ({ client, onClose }) => {
-  const isCandidatePeriodExpired = useMemo(() => {
-    if (!client?.candidatePeriod) return false;
-    const placementDate = new Date(client.dateAdded);
-    const expiryDate = new Date(placementDate);
-    expiryDate.setMonth(expiryDate.getMonth() + client.candidatePeriod);
-    return new Date() > expiryDate;
-  }, [client]);
-
   return (
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
         onClick={onClose}
       >
         <motion.div
-          initial={{ scale: 0.9, opacity: 0, y: 20 }}
+          initial={{ scale: 0.95, opacity: 0, y: 10 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.9, opacity: 0, y: 20 }}
-          className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+          exit={{ scale: 0.95, opacity: 0, y: 10 }}
+          className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-zinc-200 dark:border-zinc-800"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="bg-gradient-to-r from-purple-600 to-indigo-700 text-white p-6 rounded-t-2xl">
-            <div className="flex justify-between">
+          {/* Grey Gradient Header */}
+          <div className="bg-gradient-to-r from-zinc-800 to-zinc-950 text-white p-6 rounded-t-2xl border-b border-zinc-700">
+            <div className="flex justify-between items-start">
               <div>
-                <h2 className="text-2xl font-bold">{client.companyName}</h2>
-                <p className="text-purple-100">{client.clientId}</p>
+                <h2 className="text-2xl font-bold tracking-tight">{client.companyName}</h2>
+                <div className="flex items-center gap-3 mt-2 text-zinc-300 text-sm">
+                  <span className="bg-zinc-800 px-2 py-1 rounded-md border border-zinc-700 text-xs font-mono">
+                    {client.clientId}
+                  </span>
+                  {client.industry && <span>• {client.industry}</span>}
+                </div>
               </div>
-              <button onClick={onClose}>
+              <button 
+                onClick={onClose}
+                className="p-1.5 hover:bg-zinc-700 rounded-lg transition-colors text-zinc-400 hover:text-white"
+              >
                 <XMarkIcon className="w-6 h-6" />
               </button>
             </div>
           </div>
 
-          <div className="p-6 space-y-6">
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="font-semibold text-lg mb-2 flex items-center gap-2">
-                  <UserIcon className="w-5 h-5" /> Contact Info
+          <div className="p-6 space-y-6 text-zinc-800 dark:text-zinc-300">
+            <div className="grid md:grid-cols-2 gap-8">
+              {/* Contact Info Card */}
+              <div className="bg-zinc-50 dark:bg-zinc-800/50 p-5 rounded-xl border border-zinc-100 dark:border-zinc-800">
+                <h3 className="font-semibold text-lg mb-4 flex items-center gap-2 text-zinc-900 dark:text-zinc-100 border-b border-zinc-200 dark:border-zinc-700 pb-2">
+                  <UserIcon className="w-5 h-5 text-zinc-500" /> Contact Details
                 </h3>
-                <div className="space-y-2 text-sm">
-                  <p><span className="font-medium">Person:</span> {client.contactPerson || "N/A"}</p>
-                  <p><span className="font-medium">Email:</span> {client.email || "N/A"}</p>
-                  <p><span className="font-medium">Phone:</span> {client.phone || "N/A"}</p>
-                  <p><span className="font-medium">Address:</span> {client.address || "N/A"}</p>
-                  <p><span className="font-medium">Website:</span> {client.website || "N/A"}</p>
+                <div className="space-y-3 text-sm">
+                  <p className="flex justify-between"><span className="text-zinc-500">Contact Person:</span> <span className="font-medium">{client.contactPerson || "-"}</span></p>
+                  <p className="flex justify-between"><span className="text-zinc-500">Email:</span> <span className="font-medium">{client.email || "-"}</span></p>
+                  <p className="flex justify-between"><span className="text-zinc-500">Phone:</span> <span className="font-medium">{client.phone || "-"}</span></p>
+                  <p className="flex justify-between"><span className="text-zinc-500">Website:</span> <span className="font-medium">{client.website || "-"}</span></p>
+                  <div className="pt-2"><span className="text-zinc-500 block mb-1">Address:</span> <p className="font-medium text-xs leading-relaxed">{client.address || "-"}</p></div>
                 </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-lg mb-2 flex items-center gap-2">
-                  <BuildingOfficeIcon className="w-5 h-5" /> Business Terms
+
+              {/* Business Terms Card */}
+              <div className="bg-zinc-50 dark:bg-zinc-800/50 p-5 rounded-xl border border-zinc-100 dark:border-zinc-800">
+                <h3 className="font-semibold text-lg mb-4 flex items-center gap-2 text-zinc-900 dark:text-zinc-100 border-b border-zinc-200 dark:border-zinc-700 pb-2">
+                  <BuildingOfficeIcon className="w-5 h-5 text-zinc-500" /> Business Terms
                 </h3>
-                <div className="space-y-2 text-sm">
-                  <p><span className="font-medium">Commission:</span> {client.percentage ? `${client.percentage}%` : "N/A"}</p>
-                  <p><span className="font-medium">Period:</span> {client.candidatePeriod ? `${client.candidatePeriod} months` : "N/A"}</p>
-                  <p><span className="font-medium">Replacement:</span> {client.replacementPeriod ? `${client.replacementPeriod} days` : "N/A"}</p>
-                  <p><span className="font-medium">GST:</span> {client.gstNumber || "N/A"}</p>
+                <div className="space-y-3 text-sm">
+                  <p className="flex justify-between"><span className="text-zinc-500">Commission Rate:</span> <span className="font-medium">{client.percentage ? `${client.percentage}%` : "-"}</span></p>
+                  <p className="flex justify-between"><span className="text-zinc-500">Candidate Period:</span> <span className="font-medium">{client.candidatePeriod ? `${client.candidatePeriod} months` : "-"}</span></p>
+                  <p className="flex justify-between"><span className="text-zinc-500">Replacement:</span> <span className="font-medium">{client.replacementPeriod ? `${client.replacementPeriod} days` : "-"}</span></p>
+                  <p className="flex justify-between"><span className="text-zinc-500">GST Number:</span> <span className="font-medium font-mono text-xs">{client.gstNumber || "-"}</span></p>
+                  <p className="flex justify-between"><span className="text-zinc-500">Status:</span> 
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${client.active ? 'bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+                      {client.active ? "Active" : "Inactive"}
+                    </span>
+                  </p>
                 </div>
               </div>
             </div>
+
             {client.terms && (
-              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                <h4 className="font-semibold mb-1">Terms & Conditions</h4>
-                <p className="text-sm">{client.terms}</p>
+              <div className="bg-zinc-100 dark:bg-zinc-800 p-5 rounded-xl border border-zinc-200 dark:border-zinc-700">
+                <h4 className="font-semibold mb-2 text-zinc-900 dark:text-zinc-100">Terms & Conditions</h4>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap leading-relaxed">{client.terms}</p>
               </div>
             )}
           </div>
@@ -95,13 +106,27 @@ const ClientDetailCard = ({ client, onClose }) => {
   );
 };
 
-/* ---------------- MAIN ---------------- */
-
-const AdminClientInfo = () => {
+/* ---------------- MAIN DASHBOARD ---------------- */
+export default function AdminClientInfo() {
   const { toast } = useToast();
+  const { authHeaders } = useAuth();
+
+  // ── Auth helper — reads Firebase idToken from AuthContext (stored in sessionStorage as 'currentUser')
+  const getAuthHeader = () => ({
+    "Content-Type": "application/json",
+    ...authHeaders(),
+  });
 
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingClient, setEditingClient] = useState(null);
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [industryFilter, setIndustryFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [errors, setErrors] = useState({});
 
   const initialFormState = {
     companyName: "", contactPerson: "", email: "", phone: "", website: "",
@@ -109,20 +134,7 @@ const AdminClientInfo = () => {
     clientId: "", percentage: "", candidatePeriod: "", replacementPeriod: "",
     terms: "", active: true,
   };
-
   const [form, setForm] = useState(initialFormState);
-  const [errors, setErrors] = useState({});
-  const [selectedClient, setSelectedClient] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [editingClient, setEditingClient] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [industryFilter, setIndustryFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-
-  const getAuthHeader = () => ({
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${sessionStorage.getItem("authToken")}`,
-  });
 
   const fetchClients = async () => {
     setLoading(true);
@@ -172,7 +184,7 @@ const AdminClientInfo = () => {
         body: JSON.stringify(form),
       });
       if (!res.ok) throw new Error();
-      toast({ title: "Success", description: "Client saved" });
+      toast({ title: "Success", description: "Client saved successfully" });
       setShowForm(false);
       setEditingClient(null);
       setForm(initialFormState);
@@ -205,155 +217,171 @@ const AdminClientInfo = () => {
     } catch {}
   };
 
-  const uniqueIndustries = useMemo(
-    () => Array.from(new Set(clients.map((c) => c.industry).filter(Boolean))),
-    [clients]
-  );
+  const uniqueIndustries = useMemo(() => Array.from(new Set(clients.map((c) => c.industry).filter(Boolean))), [clients]);
 
   const filteredClients = clients.filter((c) => {
     const s = searchTerm.toLowerCase();
-    const matchSearch =
-      c.companyName.toLowerCase().includes(s) ||
-      (c.email || "").toLowerCase().includes(s);
+    const matchSearch = c.companyName.toLowerCase().includes(s) || (c.email || "").toLowerCase().includes(s);
     const matchIndustry = industryFilter === "all" || c.industry === industryFilter;
-    const matchStatus =
-      statusFilter === "all" ||
-      (statusFilter === "active" ? c.active !== false : c.active === false);
+    const matchStatus = statusFilter === "all" || (statusFilter === "active" ? c.active !== false : c.active === false);
     return matchSearch && matchIndustry && matchStatus;
   });
 
-  const getStatusBadge = (client) => (
-    <Badge className={client.active !== false ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-      {client.active !== false ? "Active" : "Inactive"}
-    </Badge>
-  );
-
   return (
-    <>
-      <div className="flex-1 p-6 space-y-6">
-        <div className="flex justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Client Information</h1>
-            <p className="text-gray-500">Manage client companies</p>
-          </div>
-          <button
-            onClick={() => {
-              setEditingClient(null);
-              setShowForm(!showForm);
-              setForm(initialFormState);
-            }}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition"
-          >
-            <PlusIcon className="w-4 h-4" />
-            {showForm ? "Cancel" : "Add Client"}
-          </button>
+    <div className="flex-1 p-6 space-y-8 bg-zinc-50 dark:bg-zinc-950 min-h-screen text-zinc-900 dark:text-zinc-100">
+      
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">Clients</h1>
+          <p className="text-zinc-500 dark:text-zinc-400 mt-1">Manage client profiles and business terms</p>
         </div>
+        <button
+          onClick={() => {
+            setEditingClient(null);
+            setShowForm(!showForm);
+            setForm(initialFormState);
+          }}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 rounded-lg text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-sm"
+        >
+          {showForm ? <XMarkIcon className="w-4 h-4" /> : <PlusIcon className="w-4 h-4" />}
+          {showForm ? "Cancel" : "Add Client"}
+        </button>
+      </div>
 
-        {/* Form */}
-        {showForm && (
-          <div className="rounded-xl border border-border bg-card shadow-sm p-6">
-            <h3 className="font-semibold text-foreground mb-4">{editingClient ? "Edit Client" : "Add Client"}</h3>
-            <div className="grid md:grid-cols-3 gap-4">
-              <div>
-                <input name="companyName" placeholder="Company Name *" value={form.companyName} onChange={handleChange} className={`${inputCls} ${errors.companyName ? 'border-red-500' : ''}`} />
-                {errors.companyName && <p className="text-xs text-red-500 mt-1">{errors.companyName}</p>}
-              </div>
-              <input name="contactPerson" placeholder="Contact Person" value={form.contactPerson} onChange={handleChange} className={inputCls} />
-              <div>
-                <input name="email" placeholder="Email" value={form.email} onChange={handleChange} className={`${inputCls} ${errors.email ? 'border-red-500' : ''}`} />
-                {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
-              </div>
-              <div>
-                <input name="phone" placeholder="Phone" value={form.phone} onChange={handleChange} className={`${inputCls} ${errors.phone ? 'border-red-500' : ''}`} />
-                {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
-              </div>
-              <input name="industry" placeholder="Industry" value={form.industry} onChange={handleChange} className={inputCls} />
-              <div>
-                <input name="percentage" placeholder="Commission %" value={form.percentage} onChange={handleChange} className={`${inputCls} ${errors.percentage ? 'border-red-500' : ''}`} />
-                {errors.percentage && <p className="text-xs text-red-500 mt-1">{errors.percentage}</p>}
-              </div>
-              <div className="md:col-span-3 flex justify-end">
-                <button
-                  onClick={handleSubmit}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition"
-                >
-                  {editingClient ? "Update Client" : "Save Client"}
-                </button>
-              </div>
+      {/* Form Panel */}
+      {showForm && (
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-6"
+        >
+          <h3 className="font-semibold text-lg mb-6 border-b border-zinc-100 dark:border-zinc-800 pb-3 text-zinc-900 dark:text-white">
+            {editingClient ? "Edit Client Profile" : "Create New Client"}
+          </h3>
+          <div className="grid md:grid-cols-3 gap-5">
+            <div>
+              <label className="block text-xs font-medium text-zinc-500 mb-1">Company Name *</label>
+              <input name="companyName" value={form.companyName} onChange={handleChange} className={`${inputCls} ${errors.companyName ? 'border-red-500' : ''}`} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-500 mb-1">Contact Person</label>
+              <input name="contactPerson" value={form.contactPerson} onChange={handleChange} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-500 mb-1">Email</label>
+              <input name="email" value={form.email} onChange={handleChange} className={`${inputCls} ${errors.email ? 'border-red-500' : ''}`} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-500 mb-1">Phone (10 digits)</label>
+              <input name="phone" value={form.phone} onChange={handleChange} className={`${inputCls} ${errors.phone ? 'border-red-500' : ''}`} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-500 mb-1">Industry</label>
+              <input name="industry" value={form.industry} onChange={handleChange} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-500 mb-1">Commission %</label>
+              <input name="percentage" value={form.percentage} onChange={handleChange} className={`${inputCls} ${errors.percentage ? 'border-red-500' : ''}`} />
+            </div>
+            <div className="md:col-span-3 flex justify-end pt-4">
+              <button
+                onClick={handleSubmit}
+                className="px-6 py-2 bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 rounded-lg text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-sm"
+              >
+                {editingClient ? "Update Client" : "Save Client"}
+              </button>
             </div>
           </div>
-        )}
+        </motion.div>
+      )}
 
-        {/* Search & Filters */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <input
-            placeholder="Search by company or email..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className={`${inputCls} flex-1`}
-          />
-          <select value={industryFilter} onChange={e => setIndustryFilter(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none">
-            <option value="all">All Industries</option>
-            {uniqueIndustries.map(ind => <option key={ind} value={ind}>{ind}</option>)}
-          </select>
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none">
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+        <input
+          placeholder="Search by company or email..."
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+          className={`${inputCls} flex-1`}
+        />
+        <select value={industryFilter} onChange={e => setIndustryFilter(e.target.value)} className={`${inputCls} w-full sm:w-48`}>
+          <option value="all">All Industries</option>
+          {uniqueIndustries.map(ind => <option key={ind} value={ind}>{ind}</option>)}
+        </select>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className={`${inputCls} w-full sm:w-40`}>
+          <option value="all">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+
+      {/* Table Area */}
+      {loading ? (
+        <div className="text-center p-12 text-zinc-500 flex flex-col items-center">
+          <div className="w-8 h-8 border-4 border-zinc-300 border-t-zinc-800 rounded-full animate-spin mb-4"></div>
+          Loading clients...
         </div>
-
-        {/* Table */}
-        {loading ? (
-          <div className="text-center p-10 text-gray-500">Loading clients...</div>
-        ) : (
-          <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-100 dark:bg-gray-800 text-xs uppercase">
+      ) : (
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left whitespace-nowrap">
+              <thead className="bg-zinc-50 dark:bg-zinc-900/50 text-xs uppercase text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
                 <tr>
-                  <th className="px-4 py-3 text-left">Client</th>
-                  <th className="px-4 py-3 text-left">Contact</th>
-                  <th className="px-4 py-3 text-left">Terms</th>
-                  <th className="px-4 py-3 text-left">Status</th>
-                  <th className="px-4 py-3 text-left">Actions</th>
+                  <th className="px-6 py-4 font-medium tracking-wider">Client</th>
+                  <th className="px-6 py-4 font-medium tracking-wider">Contact</th>
+                  <th className="px-6 py-4 font-medium tracking-wider">Terms</th>
+                  <th className="px-6 py-4 font-medium tracking-wider">Status</th>
+                  <th className="px-6 py-4 font-medium tracking-wider text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
                 {filteredClients.length === 0 ? (
-                  <tr><td colSpan={5} className="text-center py-10 text-gray-400">No clients found.</td></tr>
+                  <tr><td colSpan={5} className="text-center py-12 text-zinc-400">No clients found matching criteria.</td></tr>
                 ) : filteredClients.map((client) => (
-                  <tr key={client.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
-                    <td className="px-4 py-3">
-                      <div className="font-medium">{client.companyName}</div>
-                      <div className="text-xs text-gray-500">{client.clientId}</div>
+                  <tr key={client.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="font-semibold text-zinc-900 dark:text-zinc-100">{client.companyName}</div>
+                      <div className="text-xs text-zinc-500 font-mono mt-0.5">{client.clientId}</div>
                     </td>
-                    <td className="px-4 py-3">
-                      <div>{client.contactPerson || "-"}</div>
-                      <div className="text-xs text-gray-500">{client.email || "-"}</div>
+                    <td className="px-6 py-4">
+                      <div className="text-zinc-800 dark:text-zinc-300">{client.contactPerson || "-"}</div>
+                      <div className="text-xs text-zinc-500 mt-0.5">{client.email || "-"}</div>
                     </td>
-                    <td className="px-4 py-3">{client.percentage ? `${client.percentage}%` : "-"}</td>
-                    <td className="px-4 py-3">{getStatusBadge(client)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-2">
+                    <td className="px-6 py-4 text-zinc-600 dark:text-zinc-400">
+                      {client.percentage ? `${client.percentage}% Comm.` : "-"}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border ${
+                        client.active !== false 
+                          ? "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700" 
+                          : "bg-red-50 text-red-600 border-red-100 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/30"
+                      }`}>
+                        {client.active !== false ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => setSelectedClient(client)}
-                          className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                          title="View Details"
+                          className="p-2 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors"
                         >
                           <EyeIcon className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleEditClient(client)}
-                          className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                          title="Edit"
+                          className="p-2 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors"
                         >
                           <PencilIcon className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleToggleActive(client)}
-                          className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                          title={client.active ? "Deactivate" : "Activate"}
+                          className="p-2 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors"
                         >
                           {client.active !== false
-                            ? <NoSymbolIcon className="w-4 h-4 text-red-500" />
-                            : <CheckCircleIcon className="w-4 h-4 text-green-500" />}
+                            ? <NoSymbolIcon className="w-4 h-4" />
+                            : <CheckCircleIcon className="w-4 h-4" />}
                         </button>
                       </div>
                     </td>
@@ -362,14 +390,11 @@ const AdminClientInfo = () => {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
-
-      {selectedClient && (
-        <ClientDetailCard client={selectedClient} onClose={() => setSelectedClient(null)} />
+        </div>
       )}
-    </>
-  );
-};
 
-export default AdminClientInfo;
+      {/* Render Modal */}
+      {selectedClient && <ClientDetailCard client={selectedClient} onClose={() => setSelectedClient(null)} />}
+    </div>
+  );
+}
