@@ -39,6 +39,7 @@ const io = new Server(httpServer, {
       'http://localhost:5173',
       'http://localhost:5000',
       'http://localhost:8080',
+      'https://vagarious-cms.netlify.app',
       'https://vagarious-cms.netlify.app'
     ],
     methods: ["GET", "POST", "PUT", "DELETE"],
@@ -53,7 +54,8 @@ app.use(cors({
     'http://localhost:5173',
     'http://localhost:5000',
     'http://localhost:8080',
-    'http://127.0.0.1:8080'
+    'http://127.0.0.1:8080',
+    'https://vagarious-cms.netlify.app'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
