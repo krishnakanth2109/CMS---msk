@@ -17,11 +17,11 @@ const seedData = async () => {
     // 3. Define Users
     const users = [
       {
-        username: 'sivaprasannagorla@gmail.com',
+        username: 'urstruelykrishnkanth@gmail.com',
         password: '987654321', // Middleware in User.js will hash this
-        name: 'Sanjay',
-        role: 'admin',
-        email:"sivaprasannagorla@gmail.com"
+        name: 'mahesh',
+        role: 'recruiter',
+        email:"urstruelykrishnkanth@gmail.com"
       },
       {
         username: 'kkanth355@gmail.com',

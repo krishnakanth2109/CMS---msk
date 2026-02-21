@@ -5,11 +5,11 @@ import User from '../models/User.js';
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
+      projectId:    process.env.FIREBASE_PROJECT_ID,
       privateKeyId: process.env.FIREBASE_PRIVATE_KEY_ID,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      clientId: process.env.FIREBASE_CLIENT_ID,
+      privateKey:   process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      clientEmail:  process.env.FIREBASE_CLIENT_EMAIL,
+      clientId:     process.env.FIREBASE_CLIENT_ID,
     }),
   });
 }
@@ -17,51 +17,74 @@ if (!admin.apps.length) {
 export { admin };
 
 /**
- * Protect middleware — verifies Firebase ID token from Authorization header.
- * Expects: Authorization: Bearer <firebase_id_token>
+ * protect — verifies Firebase ID token from the Authorization header.
+ *
+ * Flow:
+ *  1. Extract Bearer token from Authorization header
+ *  2. Verify with Firebase Admin SDK
+ *  3. Look up MongoDB user by firebaseUid
+ *  4. Fallback: look up by email (for existing users missing firebaseUid)
+ *     and auto-sync the firebaseUid so future lookups work correctly
  */
 export const protect = async (req, res, next) => {
-  let token;
+  const authHeader = req.headers.authorization;
 
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith('Bearer')
-  ) {
-    try {
-      token = req.headers.authorization.split(' ')[1];
-
-      // Verify Firebase ID token
-      const decodedToken = await admin.auth().verifyIdToken(token);
-
-      // Attach Firebase UID and email to request
-      req.firebaseUser = decodedToken;
-
-      // Optionally fetch your own DB user record using Firebase UID or email
-      req.user = await User.findOne({ firebaseUid: decodedToken.uid }).select('-password');
-
-      if (!req.user) {
-        return res.status(401).json({ message: 'User not found. Please register first.' });
-      }
-
-      next();
-    } catch (error) {
-      console.error('Auth Middleware Error:', error.message);
-      return res.status(401).json({ message: 'Not authorized, token failed or expired.' });
-    }
-  } else {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ message: 'Not authorized, no token provided.' });
+  }
+
+  try {
+    const token = authHeader.split(' ')[1];
+
+    // Verify the Firebase ID token
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    const { uid, email } = decodedToken;
+
+    req.firebaseUser = decodedToken;
+
+    // Primary lookup: by firebaseUid
+    let user = await User.findOne({ firebaseUid: uid }).select('-password');
+
+    // Fallback: by email — handles legacy accounts or newly-created recruiters
+    // where firebaseUid wasn't stored yet
+    if (!user && email) {
+      user = await User.findOne({ email }).select('-password');
+      if (user) {
+        // Auto-sync the firebaseUid so future lookups are fast
+        user.firebaseUid = uid;
+        await user.save();
+        console.log(`[Auth] Auto-synced firebaseUid for user: ${email}`);
+      }
+    }
+
+    if (!user) {
+      return res.status(401).json({ message: 'User not found. Please contact admin.' });
+    }
+
+    if (user.active === false) {
+      return res.status(401).json({ message: 'Account is deactivated. Contact admin.' });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error('Auth Middleware Error:', error.message);
+
+    if (error.code === 'auth/id-token-expired') {
+      return res.status(401).json({ message: 'Session expired. Please login again.' });
+    }
+    return res.status(401).json({ message: 'Not authorized, token failed or expired.' });
   }
 };
 
 /**
- * Authorize middleware — restricts access based on user role stored in your DB.
- * Must be used AFTER protect middleware.
+ * authorize — restricts access by role. Must come after protect.
  */
 export const authorize = (...roles) => {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
       return res.status(403).json({
-        message: `User role '${req.user?.role}' is not authorized to access this route.`,
+        message: `Role '${req.user?.role}' is not authorized for this route.`,
       });
     }
     next();

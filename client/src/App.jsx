@@ -1,19 +1,42 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import Login from './pages/Login';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 
-// Replace placeholder divs with your actual dashboard components when ready:
-// import AdminDashboard from './pages/AdminDashboard';
-// import RecruiterDashboard from './pages/RecruiterDashboard';
+// Auth Pages
+import Login from '@/pages/Login';
+import ForgotPassword from '@/pages/ForgotPassword';
+import ResetPassword from '@/pages/ResetPassword';
+
+// Layout
+import DashboardLayout from '@/components/DashboardLayout';
+
+// Admin Pages
+import AdminDashboard from '@/pages/AdminDashboard';
+import AdminCandidate from '@/pages/AdminCandidate';
+import AddCandidate from '@/pages/AddCandidate';
+import AdminRecruiters from '@/pages/AdminRecruiters';
+import AdminClientInfo from '@/pages/AdminClientInfo';
+import AdminClientInvoice from '@/pages/AdminClientInvoice';
+import AdminRequirements from '@/pages/AdminRequirements';
+import AdminMessages from '@/pages/AdminMessages';
+import AdminReports from '@/pages/AdminReports';
+import AdminSettings from '@/pages/AdminSettings';
+
+// Recruiter Pages
+import RecruiterDashboard from '@/pages/RecruiterDashboard';
+import RecruiterCandidates from '@/pages/RecruiterCandidates';
+import RecruiterAssignments from '@/pages/RecruiterAssignments';
+import RecruiterSchedules from '@/pages/RecruiterSchedules';
+import MessagesRecruiters from '@/pages/MessagesRecruiters';
+import RecruiterReports from '@/pages/RecruiterReports';
+import RecruiterProfile from '@/pages/RecruiterProfile';
+import RecruiterSettings from '@/pages/RecruiterSettings';
 
 function ProtectedRoute({ children, allowedRoles }) {
-  const { isAuthenticated, userRole } = useAuth();
+  const { isAuthenticated, userRole, loading } = useAuth();
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;       
-  }
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   if (allowedRoles && !allowedRoles.includes(userRole)) {
     return <Navigate to={userRole === 'admin' ? '/admin' : '/recruiter'} replace />;
@@ -23,12 +46,9 @@ function ProtectedRoute({ children, allowedRoles }) {
 }
 
 function PublicRoute({ children }) {
-  const { isAuthenticated, userRole } = useAuth();
-
-  if (isAuthenticated) {
-    return <Navigate to={userRole === 'admin' ? '/admin' : '/recruiter'} replace />;
-  }
-
+  const { isAuthenticated, userRole, loading } = useAuth();
+  if (loading) return null;
+  if (isAuthenticated) return <Navigate to={userRole === 'admin' ? '/admin' : '/recruiter'} replace />;
   return children;
 }
 
@@ -38,28 +58,43 @@ function AppRoutes() {
       {/* Public Routes */}
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
-
-      {/* Firebase redirects here with ?oobCode=... after user clicks the reset email link */}
       <Route path="/reset-password" element={<ResetPassword />} />
 
-      {/* Protected Routes */}
-      <Route
-        path="/admin"
-        element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <div className="p-8 text-xl font-bold">Admin Dashboard</div>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/recruiter"
-        element={
-          <ProtectedRoute allowedRoles={['recruiter', 'admin']}>
-            <div className="p-8 text-xl font-bold">Recruiter Dashboard</div>
-          </ProtectedRoute>
-        }
-      />
+      {/* ===================== ADMIN ROUTES ===================== */}
+      <Route path="/admin" element={
+        <ProtectedRoute allowedRoles={['admin']}>
+          <DashboardLayout />
+        </ProtectedRoute>
+      }>
+        <Route index element={<AdminDashboard />} />
+        <Route path="candidates" element={<AdminCandidate />} />
+        <Route path="add-candidate" element={<AddCandidate />} />
+        <Route path="recruiters" element={<AdminRecruiters />} />
+        <Route path="clients" element={<AdminClientInfo />} />
+        <Route path="invoices" element={<AdminClientInvoice />} />
+        <Route path="requirements" element={<AdminRequirements />} />
+        <Route path="messages" element={<AdminMessages />} />
+        <Route path="reports" element={<AdminReports />} />
+        <Route path="settings" element={<AdminSettings />} />
+      </Route>
 
+      {/* ===================== RECRUITER ROUTES ===================== */}
+      <Route path="/recruiter" element={
+        <ProtectedRoute allowedRoles={['recruiter']}>
+          <DashboardLayout />
+        </ProtectedRoute>
+      }>
+        <Route index element={<RecruiterDashboard />} />
+        <Route path="candidates" element={<RecruiterCandidates />} />
+        <Route path="assignments" element={<RecruiterAssignments />} />
+        <Route path="schedules" element={<RecruiterSchedules />} />
+        <Route path="messages" element={<MessagesRecruiters />} />
+        <Route path="reports" element={<RecruiterReports />} />
+        <Route path="profile" element={<RecruiterProfile />} />
+        <Route path="settings" element={<RecruiterSettings />} />
+      </Route>
+
+      {/* Fallback */}
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>

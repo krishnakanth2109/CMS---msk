@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { DashboardSidebar } from '@/components/DashboardSidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 import { Lock, User, Mail, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -142,16 +141,14 @@ export default function AdminSettings() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen bg-background items-center justify-center">
+      <div className="flex-1 flex items-center justify-center p-8">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <DashboardSidebar />
-      <div className="flex-1 p-8 overflow-y-auto">
+    <div className="flex-1 p-8 overflow-y-auto">
         <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
           <div>
             <h1 className="text-4xl font-bold text-foreground">Settings</h1>
@@ -268,6 +265,5 @@ export default function AdminSettings() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

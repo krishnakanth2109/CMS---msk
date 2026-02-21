@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { DashboardSidebar } from "@/components/DashboardSidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -218,8 +217,7 @@ const AdminRequirements = () => {
   );
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:to-indigo-950/20 text-gray-900 dark:text-gray-100">
-      <DashboardSidebar />
+    <>
       <div className="flex-1 p-6 lg:p-8 overflow-y-auto">
         <div className="max-w-7xl mx-auto space-y-8">
           {/* Header */}
@@ -362,7 +360,7 @@ const AdminRequirements = () => {
         </div>
       </div>
       {selectedJob && <JobDetailCard job={selectedJob} onClose={() => setSelectedJob(null)} />}
-    </div>
+    </>
   );
 };
 

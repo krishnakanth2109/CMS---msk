@@ -1,14 +1,16 @@
 import React, { useState, useRef, useEffect } from "react";
-import { DashboardSidebar } from "@/components/DashboardSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  AlertTriangle, UserPlus, Search, Mail, Phone, TrendingUp, X, Download, Grid3X3, List, Edit, Trash2, UserX, UserCheck, IdCard, Camera, Briefcase, MoreVertical, Users, Eye, EyeOff, ArrowUpDown
+  AlertTriangle, UserPlus, Search, Mail, Phone, TrendingUp,
+  Download, Grid3X3, List, Edit, Trash2, UserX, UserCheck,
+  Camera, Briefcase, MoreVertical, Users, Eye, EyeOff, ArrowUpDown
 } from "lucide-react";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -18,231 +20,179 @@ import { toast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 
-// Get API URL from env
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// ── ENV ───────────────────────────────────────────────────────────────────────
+const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
+const API_URL  = `${BASE_URL}/api`;
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const getInitials = (name = '') =>
+  name.split(' ').map((n) => n[0]).join('').toUpperCase().substring(0, 2);
+
+// ═════════════════════════════════════════════════════════════════════════════
 export default function AdminRecruiters() {
   const navigate = useNavigate();
-  
-  // State for Data
-  const [recruiters, setRecruiters] = useState([]);
-  const [candidates, setCandidates] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { authHeaders } = useAuth();
 
-  // UI State
-  const [searchTerm, setSearchTerm] = useState("");
-  const [viewMode, setViewMode] = useState("grid");
-  const [sortField, setSortField] = useState("name");
-  const [sortOrder, setSortOrder] = useState("asc");
-  
-  const [showModal, setShowModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  // ── Auth helper (uses AuthContext idToken) ────────────────────────────────
+  const getAuthHeader = () => ({
+    'Content-Type': 'application/json',
+    ...authHeaders(),
+  });
+
+  // ── Data ──────────────────────────────────────────────────────────────────
+  const [recruiters,  setRecruiters]  = useState([]);
+  const [candidates,  setCandidates]  = useState([]);
+  const [isLoading,   setIsLoading]   = useState(true);
+
+  // ── UI State ──────────────────────────────────────────────────────────────
+  const [searchTerm,  setSearchTerm]  = useState("");
+  const [viewMode,    setViewMode]    = useState("grid");
+  const [sortField,   setSortField]   = useState("name");
+  const [sortOrder,   setSortOrder]   = useState("asc");
+
+  // ── Modals ────────────────────────────────────────────────────────────────
+  const [showModal,            setShowModal]            = useState(false);
+  const [showEditModal,        setShowEditModal]        = useState(false);
+  const [showDeleteModal,      setShowDeleteModal]      = useState(false);
   const [showPerformanceModal, setShowPerformanceModal] = useState(false);
-  
+  const [showStatsModal,       setShowStatsModal]       = useState(false);
+  const [showCandidatesModal,  setShowCandidatesModal]  = useState(false);
+
   const [selectedStatsRecruiters, setSelectedStatsRecruiters] = useState([]);
-  const [statsModalTitle, setStatsModalTitle] = useState("");
-  const [statsModalType, setStatsModalType] = useState('total');
+  const [statsModalTitle,         setStatsModalTitle]         = useState("");
+  const [candidatesModalTitle,    setCandidatesModalTitle]    = useState("");
+  const [candidateFilterType,     setCandidateFilterType]     = useState(null);
+  const [selectedRecruiter,       setSelectedRecruiter]       = useState(null);
+  const [recruiterToDelete,       setRecruiterToDelete]       = useState(null);
 
-  const [showStatsModal, setShowStatsModal] = useState(false);
-  const [showCandidatesModal, setShowCandidatesModal] = useState(false);
-  const [candidatesModalTitle, setCandidatesModalTitle] = useState("");
-  const [candidateFilterType, setCandidateFilterType] = useState(null);
-
-  const [selectedRecruiter, setSelectedRecruiter] = useState(null);
-  const [recruiterToDelete, setRecruiterToDelete] = useState(null);
-  
-  const fileInputRef = useRef(null);
+  const fileInputRef     = useRef(null);
   const editFileInputRef = useRef(null);
 
-  // Password Visibility State
-  const [showPassword, setShowPassword] = useState(false);
+  // ── Password visibility ───────────────────────────────────────────────────
+  const [showPassword,     setShowPassword]     = useState(false);
   const [showEditPassword, setShowEditPassword] = useState(false);
 
-  // Error State
+  // ── Errors ────────────────────────────────────────────────────────────────
   const [errors, setErrors] = useState({});
 
-  const [newRecruiter, setNewRecruiter] = useState({
-    recruiterId: "",
-    name: "",
-    email: "",
-    phone: "",
-    username: "",
-    password: "",
-    profilePicture: "",
-    role: "recruiter"
-  });
-
-  const [editRecruiter, setEditRecruiter] = useState({
-    id: "",
-    recruiterId: "",
-    name: "",
-    email: "",
-    phone: "",
-    username: "",
-    password: "",
-    profilePicture: "",
-    role: "recruiter"
-  });
-
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [performanceData, setPerformanceData] = useState([]);
-
-  // --- API Functions ---
-  const getAuthHeader = () => {
-    const token = sessionStorage.getItem('authToken');
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    };
+  // ── Form State ────────────────────────────────────────────────────────────
+  // Fields match backend recruiterController.js / User model exactly
+  const EMPTY_RECRUITER = {
+    recruiterId: "", name: "", email: "", phone: "",
+    username: "", password: "", profilePicture: "", role: "recruiter",
   };
 
+  const [newRecruiter,  setNewRecruiter]  = useState(EMPTY_RECRUITER);
+  const [editRecruiter, setEditRecruiter] = useState({ id: "", ...EMPTY_RECRUITER });
+
+  // ── Performance ───────────────────────────────────────────────────────────
+  const [startDate,       setStartDate]       = useState("");
+  const [endDate,         setEndDate]         = useState("");
+  const [performanceData, setPerformanceData] = useState([]);
+
+  // ── Fetch ─────────────────────────────────────────────────────────────────
   const fetchData = async () => {
     setIsLoading(true);
     try {
       const headers = getAuthHeader();
-      const [recruiterRes, candidateRes] = await Promise.all([
-        fetch(`${API_URL}/recruiters`, { headers }),
-        fetch(`${API_URL}/candidates`, { headers })
+      const [rr, rc] = await Promise.all([
+        fetch(`${API_URL}/recruiters`,  { headers }),
+        fetch(`${API_URL}/candidates`,  { headers }),
       ]);
 
-      if (!recruiterRes.ok) throw new Error('Failed to fetch recruiters');
-      if (!candidateRes.ok) throw new Error('Failed to fetch candidates');
-      
-      const recruiterData = await recruiterRes.json();
-      const candidateData = await candidateRes.json();
+      if (!rr.ok) {
+        const e = await rr.json().catch(() => ({}));
+        throw new Error(e.message || 'Failed to fetch recruiters');
+      }
+      if (!rc.ok) {
+        const e = await rc.json().catch(() => ({}));
+        throw new Error(e.message || 'Failed to fetch candidates');
+      }
 
-      const mappedRecruiters = recruiterData.map((r) => ({ ...r, id: r._id }));
-      const mappedCandidates = candidateData.map((c) => ({ ...c, id: c._id }));
+      const recruiterData  = await rr.json();
+      const candidateData  = await rc.json();
 
-      setRecruiters(mappedRecruiters);
-      setCandidates(mappedCandidates);
-
+      setRecruiters(recruiterData.map((r) => ({ ...r, id: r._id })));
+      setCandidates(candidateData.map((c) => ({ ...c, id: c._id })));
     } catch (error) {
       console.error(error);
-      toast({ title: "Error", description: "Failed to load data", variant: "destructive" });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
-  // --- STRICT VALIDATION LOGIC ---
+  // ── Validation ────────────────────────────────────────────────────────────
+  // Only name & email truly required; everything else optional per backend
   const validateForm = (data, isEdit = false) => {
-    const newErrors = {};
-    
-    if (!data.name.trim()) {
-        newErrors.name = "Name is required";
-    } else if (!/^[a-zA-Z\s]+$/.test(data.name)) {
-        newErrors.name = "Name should contain only alphabets";
-    } else if (data.name.length < 2) {
-        newErrors.name = "Name too short";
-    }
-    
-    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    if (!data.email.trim()) newErrors.email = "Email is required";
-    else if (!emailRegex.test(data.email)) newErrors.email = "Invalid email format";
-    
-    const phoneRegex = /^\d{10}$/;
-    if (!data.phone.trim()) newErrors.phone = "Phone is required";
-    else if (!phoneRegex.test(data.phone)) newErrors.phone = "Phone must be exactly 10 digits";
-    
-    if (!data.recruiterId.trim()) newErrors.recruiterId = "Recruiter ID is required";
-    
-    if (!isEdit) {
-        if (!data.password) newErrors.password = "Password is required";
-        else if (data.password.length < 6) newErrors.password = "Password must be at least 6 characters";
-    } else {
-        if (data.password && data.password.length < 6) {
-            newErrors.password = "Password must be at least 6 characters";
-        }
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const e = {};
+    if (!data.name.trim()) e.name = "Name is required";
+    if (!data.email.trim()) e.email = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = "Invalid email";
+    if (data.phone && !/^\d{10}$/.test(data.phone)) e.phone = "Phone must be 10 digits";
+    if (!isEdit && !data.password) e.password = "Password is required";
+    if (data.password && data.password.length < 6) e.password = "Min 6 characters";
+    setErrors(e);
+    return !Object.keys(e).length;
   };
 
   const handleInputChange = (field, value, isEdit) => {
-    if (field === 'phone') {
-        if (!/^\d*$/.test(value)) return; 
-        if (value.length > 10) return; 
-    }
+    // Restrict phone to digits only
+    if (field === 'phone' && value && !/^\d*$/.test(value)) return;
+    if (field === 'phone' && value.length > 10) return;
 
-    if (field === 'name') {
-        if (!/^[a-zA-Z\s]*$/.test(value)) return;
-    }
+    if (errors[field]) setErrors((p) => { const n = { ...p }; delete n[field]; return n; });
 
-    if (errors[field]) {
-        setErrors(prev => {
-            const newErrs = { ...prev };
-            delete newErrs[field];
-            return newErrs;
-        });
-    }
-
-    if (isEdit) {
-        setEditRecruiter(prev => ({ ...prev, [field]: value }));
-    } else {
-        setNewRecruiter(prev => ({ ...prev, [field]: value }));
-    }
+    if (isEdit) setEditRecruiter((p) => ({ ...p, [field]: value }));
+    else        setNewRecruiter((p)  => ({ ...p, [field]: value }));
   };
 
+  // ── CRUD ──────────────────────────────────────────────────────────────────
   const handleAddRecruiter = async () => {
-    if (!validateForm(newRecruiter)) {
-      toast({ title: "Validation Error", description: "Please fix the highlighted errors", variant: "destructive" });
-      return;
-    }
-
+    if (!validateForm(newRecruiter)) return;
     try {
-      const payload = { ...newRecruiter, role: 'recruiter' };
-      const response = await fetch(`${API_URL}/recruiters`, {
+      const headers = getAuthHeader();
+      const res = await fetch(`${API_URL}/recruiters`, {
         method: 'POST',
-        headers: getAuthHeader(),
-        body: JSON.stringify(payload)
+        headers,
+        body: JSON.stringify({ ...newRecruiter, role: 'recruiter' }),
       });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Failed to create recruiter');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to create recruiter');
 
       toast({ title: "Success", description: "Recruiter added successfully!" });
       setShowModal(false);
-      setNewRecruiter({
-        recruiterId: "", name: "", email: "", phone: "", username: "", 
-        password: "", profilePicture: "", role: "recruiter"
-      });
+      setNewRecruiter(EMPTY_RECRUITER);
       setErrors({});
-      fetchData(); 
+      fetchData();
     } catch (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
 
   const handleEditRecruiter = async () => {
-    if (!validateForm(editRecruiter, true)) {
-      toast({ title: "Validation Error", description: "Please fix the highlighted errors", variant: "destructive" });
-      return;
-    }
-
+    if (!validateForm(editRecruiter, true)) return;
     try {
+      const headers = getAuthHeader();
       const payload = { ...editRecruiter, role: 'recruiter' };
-      const response = await fetch(`${API_URL}/recruiters/${editRecruiter.id}`, {
+      if (!payload.password) delete payload.password; // Don't send blank password
+
+      const res = await fetch(`${API_URL}/recruiters/${editRecruiter.id}`, {
         method: 'PUT',
-        headers: getAuthHeader(),
-        body: JSON.stringify(payload)
+        headers,
+        body: JSON.stringify(payload),
       });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to update recruiter');
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Failed to update recruiter');
-
-      toast({ title: "Success", description: "Recruiter updated successfully!" });
+      toast({ title: "Success", description: "Recruiter updated!" });
       setShowEditModal(false);
       setErrors({});
-      fetchData(); 
+      fetchData();
     } catch (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
@@ -251,15 +201,16 @@ export default function AdminRecruiters() {
   const handleDeleteRecruiter = async () => {
     if (!recruiterToDelete) return;
     try {
-      const response = await fetch(`${API_URL}/recruiters/${recruiterToDelete.id}`, {
-        method: 'DELETE',
-        headers: getAuthHeader()
+      const headers = getAuthHeader();
+      const res = await fetch(`${API_URL}/recruiters/${recruiterToDelete.id}`, {
+        method: 'DELETE', headers,
       });
-      if (!response.ok) throw new Error('Failed to delete recruiter');
-      toast({ title: "Success", description: "Recruiter deleted successfully!" });
+      if (!res.ok) throw new Error('Failed to delete recruiter');
+
+      toast({ title: "Deleted", description: "Recruiter removed." });
       setShowDeleteModal(false);
       setRecruiterToDelete(null);
-      fetchData(); 
+      fetchData();
     } catch (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
@@ -267,346 +218,332 @@ export default function AdminRecruiters() {
 
   const handleToggleStatus = async (recruiter) => {
     try {
-      const response = await fetch(`${API_URL}/recruiters/${recruiter.id}/status`, {
-        method: 'PATCH',
-        headers: getAuthHeader()
+      const headers = getAuthHeader();
+      const res = await fetch(`${API_URL}/recruiters/${recruiter.id}/status`, {
+        method: 'PATCH', headers,
       });
-      if (!response.ok) throw new Error('Failed to update status');
-      const data = await response.json();
-      toast({ title: "Success", description: data.message });
-      fetchData(); 
+      if (!res.ok) throw new Error('Failed to update status');
+      const data = await res.json();
+      toast({ title: "Status Updated", description: data.message });
+      fetchData();
     } catch (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
 
-  const openEditModal = (recruiter) => {
+  // ── Modal openers ─────────────────────────────────────────────────────────
+  const openEditModal = (r) => {
     setEditRecruiter({
-      id: recruiter.id,
-      recruiterId: recruiter.recruiterId || "",
-      name: recruiter.name,
-      email: recruiter.email,
-      phone: recruiter.phone || "",
-      username: recruiter.username || "",
-      profilePicture: recruiter.profilePicture || "",
-      role: "recruiter",
-      password: "",
+      id: r.id, recruiterId: r.recruiterId || "", name: r.name,
+      email: r.email, phone: r.phone || "", username: r.username || "",
+      profilePicture: r.profilePicture || "", role: "recruiter", password: "",
     });
     setErrors({});
     setShowEditModal(true);
   };
 
-  const calculateRecruiterStats = (recruiterId) => {
-    const recruiterCandidates = candidates.filter(candidate => 
-      candidate.recruiterId === recruiterId
-    );
+  // ── Profile Picture ───────────────────────────────────────────────────────
+  const handleFileUpload = (e, isEdit = false) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result;
+      if (isEdit) setEditRecruiter((p) => ({ ...p, profilePicture: result }));
+      else        setNewRecruiter((p)  => ({ ...p, profilePicture: result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // ── Stats helper ──────────────────────────────────────────────────────────
+  const calcStats = (recruiterId) => {
+    const rc = candidates.filter((c) => {
+      const rid = typeof c.recruiterId === 'object' ? c.recruiterId?._id : c.recruiterId;
+      return rid === recruiterId;
+    });
+    const hasStatus = (s) => rc.filter((c) => {
+      const sa = Array.isArray(c.status) ? c.status : [c.status || ''];
+      return sa.includes(s);
+    }).length;
 
     return {
-      totalSubmissions: recruiterCandidates.length,
-      interviews: recruiterCandidates.filter(c => ['L1 Interview', 'L2 Interview', 'Interview'].includes(c.status)).length,
-      offers: recruiterCandidates.filter(c => c.status === 'Offer').length,
-      joined: recruiterCandidates.filter(c => c.status === 'Joined').length,
-      rejected: recruiterCandidates.filter(c => c.status === 'Rejected').length,
-      pending: recruiterCandidates.filter(c => c.status === 'Pending' || c.status === 'Submitted').length
+      total:    rc.length,
+      joined:   hasStatus('Joined'),
+      selected: hasStatus('Selected'),
+      rejected: hasStatus('Rejected'),
+      turnups:  hasStatus('Turnups'),
+      noShow:   hasStatus('No Show'),
     };
   };
 
+  // ── Sort / Filter ─────────────────────────────────────────────────────────
   const toggleSort = (field) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortOrder("asc");
-    }
+    if (sortField === field) setSortOrder((o) => o === 'asc' ? 'desc' : 'asc');
+    else { setSortField(field); setSortOrder('asc'); }
   };
 
-  const getSortIcon = (field) => {
-    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-50" />;
-    return <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>;
-  };
+  const SortIcon = ({ field }) =>
+    sortField !== field
+      ? <ArrowUpDown className="h-3 w-3 ml-1 opacity-50" />
+      : <span className="ml-1 text-blue-500">{sortOrder === 'asc' ? '↑' : '↓'}</span>;
 
-  const filteredAndSortedRecruiters = recruiters
-    .filter((r) =>
-      r.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.recruiterId?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+  const filteredRecruiters = recruiters
+    .filter((r) => {
+      const q = searchTerm.toLowerCase();
+      return (r.name || '').toLowerCase().includes(q) ||
+             (r.email || '').toLowerCase().includes(q) ||
+             (r.username || '').toLowerCase().includes(q) ||
+             (r.recruiterId || '').toLowerCase().includes(q);
+    })
     .sort((a, b) => {
-      let aValue = '';
-      let bValue = '';
-      const statsA = calculateRecruiterStats(a.id);
-      const statsB = calculateRecruiterStats(b.id);
-
+      const sa = calcStats(a.id), sb = calcStats(b.id);
+      let av = '', bv = '';
       switch (sortField) {
-        case 'name': aValue = a.name; bValue = b.name; break;
-        case 'email': aValue = a.email; bValue = b.email; break;
-        case 'recruiterId': aValue = a.recruiterId || ""; bValue = b.recruiterId || ""; break;
-        case 'role': aValue = a.role || ""; bValue = b.role || ""; break;
-        case 'status': aValue = a.active; bValue = b.active; break;
-        case 'submissions': aValue = statsA.totalSubmissions; bValue = statsB.totalSubmissions; break;
-        case 'interviews': aValue = statsA.interviews; bValue = statsB.interviews; break;
-        case 'offers': aValue = statsA.offers; bValue = statsB.offers; break;
-        case 'joined': aValue = statsA.joined; bValue = statsB.joined; break;
+        case 'name':      av = a.name;  bv = b.name; break;
+        case 'email':     av = a.email; bv = b.email; break;
+        case 'id':        av = a.recruiterId || ''; bv = b.recruiterId || ''; break;
+        case 'total':     av = sa.total;    bv = sb.total;    break;
+        case 'joined':    av = sa.joined;   bv = sb.joined;   break;
+        case 'selected':  av = sa.selected; bv = sb.selected; break;
         default: break;
       }
-
-      if (sortOrder === "asc") return aValue > bValue ? 1 : -1;
-      return aValue < bValue ? 1 : -1;
+      return (av > bv ? 1 : -1) * (sortOrder === 'asc' ? 1 : -1);
     });
 
-  const handleFileUpload = (event, isEdit = false) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result;
-        if (isEdit) {
-          setEditRecruiter(prev => ({ ...prev, profilePicture: result }));
-        } else {
-          setNewRecruiter(prev => ({ ...prev, profilePicture: result }));
-        }
-        toast({ title: "Success", description: "Picture uploaded" });
-      };
-      reader.readAsDataURL(file);
-    }
+  // ── Candidate modal filter ─────────────────────────────────────────────────
+  const filteredCandidatesForModal = () => {
+    if (!selectedRecruiter) return [];
+    let list = candidates.filter((c) => {
+      const rid = typeof c.recruiterId === 'object' ? c.recruiterId?._id : c.recruiterId;
+      return rid === selectedRecruiter.id;
+    });
+    if (candidateFilterType === 'joined')   list = list.filter((c) => (Array.isArray(c.status) ? c.status : [c.status]).includes('Joined'));
+    if (candidateFilterType === 'selected') list = list.filter((c) => (Array.isArray(c.status) ? c.status : [c.status]).includes('Selected'));
+    if (candidateFilterType === 'rejected') list = list.filter((c) => (Array.isArray(c.status) ? c.status : [c.status]).includes('Rejected'));
+    return list;
   };
 
-  const triggerFileInput = (isEdit = false) => {
-    isEdit ? editFileInputRef.current?.click() : fileInputRef.current?.click();
-  };
+  // ── Summary stats for top cards ────────────────────────────────────────────
+  const totalR    = recruiters.length;
+  const activeR   = recruiters.filter((r) => r.active !== false).length;
+  const inactiveR = recruiters.filter((r) => r.active === false).length;
 
-  const getStatusBadge = (recruiter) => {
-    const isActive = recruiter.active !== false;
+  // ── Status badge ──────────────────────────────────────────────────────────
+  const StatusBadge = ({ recruiter }) => {
+    const active = recruiter.active !== false;
     return (
-      <Badge variant="secondary" className={isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-        {isActive ? <><UserCheck className="h-3 w-3 mr-1" /> Active</> : <><UserX className="h-3 w-3 mr-1" /> Inactive</>}
+      <Badge variant="secondary"
+        className={active ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+        {active
+          ? <><UserCheck className="h-3 w-3 mr-1" />Active</>
+          : <><UserX    className="h-3 w-3 mr-1" />Inactive</>}
       </Badge>
     );
   };
 
-  const getInitials = (name) => name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
-
-  const generatePerformanceData = (recruiter, start, end) => {
-    const startDt = new Date(start);
-    const endDt = new Date(end);
-    const data = [];
-    for (let d = new Date(startDt); d <= endDt; d.setDate(d.getDate() + 1)) {
-      data.push({
-        date: d.toISOString().split("T")[0],
-        submissions: Math.floor(Math.random() * 5),
-        interviews: Math.floor(Math.random() * 2),
-        offers: Math.floor(Math.random() * 1),
-      });
-    }
-    return data;
-  };
-
-  const handleGenerateReport = () => {
-    if (!startDate || !endDate || !selectedRecruiter) {
+  // ── Performance report (demo data) ────────────────────────────────────────
+  const generatePerformanceData = () => {
+    if (!startDate || !endDate) {
       toast({ title: "Error", description: "Select start and end dates.", variant: "destructive" });
       return;
     }
-    setPerformanceData(generatePerformanceData(selectedRecruiter, startDate, endDate));
+    const data = [];
+    for (let d = new Date(startDate); d <= new Date(endDate); d.setDate(d.getDate() + 1)) {
+      data.push({
+        date: d.toISOString().split("T")[0],
+        submissions: Math.floor(Math.random() * 5),
+        turnups:     Math.floor(Math.random() * 3),
+        joined:      Math.floor(Math.random() * 2),
+      });
+    }
+    setPerformanceData(data);
   };
 
   const downloadPDF = () => {
-    if (!selectedRecruiter || performanceData.length === 0) return;
+    if (!selectedRecruiter || !performanceData.length) return;
     const doc = new jsPDF();
-    doc.text(`Performance: ${selectedRecruiter.name}`, 14, 20);
+    doc.text(`Performance Report: ${selectedRecruiter.name}`, 14, 20);
     autoTable(doc, {
       startY: 30,
-      head: [["Date", "Submissions", "Interviews", "Offers"]],
-      body: performanceData.map((d) => [d.date, d.submissions, d.interviews, d.offers]),
+      head:   [["Date", "Submissions", "Turnups", "Joined"]],
+      body:   performanceData.map((d) => [d.date, d.submissions, d.turnups, d.joined]),
     });
-    doc.save("report.pdf");
+    doc.save(`${selectedRecruiter.name}-report.pdf`);
   };
 
-  const totalRecruiters = recruiters.length;
-  const activeRecruiters = recruiters.filter(r => r.active !== false).length;
-  const inactiveRecruiters = recruiters.filter(r => r.active === false).length;
-  const uniqueRoles = new Set(recruiters.map(r => r.role || 'recruiter')).size;
-
-  const handleMainStatCardClick = (type) => {
-    let data = [];
-    let title = "";
-    
-    if (type === 'total') { data = recruiters; title = "All Recruiters"; }
-    else if (type === 'active') { data = recruiters.filter(r => r.active !== false); title = "Active Recruiters"; }
-    else if (type === 'inactive') { data = recruiters.filter(r => r.active === false); title = "Inactive Recruiters"; }
-    else if (type === 'roles') { data = recruiters; title = "Recruiters by Role"; }
-
-    setSelectedStatsRecruiters(data);
-    setStatsModalTitle(title);
-    setStatsModalType(type);
-    setShowStatsModal(true);
-  };
-
-  const handleStatCardClick = (recruiter, metric) => {
-    setSelectedRecruiter(recruiter);
-    setCandidatesModalTitle(`${metric} - ${recruiter.name}`);
-    setCandidateFilterType(metric.toLowerCase());
-    setShowCandidatesModal(true);
-  };
-
-  const getFilteredCandidatesForModal = () => {
-    if (!selectedRecruiter) return [];
-    let filtered = candidates.filter(c => c.recruiterId === selectedRecruiter.id);
-
-    if (candidateFilterType) {
-        if (candidateFilterType.includes('interviews')) {
-            filtered = filtered.filter(c => ['L1 Interview', 'L2 Interview', 'Interview'].includes(c.status));
-        } else if (candidateFilterType.includes('offers')) {
-            filtered = filtered.filter(c => c.status === 'Offer');
-        } else if (candidateFilterType.includes('joined')) {
-            filtered = filtered.filter(c => c.status === 'Joined');
-        }
-    }
-    return filtered;
-  };
-
+  // ══════════════════════════════════════════════════════════════════════════
+  // Render
+  // ══════════════════════════════════════════════════════════════════════════
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
-      <DashboardSidebar />
-      <div className="flex-1 p-6 lg:p-8">
-        <div className="max-w-7xl mx-auto space-y-6">
-          
-          {/* Header */}
+    <div className="flex-1 p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+
+          {/* ── Header ──────────────────────────────────────────────────── */}
           <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Recruiters Management</h1>
-              <p className="text-gray-500">Manage your recruitment team</p>
+              <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                Recruiters Management
+              </h1>
+              <p className="text-gray-500 mt-1">Manage your recruitment team</p>
             </div>
-            <Button onClick={() => { setShowModal(true); setErrors({}); }} className="bg-blue-600 hover:bg-blue-700">
+            <Button
+              onClick={() => { setShowModal(true); setErrors({}); setNewRecruiter(EMPTY_RECRUITER); }}
+              className="bg-blue-600 hover:bg-blue-700">
               <UserPlus className="h-4 w-4 mr-2" /> Add Recruiter
             </Button>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-             <Card className="bg-blue-600 text-white cursor-pointer hover:bg-blue-700 transition" onClick={() => handleMainStatCardClick('total')}>
-               <CardContent className="p-4 flex justify-between items-center">
-                 <div><p className="text-blue-100 text-sm">Total</p><p className="text-2xl font-bold">{totalRecruiters}</p></div>
-                 <Users className="h-8 w-8 opacity-80" />
-               </CardContent>
-             </Card>
-             <Card className="bg-green-600 text-white cursor-pointer hover:bg-green-700 transition" onClick={() => handleMainStatCardClick('active')}>
-               <CardContent className="p-4 flex justify-between items-center">
-                 <div><p className="text-green-100 text-sm">Active</p><p className="text-2xl font-bold">{activeRecruiters}</p></div>
-                 <UserCheck className="h-8 w-8 opacity-80" />
-               </CardContent>
-             </Card>
-             <Card className="bg-purple-600 text-white cursor-pointer hover:bg-purple-700 transition" onClick={() => handleMainStatCardClick('inactive')}>
-               <CardContent className="p-4 flex justify-between items-center">
-                 <div><p className="text-purple-100 text-sm">Inactive</p><p className="text-2xl font-bold">{inactiveRecruiters}</p></div>
-                 <UserX className="h-8 w-8 opacity-80" />
-               </CardContent>
-             </Card>
-             <Card className="bg-orange-600 text-white cursor-pointer hover:bg-orange-700 transition" onClick={() => handleMainStatCardClick('roles')}>
-               <CardContent className="p-4 flex justify-between items-center">
-                 <div><p className="text-orange-100 text-sm">Roles</p><p className="text-2xl font-bold">{uniqueRoles}</p></div>
-                 <Briefcase className="h-8 w-8 opacity-80" />
-               </CardContent>
-             </Card>
+          {/* ── Summary Cards ────────────────────────────────────────────── */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+            <Card className="bg-blue-600 text-white cursor-pointer hover:bg-blue-700 transition"
+              onClick={() => { setSelectedStatsRecruiters(recruiters); setStatsModalTitle("All Recruiters"); setShowStatsModal(true); }}>
+              <CardContent className="p-4 flex justify-between items-center">
+                <div><p className="text-blue-100 text-sm">Total</p><p className="text-3xl font-bold">{totalR}</p></div>
+                <Users className="h-10 w-10 opacity-70" />
+              </CardContent>
+            </Card>
+            <Card className="bg-green-600 text-white cursor-pointer hover:bg-green-700 transition"
+              onClick={() => { setSelectedStatsRecruiters(recruiters.filter((r) => r.active !== false)); setStatsModalTitle("Active Recruiters"); setShowStatsModal(true); }}>
+              <CardContent className="p-4 flex justify-between items-center">
+                <div><p className="text-green-100 text-sm">Active</p><p className="text-3xl font-bold">{activeR}</p></div>
+                <UserCheck className="h-10 w-10 opacity-70" />
+              </CardContent>
+            </Card>
+            <Card className="bg-red-500 text-white cursor-pointer hover:bg-red-600 transition"
+              onClick={() => { setSelectedStatsRecruiters(recruiters.filter((r) => r.active === false)); setStatsModalTitle("Inactive Recruiters"); setShowStatsModal(true); }}>
+              <CardContent className="p-4 flex justify-between items-center">
+                <div><p className="text-red-100 text-sm">Inactive</p><p className="text-3xl font-bold">{inactiveR}</p></div>
+                <UserX className="h-10 w-10 opacity-70" />
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Controls */}
+          {/* ── Controls ─────────────────────────────────────────────────── */}
           <Card>
             <CardContent className="p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
               <div className="relative w-full md:max-w-md">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input 
-                  placeholder="Search recruiters..." 
-                  value={searchTerm} 
-                  onChange={(e) => setSearchTerm(e.target.value)} 
-                  className="pl-10" 
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search by name, email, ID…"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
                 />
               </div>
               <div className="flex gap-2">
-                <Select value={sortField} onValueChange={(val) => setSortField(val)}>
-                  <SelectTrigger className="w-[150px]"><SelectValue placeholder="Sort" /></SelectTrigger>
+                <Select value={sortField} onValueChange={setSortField}>
+                  <SelectTrigger className="w-[140px]"><SelectValue placeholder="Sort by" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="name">Name</SelectItem>
-                    <SelectItem value="recruiterId">ID</SelectItem>
-                    <SelectItem value="role">Role</SelectItem>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="id">Recruiter ID</SelectItem>
+                    <SelectItem value="total">Candidates</SelectItem>
+                    <SelectItem value="joined">Joined</SelectItem>
+                    <SelectItem value="selected">Selected</SelectItem>
                   </SelectContent>
                 </Select>
-                <div className="flex border rounded-md">
-                   <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} onClick={() => setViewMode('grid')} size="icon"><Grid3X3 className="h-4 w-4"/></Button>
-                   <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} onClick={() => setViewMode('list')} size="icon"><List className="h-4 w-4"/></Button>
+                <div className="flex border rounded-md overflow-hidden">
+                  <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('grid')}><Grid3X3 className="h-4 w-4" /></Button>
+                  <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('list')}><List    className="h-4 w-4" /></Button>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Loading State */}
+          {/* ── Loading ───────────────────────────────────────────────────── */}
           {isLoading ? (
-            <div className="flex justify-center p-12"><div className="animate-spin h-8 w-8 border-4 border-blue-500 rounded-full border-t-transparent"></div></div>
+            <div className="flex justify-center py-16">
+              <div className="animate-spin h-10 w-10 border-4 border-blue-500 rounded-full border-t-transparent" />
+            </div>
+          ) : filteredRecruiters.length === 0 ? (
+            <div className="text-center py-16 text-gray-500">
+              <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p className="text-lg font-medium">No recruiters found</p>
+            </div>
           ) : (
             <>
-              {/* Grid View */}
+              {/* ── Grid View ──────────────────────────────────────────────── */}
               {viewMode === "grid" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {filteredAndSortedRecruiters.map((recruiter) => {
-                    const stats = calculateRecruiterStats(recruiter.id);
+                  {filteredRecruiters.map((r) => {
+                    const st = calcStats(r.id);
                     return (
-                      <Card key={recruiter.id} className="hover:shadow-lg transition-shadow">
+                      <Card key={r.id} className="hover:shadow-lg transition-shadow">
                         <CardHeader className="flex flex-row items-start justify-between pb-2">
                           <div className="flex items-center gap-3">
-                            <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white overflow-hidden">
-                              {recruiter.profilePicture ? <img src={recruiter.profilePicture} className="w-full h-full object-cover" alt="profile"/> : getInitials(recruiter.name)}
+                            <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600
+                              flex items-center justify-center text-white font-bold overflow-hidden">
+                              {r.profilePicture
+                                ? <img src={r.profilePicture} className="w-full h-full object-cover" alt="pfp" />
+                                : getInitials(r.name)}
                             </div>
                             <div>
-                              <CardTitle className="text-lg">{recruiter.name}</CardTitle>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Badge variant="outline">{recruiter.recruiterId}</Badge>
-                                {getStatusBadge(recruiter)}
+                              <CardTitle className="text-base">{r.name}</CardTitle>
+                              <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                {r.recruiterId && <Badge variant="outline" className="text-xs">{r.recruiterId}</Badge>}
+                                <StatusBadge recruiter={r} />
                               </div>
                             </div>
                           </div>
                           <DropdownMenu>
-                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
+                            </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openEditModal(recruiter)}><Edit className="h-4 w-4 mr-2"/> Edit</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { setSelectedRecruiter(recruiter); setShowPerformanceModal(true); }}><TrendingUp className="h-4 w-4 mr-2"/> Performance</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { 
-                                setSelectedRecruiter(recruiter); 
-                                setCandidatesModalTitle(`All Candidates - ${recruiter.name}`);
+                              <DropdownMenuItem onClick={() => openEditModal(r)}>
+                                <Edit className="h-4 w-4 mr-2" /> Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { setSelectedRecruiter(r); setShowPerformanceModal(true); setPerformanceData([]); }}>
+                                <TrendingUp className="h-4 w-4 mr-2" /> Performance Report
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                setSelectedRecruiter(r);
+                                setCandidatesModalTitle(`All Candidates — ${r.name}`);
                                 setCandidateFilterType(null);
-                                setShowCandidatesModal(true); 
+                                setShowCandidatesModal(true);
                               }}>
-                                <Users className="h-4 w-4 mr-2"/> View Candidates
+                                <Users className="h-4 w-4 mr-2" /> View Candidates
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleToggleStatus(recruiter)}>{recruiter.active ? 'Deactivate' : 'Activate'}</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { setRecruiterToDelete(recruiter); setShowDeleteModal(true); }} className="text-red-600"><Trash2 className="h-4 w-4 mr-2"/> Delete</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleToggleStatus(r)}>
+                                {r.active !== false ? 'Deactivate' : 'Activate'}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-red-600"
+                                onClick={() => { setRecruiterToDelete(r); setShowDeleteModal(true); }}>
+                                <Trash2 className="h-4 w-4 mr-2" /> Delete
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </CardHeader>
+
                         <CardContent>
-                           <div className="space-y-2 text-sm text-gray-500 mb-4">
-                             <div className="flex items-center gap-2"><Mail className="h-4 w-4"/> {recruiter.email}</div>
-                             <div className="flex items-center gap-2"><Phone className="h-4 w-4"/> {recruiter.phone || 'N/A'}</div>
-                             <div className="flex items-center gap-2"><Briefcase className="h-4 w-4"/> {recruiter.role}</div>
-                           </div>
-                           <div className="grid grid-cols-4 gap-2 border-t pt-4 text-center">
-                              <div className="cursor-pointer" onClick={() => handleStatCardClick(recruiter, 'Submissions')}>
-                                <div className="font-bold text-lg text-blue-600">{stats.totalSubmissions}</div>
-                                <div className="text-[10px]">Subs</div>
+                          <div className="space-y-1.5 text-sm text-gray-500 mb-4">
+                            <div className="flex items-center gap-2"><Mail className="h-4 w-4 flex-shrink-0" /> {r.email}</div>
+                            {r.phone && <div className="flex items-center gap-2"><Phone className="h-4 w-4 flex-shrink-0" /> {r.phone}</div>}
+                            <div className="flex items-center gap-2"><Briefcase className="h-4 w-4 flex-shrink-0" /> {r.role || 'recruiter'}</div>
+                          </div>
+
+                          {/* Per-recruiter mini stats */}
+                          <div className="grid grid-cols-4 gap-2 border-t pt-3 text-center">
+                            {[
+                              { label: 'Total',    val: st.total,    filter: null,       color: 'text-blue-600' },
+                              { label: 'Turnups',  val: st.turnups,  filter: 'turnups',  color: 'text-teal-600' },
+                              { label: 'Selected', val: st.selected, filter: 'selected', color: 'text-purple-600' },
+                              { label: 'Joined',   val: st.joined,   filter: 'joined',   color: 'text-green-600' },
+                            ].map(({ label, val, filter, color }) => (
+                              <div key={label}
+                                className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded p-1 transition`}
+                                onClick={() => {
+                                  setSelectedRecruiter(r);
+                                  setCandidatesModalTitle(`${label} — ${r.name}`);
+                                  setCandidateFilterType(filter);
+                                  setShowCandidatesModal(true);
+                                }}>
+                                <div className={`font-bold text-lg ${color}`}>{val}</div>
+                                <div className="text-[10px] text-gray-500">{label}</div>
                               </div>
-                              <div className="cursor-pointer" onClick={() => handleStatCardClick(recruiter, 'Interviews')}>
-                                <div className="font-bold text-lg text-purple-600">{stats.interviews}</div>
-                                <div className="text-[10px]">Intrvw</div>
-                              </div>
-                              <div className="cursor-pointer" onClick={() => handleStatCardClick(recruiter, 'Offers')}>
-                                <div className="font-bold text-lg text-green-600">{stats.offers}</div>
-                                <div className="text-[10px]">Offer</div>
-                              </div>
-                              <div className="cursor-pointer" onClick={() => handleStatCardClick(recruiter, 'Joined')}>
-                                <div className="font-bold text-lg text-orange-600">{stats.joined}</div>
-                                <div className="text-[10px]">Join</div>
-                              </div>
-                           </div>
+                            ))}
+                          </div>
                         </CardContent>
                       </Card>
                     );
@@ -614,81 +551,91 @@ export default function AdminRecruiters() {
                 </div>
               )}
 
-              {/* List View */}
+              {/* ── List View ──────────────────────────────────────────────── */}
               {viewMode === "list" && (
                 <Card>
                   <CardContent className="p-0 overflow-x-auto">
                     <table className="w-full text-sm text-left">
-                      <thead className="bg-gray-50 dark:bg-gray-800 text-xs uppercase text-gray-500 font-medium">
+                      <thead className="bg-gray-50 dark:bg-gray-800 text-xs uppercase text-gray-500">
                         <tr>
-                          <th className="px-4 py-3 cursor-pointer hover:bg-gray-100" onClick={() => toggleSort('name')}>
-                            Recruiter {getSortIcon('name')}
+                          <th className="px-4 py-3 cursor-pointer" onClick={() => toggleSort('name')}>
+                            <span className="flex items-center">Recruiter <SortIcon field="name" /></span>
                           </th>
-                          <th className="px-4 py-3 cursor-pointer hover:bg-gray-100" onClick={() => toggleSort('recruiterId')}>
-                            ID {getSortIcon('recruiterId')}
+                          <th className="px-4 py-3 cursor-pointer" onClick={() => toggleSort('id')}>
+                            <span className="flex items-center">ID <SortIcon field="id" /></span>
                           </th>
-                          <th className="px-4 py-3">Role</th>
                           <th className="px-4 py-3">Status</th>
-                          <th className="px-4 py-3 text-center cursor-pointer hover:bg-gray-100" onClick={() => toggleSort('submissions')}>Submissions {getSortIcon('submissions')}</th>
-                          <th className="px-4 py-3 text-center cursor-pointer hover:bg-gray-100" onClick={() => toggleSort('interviews')}>Interviews {getSortIcon('interviews')}</th>
-                          <th className="px-4 py-3 text-center cursor-pointer hover:bg-gray-100" onClick={() => toggleSort('offers')}>Offers {getSortIcon('offers')}</th>
-                          <th className="px-4 py-3 text-center cursor-pointer hover:bg-gray-100" onClick={() => toggleSort('joined')}>Joined {getSortIcon('joined')}</th>
+                          <th className="px-4 py-3 text-center cursor-pointer" onClick={() => toggleSort('total')}>
+                            <span className="flex items-center justify-center">Total <SortIcon field="total" /></span>
+                          </th>
+                          <th className="px-4 py-3 text-center">Turnups</th>
+                          <th className="px-4 py-3 text-center cursor-pointer" onClick={() => toggleSort('selected')}>
+                            <span className="flex items-center justify-center">Selected <SortIcon field="selected" /></span>
+                          </th>
+                          <th className="px-4 py-3 text-center cursor-pointer" onClick={() => toggleSort('joined')}>
+                            <span className="flex items-center justify-center">Joined <SortIcon field="joined" /></span>
+                          </th>
                           <th className="px-4 py-3 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredAndSortedRecruiters.map((recruiter) => {
-                           const stats = calculateRecruiterStats(recruiter.id);
-                           return (
-                            <tr key={recruiter.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
-                              <td className="px-4 py-3 font-medium">
+                        {filteredRecruiters.map((r) => {
+                          const st = calcStats(r.id);
+                          return (
+                            <tr key={r.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
+                              <td className="px-4 py-3">
                                 <div className="flex items-center gap-2">
-                                  <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs">
-                                    {recruiter.profilePicture ? <img src={recruiter.profilePicture} className="w-full h-full rounded-full object-cover" alt="pfp"/> : getInitials(recruiter.name)}
+                                  <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold overflow-hidden flex-shrink-0">
+                                    {r.profilePicture
+                                      ? <img src={r.profilePicture} className="w-full h-full object-cover rounded-full" alt="pfp" />
+                                      : getInitials(r.name)}
                                   </div>
                                   <div>
-                                    <div>{recruiter.name}</div>
-                                    <div className="text-xs text-gray-500">{recruiter.email}</div>
+                                    <div className="font-medium">{r.name}</div>
+                                    <div className="text-xs text-gray-500">{r.email}</div>
                                   </div>
                                 </div>
                               </td>
-                              <td className="px-4 py-3">{recruiter.recruiterId}</td>
-                              <td className="px-4 py-3">{recruiter.role}</td>
-                              <td className="px-4 py-3">{getStatusBadge(recruiter)}</td>
-                              <td className="px-4 py-3 text-center font-medium text-blue-600 cursor-pointer hover:bg-blue-50 rounded" onClick={() => handleStatCardClick(recruiter, 'Submissions')}>
-                                {stats.totalSubmissions}
+                              <td className="px-4 py-3 text-gray-500">{r.recruiterId || '-'}</td>
+                              <td className="px-4 py-3"><StatusBadge recruiter={r} /></td>
+                              <td className="px-4 py-3 text-center font-bold text-blue-600 cursor-pointer hover:underline"
+                                onClick={() => { setSelectedRecruiter(r); setCandidatesModalTitle(`All — ${r.name}`); setCandidateFilterType(null); setShowCandidatesModal(true); }}>
+                                {st.total}
                               </td>
-                              <td className="px-4 py-3 text-center font-medium text-purple-600 cursor-pointer hover:bg-purple-50 rounded" onClick={() => handleStatCardClick(recruiter, 'Interviews')}>
-                                {stats.interviews}
+                              <td className="px-4 py-3 text-center font-bold text-teal-600">{st.turnups}</td>
+                              <td className="px-4 py-3 text-center font-bold text-purple-600 cursor-pointer hover:underline"
+                                onClick={() => { setSelectedRecruiter(r); setCandidatesModalTitle(`Selected — ${r.name}`); setCandidateFilterType('selected'); setShowCandidatesModal(true); }}>
+                                {st.selected}
                               </td>
-                              <td className="px-4 py-3 text-center font-medium text-green-600 cursor-pointer hover:bg-green-50 rounded" onClick={() => handleStatCardClick(recruiter, 'Offers')}>
-                                {stats.offers}
-                              </td>
-                              <td className="px-4 py-3 text-center font-medium text-orange-600 cursor-pointer hover:bg-orange-50 rounded" onClick={() => handleStatCardClick(recruiter, 'Joined')}>
-                                {stats.joined}
+                              <td className="px-4 py-3 text-center font-bold text-green-600 cursor-pointer hover:underline"
+                                onClick={() => { setSelectedRecruiter(r); setCandidatesModalTitle(`Joined — ${r.name}`); setCandidateFilterType('joined'); setShowCandidatesModal(true); }}>
+                                {st.joined}
                               </td>
                               <td className="px-4 py-3 text-right">
                                 <DropdownMenu>
-                                  <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
+                                  </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => openEditModal(recruiter)}><Edit className="h-4 w-4 mr-2"/> Edit</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => { setSelectedRecruiter(recruiter); setShowPerformanceModal(true); }}><TrendingUp className="h-4 w-4 mr-2"/> Performance</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => { 
-                                      setSelectedRecruiter(recruiter); 
-                                      setCandidatesModalTitle(`All Candidates - ${recruiter.name}`);
-                                      setCandidateFilterType(null);
-                                      setShowCandidatesModal(true); 
-                                    }}>
-                                      <Users className="h-4 w-4 mr-2"/> View Candidates
+                                    <DropdownMenuItem onClick={() => openEditModal(r)}>
+                                      <Edit className="h-4 w-4 mr-2" /> Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => { setSelectedRecruiter(r); setShowPerformanceModal(true); setPerformanceData([]); }}>
+                                      <TrendingUp className="h-4 w-4 mr-2" /> Performance
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => handleToggleStatus(recruiter)}>{recruiter.active ? 'Deactivate' : 'Activate'}</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => { setRecruiterToDelete(recruiter); setShowDeleteModal(true); }} className="text-red-600"><Trash2 className="h-4 w-4 mr-2"/> Delete</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleToggleStatus(r)}>
+                                      {r.active !== false ? 'Deactivate' : 'Activate'}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem className="text-red-600"
+                                      onClick={() => { setRecruiterToDelete(r); setShowDeleteModal(true); }}>
+                                      <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                    </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               </td>
                             </tr>
-                           );
+                          );
                         })}
                       </tbody>
                     </table>
@@ -698,301 +645,366 @@ export default function AdminRecruiters() {
             </>
           )}
 
-          {/* Add Recruiter Modal */}
+          {/* ════════════════════════════════════════════════════════════
+              MODALS
+          ════════════════════════════════════════════════════════════ */}
+
+          {/* ── Add Recruiter ──────────────────────────────────────────── */}
           <Dialog open={showModal} onClose={() => setShowModal(false)} className="relative z-50">
             <DialogBackdrop className="fixed inset-0 bg-black/50" />
             <div className="fixed inset-0 flex items-center justify-center p-4">
               <DialogPanel className="bg-white dark:bg-gray-900 w-full max-w-lg rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
-                <DialogTitle className="text-xl font-bold mb-4">Add Recruiter</DialogTitle>
+                <DialogTitle className="text-xl font-bold mb-1">Add Recruiter</DialogTitle>
+                <p className="text-sm text-gray-500 mb-4">Name & Email required. Everything else optional.</p>
+
                 <div className="space-y-4">
-                   <div className="flex items-center gap-4">
-                     <div className="h-16 w-16 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
-                       {newRecruiter.profilePicture ? <img src={newRecruiter.profilePicture} className="w-full h-full object-cover" alt="preview"/> : <Camera className="h-6 w-6 text-gray-400"/>}
-                     </div>
-                     <input type="file" ref={fileInputRef} hidden onChange={(e) => handleFileUpload(e, false)} />
-                     <Button variant="outline" size="sm" onClick={() => triggerFileInput(false)}>Upload Photo</Button>
-                   </div>
-                   <div className="grid grid-cols-2 gap-4">
-                     <div>
-                        <label className="text-sm font-medium">Recruiter ID *</label>
-                        <Input 
-                            value={newRecruiter.recruiterId} 
-                            onChange={e => handleInputChange('recruiterId', e.target.value, false)} 
-                            className={errors.recruiterId ? "border-red-500" : ""} 
-                        />
-                        {errors.recruiterId && <p className="text-xs text-red-500 mt-1">{errors.recruiterId}</p>}
-                     </div>
-                     <div>
-                        <label className="text-sm font-medium">Full Name *</label>
-                        <Input 
-                            value={newRecruiter.name} 
-                            onChange={e => handleInputChange('name', e.target.value, false)} 
-                            className={errors.name ? "border-red-500" : ""} 
-                        />
-                        {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
-                     </div>
-                   </div>
-                   <div>
-                      <label className="text-sm font-medium">Email *</label>
-                      <Input 
-                        value={newRecruiter.email} 
-                        onChange={e => handleInputChange('email', e.target.value, false)} 
-                        className={errors.email ? "border-red-500" : ""} 
-                      />
-                      {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
-                   </div>
-                   <div className="grid grid-cols-2 gap-4">
-                     <div>
-                        <label className="text-sm font-medium">Phone</label>
-                        <Input 
-                            value={newRecruiter.phone} 
-                            onChange={e => handleInputChange('phone', e.target.value, false)} 
-                            maxLength={10} 
-                            className={errors.phone ? "border-red-500" : ""} 
-                        />
-                        {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
-                     </div>
-                     <div>
-                       <label className="text-sm font-medium">Role</label>
-                       <Input value="Recruiter" disabled className="bg-gray-100 dark:bg-gray-800 text-gray-500" />
-                     </div>
-                   </div>
-                   <div className="grid grid-cols-2 gap-4">
-                     <div>
-                        <label className="text-sm font-medium">Username</label>
-                        <Input value={newRecruiter.username} onChange={e => handleInputChange('username', e.target.value, false)} />
-                     </div>
-                     <div>
-                        <label className="text-sm font-medium">Password *</label>
-                        <div className="relative">
-                          <Input 
-                            type={showPassword ? "text" : "password"} 
-                            value={newRecruiter.password} 
-                            onChange={e => handleInputChange('password', e.target.value, false)} 
-                            className={errors.password ? "border-red-500" : ""}
-                          />
-                          <button 
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-2 top-2.5 text-gray-500 hover:text-gray-700"
-                          >
-                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </button>
-                        </div>
-                        {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
-                     </div>
-                   </div>
-                   <div className="flex justify-end gap-2 mt-4">
-                     <Button variant="outline" onClick={() => setShowModal(false)}>Cancel</Button>
-                     <Button onClick={handleAddRecruiter}>Save Recruiter</Button>
-                   </div>
+                  {/* Profile picture */}
+                  <div className="flex items-center gap-4">
+                    <div className="h-16 w-16 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
+                      {newRecruiter.profilePicture
+                        ? <img src={newRecruiter.profilePicture} className="w-full h-full object-cover" alt="preview" />
+                        : <Camera className="h-6 w-6 text-gray-400" />}
+                    </div>
+                    <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={(e) => handleFileUpload(e, false)} />
+                    <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>Upload Photo</Button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Recruiter ID</label>
+                      <Input value={newRecruiter.recruiterId}
+                        onChange={(e) => handleInputChange('recruiterId', e.target.value, false)}
+                        placeholder="e.g. REC001" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Full Name <span className="text-red-500">*</span></label>
+                      <Input value={newRecruiter.name}
+                        onChange={(e) => handleInputChange('name', e.target.value, false)}
+                        className={errors.name ? "border-red-500" : ""} />
+                      {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium">Email <span className="text-red-500">*</span></label>
+                    <Input type="email" value={newRecruiter.email}
+                      onChange={(e) => handleInputChange('email', e.target.value, false)}
+                      className={errors.email ? "border-red-500" : ""} />
+                    {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Phone</label>
+                      <Input value={newRecruiter.phone} maxLength={10}
+                        onChange={(e) => handleInputChange('phone', e.target.value, false)}
+                        className={errors.phone ? "border-red-500" : ""}
+                        placeholder="10 digits" />
+                      {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Role</label>
+                      <Input value="Recruiter" disabled className="bg-gray-100 dark:bg-gray-800 text-gray-500" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Username</label>
+                      <Input value={newRecruiter.username}
+                        onChange={(e) => handleInputChange('username', e.target.value, false)} />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Password <span className="text-red-500">*</span></label>
+                      <div className="relative">
+                        <Input type={showPassword ? "text" : "password"}
+                          value={newRecruiter.password}
+                          onChange={(e) => handleInputChange('password', e.target.value, false)}
+                          className={errors.password ? "border-red-500 pr-10" : "pr-10"}
+                          placeholder="Min 6 characters" />
+                        <button type="button"
+                          onClick={() => setShowPassword((p) => !p)}
+                          className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600">
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                      {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="outline" onClick={() => setShowModal(false)}>Cancel</Button>
+                    <Button onClick={handleAddRecruiter} className="bg-blue-600 hover:bg-blue-700">Save Recruiter</Button>
+                  </div>
                 </div>
               </DialogPanel>
             </div>
           </Dialog>
 
-          {/* Edit Recruiter Modal */}
+          {/* ── Edit Recruiter ─────────────────────────────────────────── */}
           <Dialog open={showEditModal} onClose={() => setShowEditModal(false)} className="relative z-50">
             <DialogBackdrop className="fixed inset-0 bg-black/50" />
             <div className="fixed inset-0 flex items-center justify-center p-4">
               <DialogPanel className="bg-white dark:bg-gray-900 w-full max-w-lg rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
                 <DialogTitle className="text-xl font-bold mb-4">Edit Recruiter</DialogTitle>
+
                 <div className="space-y-4">
-                   <div className="flex items-center gap-4">
-                     <div className="h-16 w-16 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
-                       {editRecruiter.profilePicture ? <img src={editRecruiter.profilePicture} className="w-full h-full object-cover" alt="edit-preview"/> : <Camera className="h-6 w-6 text-gray-400"/>}
-                     </div>
-                     <input type="file" ref={editFileInputRef} hidden onChange={(e) => handleFileUpload(e, true)} />
-                     <Button variant="outline" size="sm" onClick={() => triggerFileInput(true)}>Change Photo</Button>
-                   </div>
-                   <div className="grid grid-cols-2 gap-4">
-                     <div>
-                        <label className="text-sm font-medium">Recruiter ID *</label>
-                        <Input 
-                            value={editRecruiter.recruiterId} 
-                            onChange={e => handleInputChange('recruiterId', e.target.value, true)} 
-                            className={errors.recruiterId ? "border-red-500" : ""} 
-                        />
-                        {errors.recruiterId && <p className="text-xs text-red-500 mt-1">{errors.recruiterId}</p>}
-                     </div>
-                     <div>
-                        <label className="text-sm font-medium">Full Name *</label>
-                        <Input 
-                            value={editRecruiter.name} 
-                            onChange={e => handleInputChange('name', e.target.value, true)} 
-                            className={errors.name ? "border-red-500" : ""} 
-                        />
-                        {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
-                     </div>
-                   </div>
-                   <div>
-                      <label className="text-sm font-medium">Email *</label>
-                      <Input 
-                        value={editRecruiter.email} 
-                        onChange={e => handleInputChange('email', e.target.value, true)} 
-                        className={errors.email ? "border-red-500" : ""} 
-                      />
-                      {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
-                   </div>
-                   <div className="grid grid-cols-2 gap-4">
-                     <div>
-                        <label className="text-sm font-medium">Phone</label>
-                        <Input 
-                            value={editRecruiter.phone} 
-                            onChange={e => handleInputChange('phone', e.target.value, true)} 
-                            maxLength={10} 
-                            className={errors.phone ? "border-red-500" : ""} 
-                        />
-                        {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
-                     </div>
-                     <div>
-                       <label className="text-sm font-medium">Role</label>
-                       <Input value="Recruiter" disabled className="bg-gray-100 dark:bg-gray-800 text-gray-500" />
-                     </div>
-                   </div>
-                   <div className="grid grid-cols-2 gap-4">
-                     <div><label className="text-sm font-medium">Username</label><Input value={editRecruiter.username} onChange={e => handleInputChange('username', e.target.value, true)} /></div>
-                     <div>
-                        <label className="text-sm font-medium">Password</label>
-                        <div className="relative">
-                          <Input 
-                            type={showEditPassword ? "text" : "password"} 
-                            placeholder="Leave blank to keep current" 
-                            value={editRecruiter.password} 
-                            onChange={e => handleInputChange('password', e.target.value, true)} 
-                          />
-                          <button 
-                            type="button"
-                            onClick={() => setShowEditPassword(!showEditPassword)}
-                            className="absolute right-2 top-2.5 text-gray-500 hover:text-gray-700"
-                          >
-                            {showEditPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </button>
-                        </div>
-                     </div>
-                   </div>
-                   <div className="flex justify-end gap-2 mt-4">
-                     <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
-                     <Button onClick={handleEditRecruiter}>Update Recruiter</Button>
-                   </div>
+                  <div className="flex items-center gap-4">
+                    <div className="h-16 w-16 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
+                      {editRecruiter.profilePicture
+                        ? <img src={editRecruiter.profilePicture} className="w-full h-full object-cover" alt="edit-preview" />
+                        : <Camera className="h-6 w-6 text-gray-400" />}
+                    </div>
+                    <input type="file" ref={editFileInputRef} hidden accept="image/*" onChange={(e) => handleFileUpload(e, true)} />
+                    <Button variant="outline" size="sm" onClick={() => editFileInputRef.current?.click()}>Change Photo</Button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Recruiter ID</label>
+                      <Input value={editRecruiter.recruiterId}
+                        onChange={(e) => handleInputChange('recruiterId', e.target.value, true)} />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Full Name <span className="text-red-500">*</span></label>
+                      <Input value={editRecruiter.name}
+                        onChange={(e) => handleInputChange('name', e.target.value, true)}
+                        className={errors.name ? "border-red-500" : ""} />
+                      {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium">Email <span className="text-red-500">*</span></label>
+                    <Input type="email" value={editRecruiter.email}
+                      onChange={(e) => handleInputChange('email', e.target.value, true)}
+                      className={errors.email ? "border-red-500" : ""} />
+                    {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Phone</label>
+                      <Input value={editRecruiter.phone} maxLength={10}
+                        onChange={(e) => handleInputChange('phone', e.target.value, true)}
+                        className={errors.phone ? "border-red-500" : ""} />
+                      {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Role</label>
+                      <Input value="Recruiter" disabled className="bg-gray-100 dark:bg-gray-800 text-gray-500" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Username</label>
+                      <Input value={editRecruiter.username}
+                        onChange={(e) => handleInputChange('username', e.target.value, true)} />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">New Password</label>
+                      <div className="relative">
+                        <Input type={showEditPassword ? "text" : "password"}
+                          value={editRecruiter.password}
+                          onChange={(e) => handleInputChange('password', e.target.value, true)}
+                          className={`pr-10 ${errors.password ? "border-red-500" : ""}`}
+                          placeholder="Leave blank to keep current" />
+                        <button type="button"
+                          onClick={() => setShowEditPassword((p) => !p)}
+                          className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600">
+                          {showEditPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                      {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
+                    <Button onClick={handleEditRecruiter} className="bg-blue-600 hover:bg-blue-700">Update Recruiter</Button>
+                  </div>
                 </div>
               </DialogPanel>
             </div>
           </Dialog>
 
-          {/* Delete Modal */}
+          {/* ── Delete Confirm ─────────────────────────────────────────── */}
           <Dialog open={showDeleteModal} onClose={() => setShowDeleteModal(false)} className="relative z-50">
-             <DialogBackdrop className="fixed inset-0 bg-black/50" />
-             <div className="fixed inset-0 flex items-center justify-center p-4">
-               <DialogPanel className="bg-white dark:bg-gray-900 rounded-xl p-6 max-w-md shadow-2xl">
-                 <DialogTitle className="text-lg font-bold text-red-600 flex items-center gap-2"><AlertTriangle className="h-5 w-5"/> Confirm Deletion</DialogTitle>
-                 <p className="mt-2 text-gray-600">Are you sure you want to delete <strong>{recruiterToDelete?.name}</strong>? This action cannot be undone.</p>
-                 <div className="flex justify-end gap-2 mt-4">
-                   <Button variant="outline" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
-                   <Button variant="destructive" onClick={handleDeleteRecruiter}>Delete</Button>
-                 </div>
-               </DialogPanel>
-             </div>
+            <DialogBackdrop className="fixed inset-0 bg-black/50" />
+            <div className="fixed inset-0 flex items-center justify-center p-4">
+              <DialogPanel className="bg-white dark:bg-gray-900 rounded-xl p-6 max-w-md shadow-2xl">
+                <DialogTitle className="text-lg font-bold text-red-600 flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5" /> Confirm Deletion
+                </DialogTitle>
+                <p className="mt-2 text-gray-600 dark:text-gray-300">
+                  Delete <strong>{recruiterToDelete?.name}</strong>? This cannot be undone.
+                </p>
+                <div className="flex justify-end gap-2 mt-4">
+                  <Button variant="outline" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
+                  <Button variant="destructive" onClick={handleDeleteRecruiter}>Delete</Button>
+                </div>
+              </DialogPanel>
+            </div>
           </Dialog>
 
-           {/* Performance Modal */}
-           {showPerformanceModal && selectedRecruiter && (
-             <Dialog open={showPerformanceModal} onClose={() => setShowPerformanceModal(false)} className="relative z-50">
-               <DialogBackdrop className="fixed inset-0 bg-black/50" />
-               <div className="fixed inset-0 flex items-center justify-center p-4">
-                 <DialogPanel className="bg-white dark:bg-gray-900 w-full max-w-4xl rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
-                   <DialogTitle className="text-xl font-bold mb-4">Performance: {selectedRecruiter.name}</DialogTitle>
-                   <div className="space-y-4">
-                      <div className="grid grid-cols-3 gap-4">
-                        <div><label className="text-sm">Start Date</label><Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /></div>
-                        <div><label className="text-sm">End Date</label><Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /></div>
-                        <div className="flex items-end"><Button onClick={handleGenerateReport} className="w-full">Generate Report</Button></div>
-                      </div>
-                      {performanceData.length > 0 ? (
-                        <div className="border rounded-md overflow-hidden">
-                           <table className="w-full text-sm">
-                             <thead className="bg-gray-50 dark:bg-gray-800"><tr><th className="p-2 text-left">Date</th><th className="p-2">Submissions</th><th className="p-2">Interviews</th><th className="p-2">Offers</th></tr></thead>
-                             <tbody>{performanceData.map((d,i) => <tr key={i} className="border-t"><td className="p-2">{d.date}</td><td className="p-2 text-center">{d.submissions}</td><td className="p-2 text-center">{d.interviews}</td><td className="p-2 text-center">{d.offers}</td></tr>)}</tbody>
-                           </table>
-                           <div className="mt-4 flex justify-end"><Button onClick={downloadPDF} variant="outline"><Download className="mr-2 h-4 w-4"/> Download PDF</Button></div>
-                        </div>
-                      ) : <div className="text-center py-8 text-gray-500">No data generated yet.</div>}
-                      <div className="flex justify-end"><Button onClick={() => setShowPerformanceModal(false)} variant="ghost">Close</Button></div>
-                   </div>
-                 </DialogPanel>
-               </div>
-             </Dialog>
-           )}
+          {/* ── Performance Modal ──────────────────────────────────────── */}
+          <Dialog open={showPerformanceModal} onClose={() => setShowPerformanceModal(false)} className="relative z-50">
+            <DialogBackdrop className="fixed inset-0 bg-black/50" />
+            <div className="fixed inset-0 flex items-center justify-center p-4">
+              <DialogPanel className="bg-white dark:bg-gray-900 w-full max-w-3xl rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
+                <DialogTitle className="text-xl font-bold mb-4">
+                  Performance Report — {selectedRecruiter?.name}
+                </DialogTitle>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Start Date</label>
+                      <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">End Date</label>
+                      <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                    </div>
+                    <div className="flex items-end">
+                      <Button onClick={generatePerformanceData} className="w-full">Generate</Button>
+                    </div>
+                  </div>
 
-           {/* Stats Modal */}
-           {showStatsModal && (
-             <Dialog open={showStatsModal} onClose={() => setShowStatsModal(false)} className="relative z-50">
-               <DialogBackdrop className="fixed inset-0 bg-black/50" />
-               <div className="fixed inset-0 flex items-center justify-center p-4">
-                  <DialogPanel className="bg-white dark:bg-gray-900 w-full max-w-2xl rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
-                     <DialogTitle className="text-xl font-bold mb-4">{statsModalTitle}</DialogTitle>
-                     <div className="space-y-2">
-                        {selectedStatsRecruiters.map(r => (
-                          <div key={r.id} className="flex justify-between items-center p-2 border-b">
-                            <div className="flex items-center gap-2">
-                               <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs">{getInitials(r.name)}</div>
-                               <div><div className="font-medium">{r.name}</div><div className="text-xs text-gray-500">{r.email}</div></div>
-                            </div>
-                            <Badge variant="outline">{r.role}</Badge>
-                          </div>
-                        ))}
-                     </div>
-                     <div className="flex justify-end mt-4"><Button onClick={() => setShowStatsModal(false)}>Close</Button></div>
-                  </DialogPanel>
-               </div>
-             </Dialog>
-           )}
-
-           {/* Candidates List Modal */}
-           {showCandidatesModal && selectedRecruiter && (
-            <Dialog open={showCandidatesModal} onClose={() => setShowCandidatesModal(false)} className="relative z-50">
-              <DialogBackdrop className="fixed inset-0 bg-black/50" />
-              <div className="fixed inset-0 flex items-center justify-center p-4">
-                <DialogPanel className="bg-white dark:bg-gray-900 w-full max-w-4xl rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
-                  <DialogTitle className="text-xl font-bold mb-4">{candidatesModalTitle}</DialogTitle>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                      <thead className="bg-gray-50 dark:bg-gray-800 text-xs uppercase text-gray-500 font-medium">
-                        <tr>
-                          <th className="p-3">Candidate Name</th>
-                          <th className="p-3">Role</th>
-                          <th className="p-3">Status</th>
-                          <th className="p-3">Email</th>
-                          <th className="p-3">Phone</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {getFilteredCandidatesForModal().length > 0 ? (
-                            getFilteredCandidatesForModal().map((candidate, idx) => (
-                              <tr key={idx} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
-                                <td className="p-3 font-medium">{candidate.name}</td>
-                                <td className="p-3">{candidate.position}</td>
-                                <td className="p-3"><Badge variant="outline">{candidate.status}</Badge></td>
-                                <td className="p-3 text-gray-500">{candidate.email}</td>
-                                <td className="p-3 text-gray-500">{candidate.contact}</td>
+                  {performanceData.length > 0 ? (
+                    <>
+                      <div className="border rounded-lg overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50 dark:bg-gray-800">
+                            <tr>
+                              <th className="p-2 text-left">Date</th>
+                              <th className="p-2 text-center">Submissions</th>
+                              <th className="p-2 text-center">Turnups</th>
+                              <th className="p-2 text-center">Joined</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {performanceData.map((d, i) => (
+                              <tr key={i} className="border-t">
+                                <td className="p-2">{d.date}</td>
+                                <td className="p-2 text-center">{d.submissions}</td>
+                                <td className="p-2 text-center">{d.turnups}</td>
+                                <td className="p-2 text-center">{d.joined}</td>
                               </tr>
-                            ))
-                        ) : (
-                          <tr><td colSpan={5} className="p-4 text-center text-gray-500">No candidates found for this selection.</td></tr>
-                        )}
-                      </tbody>
-                    </table>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="flex justify-end">
+                        <Button onClick={downloadPDF} variant="outline">
+                          <Download className="h-4 w-4 mr-2" /> Download PDF
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-8 text-gray-400">
+                      Select dates and click Generate to view performance data.
+                    </div>
+                  )}
+
+                  <div className="flex justify-end">
+                    <Button variant="ghost" onClick={() => setShowPerformanceModal(false)}>Close</Button>
                   </div>
-                  <div className="flex justify-end mt-4">
-                    <Button onClick={() => setShowCandidatesModal(false)}>Close</Button>
-                  </div>
-                </DialogPanel>
-              </div>
-            </Dialog>
-           )}
-           
+                </div>
+              </DialogPanel>
+            </div>
+          </Dialog>
+
+          {/* ── Stats Modal ────────────────────────────────────────────── */}
+          <Dialog open={showStatsModal} onClose={() => setShowStatsModal(false)} className="relative z-50">
+            <DialogBackdrop className="fixed inset-0 bg-black/50" />
+            <div className="fixed inset-0 flex items-center justify-center p-4">
+              <DialogPanel className="bg-white dark:bg-gray-900 w-full max-w-xl rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
+                <DialogTitle className="text-xl font-bold mb-4">{statsModalTitle}</DialogTitle>
+                <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {selectedStatsRecruiters.map((r) => (
+                    <div key={r.id} className="flex items-center justify-between py-2.5">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold overflow-hidden">
+                          {r.profilePicture
+                            ? <img src={r.profilePicture} className="w-full h-full object-cover" alt="pfp" />
+                            : getInitials(r.name)}
+                        </div>
+                        <div>
+                          <div className="font-medium">{r.name}</div>
+                          <div className="text-xs text-gray-500">{r.email}</div>
+                        </div>
+                      </div>
+                      <StatusBadge recruiter={r} />
+                    </div>
+                  ))}
+                  {selectedStatsRecruiters.length === 0 && (
+                    <p className="text-center text-gray-400 py-6">No recruiters in this category.</p>
+                  )}
+                </div>
+                <div className="flex justify-end mt-4">
+                  <Button onClick={() => setShowStatsModal(false)}>Close</Button>
+                </div>
+              </DialogPanel>
+            </div>
+          </Dialog>
+
+          {/* ── Candidates Modal ───────────────────────────────────────── */}
+          <Dialog open={showCandidatesModal} onClose={() => setShowCandidatesModal(false)} className="relative z-50">
+            <DialogBackdrop className="fixed inset-0 bg-black/50" />
+            <div className="fixed inset-0 flex items-center justify-center p-4">
+              <DialogPanel className="bg-white dark:bg-gray-900 w-full max-w-4xl rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
+                <DialogTitle className="text-xl font-bold mb-4">{candidatesModalTitle}</DialogTitle>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-gray-50 dark:bg-gray-800 text-xs uppercase text-gray-500">
+                      <tr>
+                        <th className="p-3">Name</th>
+                        <th className="p-3">Role / Client</th>
+                        <th className="p-3">Status</th>
+                        <th className="p-3">Email</th>
+                        <th className="p-3">Phone</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredCandidatesForModal().length > 0
+                        ? filteredCandidatesForModal().map((c, i) => (
+                          <tr key={i} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
+                            <td className="p-3 font-medium">{c.name}</td>
+                            <td className="p-3">
+                              <div>{c.position}</div>
+                              <div className="text-xs text-gray-400">{c.client}</div>
+                            </td>
+                            <td className="p-3">
+                              <div className="flex flex-wrap gap-1">
+                                {(Array.isArray(c.status) ? c.status : [c.status || '']).map((s) => (
+                                  <Badge key={s} variant="outline" className="text-xs">{s}</Badge>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="p-3 text-gray-500">{c.email}</td>
+                            <td className="p-3 text-gray-500">{c.contact}</td>
+                          </tr>
+                        ))
+                        : (
+                          <tr>
+                            <td colSpan={5} className="p-6 text-center text-gray-400">
+                              No candidates found.
+                            </td>
+                          </tr>
+                        )
+                      }
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex justify-end mt-4">
+                  <Button onClick={() => setShowCandidatesModal(false)}>Close</Button>
+                </div>
+              </DialogPanel>
+            </div>
+          </Dialog>
+
         </div>
-      </div>
     </div>
   );
 }

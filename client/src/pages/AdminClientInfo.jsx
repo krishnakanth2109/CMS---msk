@@ -1,15 +1,10 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { DashboardSidebar } from "@/components/DashboardSidebar";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BuildingOfficeIcon,
   UserIcon,
-  MagnifyingGlassIcon,
   XMarkIcon,
   EyeIcon,
   PencilIcon,
@@ -19,6 +14,8 @@ import {
 } from "@heroicons/react/24/outline";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
+const inputCls = "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 dark:text-white";
 
 /* ---------------- DETAIL MODAL ---------------- */
 
@@ -63,8 +60,7 @@ const ClientDetailCard = ({ client, onClose }) => {
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <h3 className="font-semibold text-lg mb-2 flex items-center gap-2">
-                  <UserIcon className="w-5 h-5" />
-                  Contact Info
+                  <UserIcon className="w-5 h-5" /> Contact Info
                 </h3>
                 <div className="space-y-2 text-sm">
                   <p><span className="font-medium">Person:</span> {client.contactPerson || "N/A"}</p>
@@ -74,11 +70,9 @@ const ClientDetailCard = ({ client, onClose }) => {
                   <p><span className="font-medium">Website:</span> {client.website || "N/A"}</p>
                 </div>
               </div>
-
               <div>
                 <h3 className="font-semibold text-lg mb-2 flex items-center gap-2">
-                  <BuildingOfficeIcon className="w-5 h-5" />
-                  Business Terms
+                  <BuildingOfficeIcon className="w-5 h-5" /> Business Terms
                 </h3>
                 <div className="space-y-2 text-sm">
                   <p><span className="font-medium">Commission:</span> {client.percentage ? `${client.percentage}%` : "N/A"}</p>
@@ -88,7 +82,6 @@ const ClientDetailCard = ({ client, onClose }) => {
                 </div>
               </div>
             </div>
-
             {client.terms && (
               <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
                 <h4 className="font-semibold mb-1">Terms & Conditions</h4>
@@ -111,22 +104,10 @@ const AdminClientInfo = () => {
   const [loading, setLoading] = useState(true);
 
   const initialFormState = {
-    companyName: "",
-    contactPerson: "",
-    email: "",
-    phone: "",
-    website: "",
-    address: "",
-    locationLink: "",
-    industry: "",
-    gstNumber: "",
-    notes: "",
-    clientId: "",
-    percentage: "",
-    candidatePeriod: "",
-    replacementPeriod: "",
-    terms: "",
-    active: true,
+    companyName: "", contactPerson: "", email: "", phone: "", website: "",
+    address: "", locationLink: "", industry: "", gstNumber: "", notes: "",
+    clientId: "", percentage: "", candidatePeriod: "", replacementPeriod: "",
+    terms: "", active: true,
   };
 
   const [form, setForm] = useState(initialFormState);
@@ -162,31 +143,18 @@ const AdminClientInfo = () => {
   const validateForm = () => {
     const e = {};
     if (!form.companyName.trim()) e.companyName = "Company required";
-
-    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
-      e.email = "Invalid email";
-
-    if (form.phone && form.phone.length !== 10)
-      e.phone = "Phone must be 10 digits";
-
-    if (form.percentage && (isNaN(form.percentage) || form.percentage > 100))
-      e.percentage = "Invalid %";
-
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Invalid email";
+    if (form.phone && form.phone.length !== 10) e.phone = "Phone must be 10 digits";
+    if (form.percentage && (isNaN(form.percentage) || form.percentage > 100)) e.percentage = "Invalid %";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-
     if (name === "phone" && /[^0-9]/.test(value)) return;
     if (name === "phone" && value.length > 10) return;
-
-    setForm({
-      ...form,
-      [name]: type === "checkbox" ? checked : value,
-    });
-
+    setForm({ ...form, [name]: type === "checkbox" ? checked : value });
     if (errors[name]) {
       const copy = { ...errors };
       delete copy[name];
@@ -196,22 +164,14 @@ const AdminClientInfo = () => {
 
   const handleSubmit = async () => {
     if (!validateForm()) return;
-
     try {
-      const url = editingClient
-        ? `${API_URL}/clients/${editingClient.id}`
-        : `${API_URL}/clients`;
-
-      const method = editingClient ? "PUT" : "POST";
-
+      const url = editingClient ? `${API_URL}/clients/${editingClient.id}` : `${API_URL}/clients`;
       const res = await fetch(url, {
-        method,
+        method: editingClient ? "PUT" : "POST",
         headers: getAuthHeader(),
         body: JSON.stringify(form),
       });
-
       if (!res.ok) throw new Error();
-
       toast({ title: "Success", description: "Client saved" });
       setShowForm(false);
       setEditingClient(null);
@@ -225,8 +185,7 @@ const AdminClientInfo = () => {
   const handleEditClient = (client) => {
     setEditingClient(client);
     setForm({
-      ...initialFormState,
-      ...client,
+      ...initialFormState, ...client,
       percentage: client.percentage?.toString() || "",
       candidatePeriod: client.candidatePeriod?.toString() || "",
       replacementPeriod: client.replacementPeriod?.toString() || "",
@@ -256,12 +215,10 @@ const AdminClientInfo = () => {
     const matchSearch =
       c.companyName.toLowerCase().includes(s) ||
       (c.email || "").toLowerCase().includes(s);
-
     const matchIndustry = industryFilter === "all" || c.industry === industryFilter;
     const matchStatus =
       statusFilter === "all" ||
       (statusFilter === "active" ? c.active !== false : c.active === false);
-
     return matchSearch && matchIndustry && matchStatus;
   });
 
@@ -272,103 +229,146 @@ const AdminClientInfo = () => {
   );
 
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
-      <DashboardSidebar />
-
+    <>
       <div className="flex-1 p-6 space-y-6">
         <div className="flex justify-between">
           <div>
             <h1 className="text-3xl font-bold">Client Information</h1>
             <p className="text-gray-500">Manage client companies</p>
           </div>
-          <Button
+          <button
             onClick={() => {
               setEditingClient(null);
               setShowForm(!showForm);
               setForm(initialFormState);
             }}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition"
           >
-            <PlusIcon className="w-4 h-4 mr-2" />
+            <PlusIcon className="w-4 h-4" />
             {showForm ? "Cancel" : "Add Client"}
-          </Button>
+          </button>
         </div>
 
+        {/* Form */}
         {showForm && (
-          <Card>
-            <CardHeader>
-              <CardTitle>{editingClient ? "Edit Client" : "Add Client"}</CardTitle>
-            </CardHeader>
-            <CardContent className="grid md:grid-cols-3 gap-4">
-              <Input name="companyName" placeholder="Company Name *" value={form.companyName} onChange={handleChange} />
-              <Input name="contactPerson" placeholder="Contact Person" value={form.contactPerson} onChange={handleChange} />
-              <Input name="email" placeholder="Email" value={form.email} onChange={handleChange} />
-              <Input name="phone" placeholder="Phone" value={form.phone} onChange={handleChange} />
-              <Input name="industry" placeholder="Industry" value={form.industry} onChange={handleChange} />
-              <Input name="percentage" placeholder="Commission %" value={form.percentage} onChange={handleChange} />
-
-              <div className="md:col-span-3 flex justify-end">
-                <Button onClick={handleSubmit}>
-                  {editingClient ? "Update Client" : "Save Client"}
-                </Button>
+          <div className="rounded-xl border border-border bg-card shadow-sm p-6">
+            <h3 className="font-semibold text-foreground mb-4">{editingClient ? "Edit Client" : "Add Client"}</h3>
+            <div className="grid md:grid-cols-3 gap-4">
+              <div>
+                <input name="companyName" placeholder="Company Name *" value={form.companyName} onChange={handleChange} className={`${inputCls} ${errors.companyName ? 'border-red-500' : ''}`} />
+                {errors.companyName && <p className="text-xs text-red-500 mt-1">{errors.companyName}</p>}
               </div>
-            </CardContent>
-          </Card>
+              <input name="contactPerson" placeholder="Contact Person" value={form.contactPerson} onChange={handleChange} className={inputCls} />
+              <div>
+                <input name="email" placeholder="Email" value={form.email} onChange={handleChange} className={`${inputCls} ${errors.email ? 'border-red-500' : ''}`} />
+                {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
+              </div>
+              <div>
+                <input name="phone" placeholder="Phone" value={form.phone} onChange={handleChange} className={`${inputCls} ${errors.phone ? 'border-red-500' : ''}`} />
+                {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
+              </div>
+              <input name="industry" placeholder="Industry" value={form.industry} onChange={handleChange} className={inputCls} />
+              <div>
+                <input name="percentage" placeholder="Commission %" value={form.percentage} onChange={handleChange} className={`${inputCls} ${errors.percentage ? 'border-red-500' : ''}`} />
+                {errors.percentage && <p className="text-xs text-red-500 mt-1">{errors.percentage}</p>}
+              </div>
+              <div className="md:col-span-3 flex justify-end">
+                <button
+                  onClick={handleSubmit}
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition"
+                >
+                  {editingClient ? "Update Client" : "Save Client"}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
+        {/* Search & Filters */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input
+            placeholder="Search by company or email..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className={`${inputCls} flex-1`}
+          />
+          <select value={industryFilter} onChange={e => setIndustryFilter(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none">
+            <option value="all">All Industries</option>
+            {uniqueIndustries.map(ind => <option key={ind} value={ind}>{ind}</option>)}
+          </select>
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none">
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+
+        {/* Table */}
         {loading ? (
-          <div className="text-center p-10">Loading clients...</div>
+          <div className="text-center p-10 text-gray-500">Loading clients...</div>
         ) : (
-          <Card>
-            <CardContent className="p-0">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-100 dark:bg-gray-800 text-xs uppercase">
-                  <tr>
-                    <th className="px-4 py-3">Client</th>
-                    <th className="px-4 py-3">Contact</th>
-                    <th className="px-4 py-3">Terms</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredClients.map((client) => (
-                    <tr key={client.id} className="border-b">
-                      <td className="px-4 py-3">
-                        <div>{client.companyName}</div>
-                        <div className="text-xs text-gray-500">{client.clientId}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div>{client.contactPerson || "-"}</div>
-                        <div className="text-xs text-gray-500">{client.email || "-"}</div>
-                      </td>
-                      <td className="px-4 py-3">{client.percentage ? `${client.percentage}%` : "-"}</td>
-                      <td className="px-4 py-3">{getStatusBadge(client)}</td>
-                      <td className="px-4 py-3 flex gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => setSelectedClient(client)}>
+          <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-100 dark:bg-gray-800 text-xs uppercase">
+                <tr>
+                  <th className="px-4 py-3 text-left">Client</th>
+                  <th className="px-4 py-3 text-left">Contact</th>
+                  <th className="px-4 py-3 text-left">Terms</th>
+                  <th className="px-4 py-3 text-left">Status</th>
+                  <th className="px-4 py-3 text-left">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredClients.length === 0 ? (
+                  <tr><td colSpan={5} className="text-center py-10 text-gray-400">No clients found.</td></tr>
+                ) : filteredClients.map((client) => (
+                  <tr key={client.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
+                    <td className="px-4 py-3">
+                      <div className="font-medium">{client.companyName}</div>
+                      <div className="text-xs text-gray-500">{client.clientId}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div>{client.contactPerson || "-"}</div>
+                      <div className="text-xs text-gray-500">{client.email || "-"}</div>
+                    </td>
+                    <td className="px-4 py-3">{client.percentage ? `${client.percentage}%` : "-"}</td>
+                    <td className="px-4 py-3">{getStatusBadge(client)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setSelectedClient(client)}
+                          className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                        >
                           <EyeIcon className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleEditClient(client)}>
+                        </button>
+                        <button
+                          onClick={() => handleEditClient(client)}
+                          className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                        >
                           <PencilIcon className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleToggleActive(client)}>
+                        </button>
+                        <button
+                          onClick={() => handleToggleActive(client)}
+                          className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                        >
                           {client.active !== false
                             ? <NoSymbolIcon className="w-4 h-4 text-red-500" />
                             : <CheckCircleIcon className="w-4 h-4 text-green-500" />}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
       {selectedClient && (
         <ClientDetailCard client={selectedClient} onClose={() => setSelectedClient(null)} />
       )}
-    </div>
+    </>
   );
 };
 

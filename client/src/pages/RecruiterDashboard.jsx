@@ -1,16 +1,13 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { DashboardSidebar } from '@/components/DashboardSidebar';
 import { 
   Users, Briefcase, ClipboardList, Calendar, TrendingUp, 
   CheckCircle2, ArrowUpRight, ArrowDownRight, UserCheck, 
   Bell, ChevronDown, CalendarDays, Filter, X, Mail, XCircle
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { Card } from '@/components/ui/card';
+import { useAuth } from '@/context/AuthContext';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell,
 } from 'recharts';
-import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import DatePicker from 'react-datepicker';
@@ -325,10 +322,10 @@ export default function RecruiterDashboard() {
       ['Submitted', 'Pending'].includes(c.status)
     ).length;
 
-    const interview = filteredCandidates.filter(c => 
-      c.status.includes('Interview') || 
-      c.status === 'Interview'
-    ).length;
+    const interview = filteredCandidates.filter(c => {
+      const s = Array.isArray(c.status) ? c.status.join(' ') : (c.status || '');
+      return s.includes('Interview');
+    }).length;
 
     const offer = filteredCandidates.filter(c => c.status === 'Offer').length;
     const joined = filteredCandidates.filter(c => c.status === 'Joined').length;
@@ -370,15 +367,7 @@ export default function RecruiterDashboard() {
 
   // Navigation
   const handleNavigateToCandidates = (status) => {
-    if (status === 'Rejected') {
-      navigate(`/recruiter/candidates?status=${status}`);
-    } else if (status === 'Hold') {
-      navigate(`/recruiter/candidates?status=${status}`);
-    } else if (status === 'Joined') {
-      navigate(`/recruiter/candidates?status=${status}`);
-    } else if (status === 'Submitted') {
-      navigate(`/recruiter/candidates?status=${status}`);
-    } else if (status === 'Selected') {
+    if (status) {
       navigate(`/recruiter/candidates?status=${status}`);
     } else {
       navigate('/recruiter/candidates');
@@ -413,262 +402,208 @@ export default function RecruiterDashboard() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen bg-gray-100 dark:bg-gray-900">
-        <DashboardSidebar />
-        <main className="flex-1 flex items-center justify-center">
-          <div className="animate-spin h-12 w-12 border-4 border-blue-500 rounded-full border-t-transparent"></div>
-        </main>
-      </div>
+      <main className="flex-1 flex items-center justify-center">
+        <div className="animate-spin h-12 w-12 border-4 border-blue-500 rounded-full border-t-transparent"></div>
+      </main>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-100 dark:bg-gray-900">
-      <DashboardSidebar />
-      
-      <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-        <div className="max-w-[1600px] mx-auto space-y-6 md:space-y-8">
-          
-          {/* Header Section */}
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
-              <div>
-                <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 dark:from-blue-400 dark:via-purple-400 dark:to-blue-200">
-                  Recruiter Dashboard
-                </h1>
-                <p className="text-base md:text-lg font-medium text-gray-800 dark:text-gray-200 mt-1">
-                  {getUserGreeting()}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="relative" ref={notificationsRef}>
-                  <button onClick={() => setNotificationsOpen(!notificationsOpen)} className="relative p-2 text-gray-600 dark:text-gray-300 hover:text-blue-600 bg-white/80 dark:bg-gray-800/80 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 transition-colors">
-                    <Bell className="w-5 h-5" />
-                    {unreadCount > 0 && <span className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full">{unreadCount}</span>}
-                  </button>
-                  {notificationsOpen && (
-                    <div className="absolute right-0 top-12 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 z-[9998] max-h-96 overflow-y-auto">
-                      <div className="p-4 border-b border-gray-200 font-semibold text-sm">Notifications</div>
-                      {notifications.length === 0 ? <div className="p-4 text-center text-gray-500">No notifications</div> : notifications.map(n => (
-                        <div key={n.id} className={clsx("p-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50", !n.read && "bg-blue-50")}>
-                          <p className="text-sm font-medium">{n.title}</p>
-                          <p className="text-xs text-gray-500">{n.message}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+    <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+      <div className="max-w-[1600px] mx-auto space-y-6 md:space-y-8">
+        
+        {/* Header Section */}
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
+            <div>
+              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 dark:from-blue-400 dark:via-purple-400 dark:to-blue-200">
+                Recruiter Dashboard
+              </h1>
+              <p className="text-base md:text-lg font-medium text-gray-800 dark:text-gray-200 mt-1">
+                {getUserGreeting()}
+              </p>
             </div>
 
-            {/* Date Filter */}
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <CalendarDays className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter Stats by Date</span>
+            <div className="flex items-center gap-3">
+              <div className="relative" ref={notificationsRef}>
+                <button onClick={() => setNotificationsOpen(!notificationsOpen)} className="relative p-2 text-gray-600 dark:text-gray-300 hover:text-blue-600 bg-white/80 dark:bg-gray-800/80 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 transition-colors">
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && <span className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full">{unreadCount}</span>}
+                </button>
+                {notificationsOpen && (
+                  <div className="absolute right-0 top-12 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 z-[9998] max-h-96 overflow-y-auto">
+                    <div className="p-4 border-b border-gray-200 font-semibold text-sm">Notifications</div>
+                    {notifications.length === 0 ? <div className="p-4 text-center text-gray-500">No notifications</div> : notifications.map(n => (
+                      <div key={n.id} className={clsx("p-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50", !n.read && "bg-blue-50")}>
+                        <p className="text-sm font-medium">{n.title}</p>
+                        <p className="text-xs text-gray-500">{n.message}</p>
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                    <div className="relative flex-1 md:w-48">
-                      <DatePicker selected={startDate} onChange={(d) => setStartDate(d)} selectsStart startDate={startDate} endDate={endDate} placeholderText="Start Date" customInput={<CustomDateInput isMobile={isMobile} placeholder="Start Date" />} wrapperClassName="w-full" popperContainer={PopperContainer} popperClassName="!z-[9999]" isClearable />
-                    </div>
-                    <div className="relative flex-1 md:w-48">
-                      <DatePicker selected={endDate} onChange={(d) => setEndDate(d)} selectsEnd startDate={startDate} endDate={endDate} minDate={startDate || undefined} placeholderText="End Date" customInput={<CustomDateInput isMobile={isMobile} placeholder="End Date" />} wrapperClassName="w-full" popperContainer={PopperContainer} popperClassName="!z-[9999]" isClearable />
-                    </div>
-                  </div>
-                </div>
-            </div>
-          </div>
-
-          {/* KPI Row 1 */}
-          <div className="grid gap-3 md:gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-            <ProfessionalStatCard 
-              title="Total Candidates" 
-              value={candidateStats.total} 
-              icon={Users} 
-              trend={0} 
-              onClick={() => handleNavigateToCandidates()} 
-              borderColor="border-blue-200 dark:border-blue-800" 
-              iconColor="text-blue-600 dark:text-blue-400" 
-            />
-            <ProfessionalStatCard 
-              title="Assigned Jobs" 
-              value={jobStats.totalAssignedJobs} 
-              icon={Briefcase} 
-              trend={0} 
-              onClick={handleNavigateToAssignments} 
-              borderColor="border-green-200 dark:border-green-800" 
-              iconColor="text-green-600 dark:text-green-400" 
-            />
-            <ProfessionalStatCard 
-              title="Interviews" 
-              value={interviewStats.totalInterviews} 
-              icon={Calendar} 
-              trend={0} 
-              onClick={handleNavigateToSchedules} 
-              borderColor="border-purple-200 dark:border-purple-800" 
-              iconColor="text-purple-600 dark:text-purple-400" 
-            />
-            <ProfessionalStatCard 
-              title="Performance" 
-              value={`${candidateStats.successRate}%`} 
-              icon={TrendingUp} 
-              trend={parseFloat(candidateStats.successRate) > 0 ? 1 : 0} 
-              borderColor="border-indigo-200 dark:border-indigo-800" 
-              iconColor="text-indigo-600 dark:text-indigo-400" 
-            />
-          </div>
-
-          {/* KPI Row 2 */}
-          <div className="grid gap-3 md:gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-            <ProfessionalStatCard 
-              title="Selected" 
-              value={candidateStats.selected} 
-              icon={ClipboardList} 
-              onClick={() => handleNavigateToCandidates('Selected')} 
-              borderColor="border-blue-200 dark:border-blue-800" 
-              iconColor="text-blue-600 dark:text-blue-400" 
-            />
-            <ProfessionalStatCard 
-              title="Rejected" 
-              value={candidateStats.rejected} 
-              icon={XCircle} 
-              onClick={() => handleNavigateToCandidates('Rejected')} 
-              borderColor="border-red-200 dark:border-red-800" 
-              iconColor="text-red-600 dark:text-red-400" 
-            />
-            <ProfessionalStatCard 
-              title="Hold" 
-              value={candidateStats.hold} 
-              icon={CheckCircle2} 
-              onClick={() => handleNavigateToCandidates('Hold')} 
-              borderColor="border-purple-200 dark:border-purple-800" 
-              iconColor="text-purple-600 dark:text-purple-400" 
-            />
-            <ProfessionalStatCard 
-              title="Joined" 
-              value={candidateStats.joined} 
-              icon={UserCheck} 
-              onClick={() => handleNavigateToCandidates('Joined')} 
-              borderColor="border-emerald-200 dark:border-emerald-800" 
-              iconColor="text-emerald-600 dark:text-emerald-400" 
-            />
-          </div>
-
-          {/* Charts Section */}
-          <div className="grid gap-4 lg:gap-6 grid-cols-1 lg:grid-cols-2">
-            <Card className="p-4 md:p-6 shadow-lg border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-              <h3 className="text-base md:text-lg font-semibold text-gray-800 dark:text-white mb-4">Candidate Pipeline</h3>
-              <div className="h-64 md:h-72 lg:h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={pipelineData}>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend />
-                    <Bar dataKey="Submitted" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Interview" fill="#F59E0B" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Offer" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Joined" fill="#10B981" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Rejected" fill="#EF4444" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-
-            <Card className="p-4 md:p-6 shadow-lg border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-              <h3 className="text-base md:text-lg font-semibold text-gray-800 dark:text-white mb-4">Status Distribution</h3>
-              <div className="h-64 md:h-72 lg:h-80">
-                {pieData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={2} dataKey="value" label>
-                        {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                      </Pie>
-                      <Tooltip />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-gray-400">No data available</div>
                 )}
               </div>
-            </Card>
+            </div>
           </div>
 
-          {/* Quick Access Tables */}
-          <div className="grid gap-4 lg:gap-6 grid-cols-1 lg:grid-cols-2">
-            <Card className="p-4 md:p-6 shadow-lg border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Recent Candidates</h3>
-                <button onClick={() => handleNavigateToCandidates()} className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">View All</button>
+          {/* Date Filter */}
+          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <CalendarDays className="w-4 h-4 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter Stats by Date</span>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-gray-50 dark:bg-gray-700 text-xs uppercase text-gray-500 font-medium">
-                    <tr><th className="p-3">Name</th><th className="p-3">Position</th><th className="p-3">Status</th></tr>
-                  </thead>
-                  <tbody>
-                    {filteredCandidates.slice(0, 5).map(c => (
-                      <tr key={c.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                        <td className="p-3 font-medium">{c.name}</td>
-                        <td className="p-3 text-gray-600 dark:text-gray-300">{c.position}</td>
-                        <td className="p-3">
-                          <span className={clsx("px-2 py-1 rounded-full text-xs font-medium", 
-                            c.status === 'Joined' ? "bg-green-100 text-green-800" : 
-                            c.status === 'Rejected' ? "bg-red-100 text-red-800" : 
-                            c.status === 'Offer' ? "bg-purple-100 text-purple-800" : 
-                            c.status.includes('Interview') ? "bg-amber-100 text-amber-800" : 
-                            "bg-blue-100 text-blue-800" 
-                          )}>{c.status}</span>
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredCandidates.length === 0 && <tr><td colSpan={3} className="p-4 text-center">No candidates found</td></tr>}
-                  </tbody>
-                </table>
+              <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                <div className="relative flex-1 md:w-48">
+                  <DatePicker selected={startDate} onChange={(d) => setStartDate(d)} selectsStart startDate={startDate} endDate={endDate} placeholderText="Start Date" customInput={<CustomDateInput isMobile={isMobile} placeholder="Start Date" />} wrapperClassName="w-full" popperContainer={PopperContainer} popperClassName="!z-[9999]" isClearable />
+                </div>
+                <div className="relative flex-1 md:w-48">
+                  <DatePicker selected={endDate} onChange={(d) => setEndDate(d)} selectsEnd startDate={startDate} endDate={endDate} minDate={startDate || undefined} placeholderText="End Date" customInput={<CustomDateInput isMobile={isMobile} placeholder="End Date" />} wrapperClassName="w-full" popperContainer={PopperContainer} popperClassName="!z-[9999]" isClearable />
+                </div>
               </div>
-            </Card>
-
-            <Card className="p-4 md:p-6 shadow-lg border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Upcoming Interviews</h3>
-                <button onClick={handleNavigateToSchedules} className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">Calendar</button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-gray-50 dark:bg-gray-700 text-xs uppercase text-gray-500 font-medium">
-                    <tr><th className="p-3">Candidate</th><th className="p-3">Date</th><th className="p-3">Type</th></tr>
-                  </thead>
-                  <tbody>
-                    {filteredInterviews.slice(0, 5).map(i => (
-                      <tr key={i.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50">
-                        <td className="p-3 font-medium">{i.candidateName}</td>
-                        <td className="p-3">
-                          <div className="font-medium">{new Date(i.interviewDate).toLocaleDateString()}</div>
-                          <div className="text-xs text-gray-500">{new Date(i.interviewDate).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
-                        </td>
-                        <td className="p-3"><span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">{i.interviewType}</span></td>
-                      </tr>
-                    ))}
-                    {filteredInterviews.length === 0 && <tr><td colSpan={3} className="p-4 text-center">No upcoming interviews</td></tr>}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
+            </div>
           </div>
-
-          <div className="grid gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-             <Button onClick={() => handleNavigateToCandidates()} className="h-auto py-4 px-6 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl shadow-lg flex flex-col items-center gap-3"><Users className="w-6 h-6"/><div className="text-center"><div className="font-semibold text-lg">My Candidates</div><div className="text-sm opacity-90">Manage pipeline</div></div></Button>
-             <Button onClick={handleNavigateToAssignments} className="h-auto py-4 px-6 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl shadow-lg flex flex-col items-center gap-3"><Briefcase className="w-6 h-6"/><div className="text-center"><div className="font-semibold text-lg">My Assignments</div><div className="text-sm opacity-90">View jobs</div></div></Button>
-             <Button onClick={handleNavigateToSchedules} className="h-auto py-4 px-6 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl shadow-lg flex flex-col items-center gap-3"><Calendar className="w-6 h-6"/><div className="text-center"><div className="font-semibold text-lg">My Schedule</div><div className="text-sm opacity-90">View calendar</div></div></Button>
-             <Button onClick={handleNavigateToMessages} className="h-auto py-4 px-6 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl shadow-lg flex flex-col items-center gap-3"><Mail className="w-6 h-6"/><div className="text-center"><div className="font-semibold text-lg">Messages</div><div className="text-sm opacity-90">Team chat</div></div></Button>
-          </div>
-
         </div>
-      </main>
-    </div>
+
+        {/* KPI Row 1 */}
+        <div className="grid gap-3 md:gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          <ProfessionalStatCard title="Total Candidates" value={candidateStats.total} icon={Users} trend={0} onClick={() => handleNavigateToCandidates()} borderColor="border-blue-200 dark:border-blue-800" iconColor="text-blue-600 dark:text-blue-400" />
+          <ProfessionalStatCard title="Assigned Jobs" value={jobStats.totalAssignedJobs} icon={Briefcase} trend={0} onClick={handleNavigateToAssignments} borderColor="border-green-200 dark:border-green-800" iconColor="text-green-600 dark:text-green-400" />
+          <ProfessionalStatCard title="Interviews" value={interviewStats.totalInterviews} icon={Calendar} trend={0} onClick={handleNavigateToSchedules} borderColor="border-purple-200 dark:border-purple-800" iconColor="text-purple-600 dark:text-purple-400" />
+          <ProfessionalStatCard title="Performance" value={`${candidateStats.successRate}%`} icon={TrendingUp} trend={parseFloat(candidateStats.successRate) > 0 ? 1 : 0} borderColor="border-indigo-200 dark:border-indigo-800" iconColor="text-indigo-600 dark:text-indigo-400" />
+        </div>
+
+        {/* KPI Row 2 */}
+        <div className="grid gap-3 md:gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          <ProfessionalStatCard title="Selected" value={candidateStats.selected} icon={ClipboardList} onClick={() => handleNavigateToCandidates('Selected')} borderColor="border-blue-200 dark:border-blue-800" iconColor="text-blue-600 dark:text-blue-400" />
+          <ProfessionalStatCard title="Rejected" value={candidateStats.rejected} icon={XCircle} onClick={() => handleNavigateToCandidates('Rejected')} borderColor="border-red-200 dark:border-red-800" iconColor="text-red-600 dark:text-red-400" />
+          <ProfessionalStatCard title="Hold" value={candidateStats.hold} icon={CheckCircle2} onClick={() => handleNavigateToCandidates('Hold')} borderColor="border-purple-200 dark:border-purple-800" iconColor="text-purple-600 dark:text-purple-400" />
+          <ProfessionalStatCard title="Joined" value={candidateStats.joined} icon={UserCheck} onClick={() => handleNavigateToCandidates('Joined')} borderColor="border-emerald-200 dark:border-emerald-800" iconColor="text-emerald-600 dark:text-emerald-400" />
+        </div>
+
+        {/* Charts Section */}
+        <div className="grid gap-4 lg:gap-6 grid-cols-1 lg:grid-cols-2">
+          <div className="p-4 md:p-6 shadow-lg rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700">
+            <h3 className="text-base md:text-lg font-semibold text-gray-800 dark:text-white mb-4">Candidate Pipeline</h3>
+            <div className="h-64 md:h-72 lg:h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={pipelineData}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                  <Bar dataKey="Submitted" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Interview" fill="#F59E0B" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Offer" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Joined" fill="#10B981" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Rejected" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="p-4 md:p-6 shadow-lg rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700">
+            <h3 className="text-base md:text-lg font-semibold text-gray-800 dark:text-white mb-4">Status Distribution</h3>
+            <div className="h-64 md:h-72 lg:h-80">
+              {pieData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={2} dataKey="value" label>
+                      {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-400">No data available</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Access Tables */}
+        <div className="grid gap-4 lg:gap-6 grid-cols-1 lg:grid-cols-2">
+          <div className="p-4 md:p-6 shadow-lg rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Recent Candidates</h3>
+              <button onClick={() => handleNavigateToCandidates()} className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">View All</button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-50 dark:bg-gray-700 text-xs uppercase text-gray-500 font-medium">
+                  <tr><th className="p-3">Name</th><th className="p-3">Position</th><th className="p-3">Status</th></tr>
+                </thead>
+                <tbody>
+                  {filteredCandidates.slice(0, 5).map(c => (
+                    <tr key={c.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                      <td className="p-3 font-medium">{c.name}</td>
+                      <td className="p-3 text-gray-600 dark:text-gray-300">{c.position}</td>
+                      <td className="p-3">
+                        <span className={clsx("px-2 py-1 rounded-full text-xs font-medium", 
+                          (Array.isArray(c.status) ? c.status.includes('Joined') : c.status === 'Joined') ? "bg-green-100 text-green-800" : 
+                          (Array.isArray(c.status) ? c.status.includes('Rejected') : c.status === 'Rejected') ? "bg-red-100 text-red-800" : 
+                          (Array.isArray(c.status) ? c.status.includes('Offer') : c.status === 'Offer') ? "bg-purple-100 text-purple-800" : 
+                          (Array.isArray(c.status) ? c.status.some(s => s.includes('Interview')) : (c.status || '').includes('Interview')) ? "bg-amber-100 text-amber-800" : 
+                          "bg-blue-100 text-blue-800" 
+                        )}>{Array.isArray(c.status) ? c.status[0] : c.status}</span>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredCandidates.length === 0 && <tr><td colSpan={3} className="p-4 text-center">No candidates found</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="p-4 md:p-6 shadow-lg rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Upcoming Interviews</h3>
+              <button onClick={handleNavigateToSchedules} className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">Calendar</button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-50 dark:bg-gray-700 text-xs uppercase text-gray-500 font-medium">
+                  <tr><th className="p-3">Candidate</th><th className="p-3">Date</th><th className="p-3">Type</th></tr>
+                </thead>
+                <tbody>
+                  {filteredInterviews.slice(0, 5).map(i => (
+                    <tr key={i.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50">
+                      <td className="p-3 font-medium">{i.candidateName}</td>
+                      <td className="p-3">
+                        <div className="font-medium">{new Date(i.interviewDate).toLocaleDateString()}</div>
+                        <div className="text-xs text-gray-500">{new Date(i.interviewDate).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
+                      </td>
+                      <td className="p-3"><span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">{i.interviewType}</span></td>
+                    </tr>
+                  ))}
+                  {filteredInterviews.length === 0 && <tr><td colSpan={3} className="p-4 text-center">No upcoming interviews</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          <button onClick={() => handleNavigateToCandidates()} className="h-auto py-4 px-6 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl shadow-lg flex flex-col items-center gap-3 hover:from-blue-700 hover:to-blue-800 transition-all">
+            <Users className="w-6 h-6"/>
+            <div className="text-center"><div className="font-semibold text-lg">My Candidates</div><div className="text-sm opacity-90">Manage pipeline</div></div>
+          </button>
+          <button onClick={handleNavigateToAssignments} className="h-auto py-4 px-6 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl shadow-lg flex flex-col items-center gap-3 hover:from-green-700 hover:to-green-800 transition-all">
+            <Briefcase className="w-6 h-6"/>
+            <div className="text-center"><div className="font-semibold text-lg">My Assignments</div><div className="text-sm opacity-90">View jobs</div></div>
+          </button>
+          <button onClick={handleNavigateToSchedules} className="h-auto py-4 px-6 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl shadow-lg flex flex-col items-center gap-3 hover:from-purple-700 hover:to-purple-800 transition-all">
+            <Calendar className="w-6 h-6"/>
+            <div className="text-center"><div className="font-semibold text-lg">My Schedule</div><div className="text-sm opacity-90">View calendar</div></div>
+          </button>
+          <button onClick={handleNavigateToMessages} className="h-auto py-4 px-6 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl shadow-lg flex flex-col items-center gap-3 hover:from-indigo-700 hover:to-indigo-800 transition-all">
+            <Mail className="w-6 h-6"/>
+            <div className="text-center"><div className="font-semibold text-lg">Messages</div><div className="text-sm opacity-90">Team chat</div></div>
+          </button>
+        </div>
+
+      </div>
+    </main>
   );
 }

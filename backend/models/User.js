@@ -1,54 +1,56 @@
-
 import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// User Model — Firebase owns authentication (passwords/tokens).
+// MongoDB stores profile data + firebaseUid for lookup.
+// We no longer store or hash passwords here.
+// ─────────────────────────────────────────────────────────────────────────────
 const userSchema = mongoose.Schema({
-  recruiterId: { 
-    type: String, 
-    unique: true, 
-    sparse: true, 
-    required: false 
-  }, 
-  name: { type: String, required: true },
+  // Firebase UID — the critical link between Firebase Auth and MongoDB
+  // The protect middleware looks users up by this field on every request
+  firebaseUid: {
+    type: String,
+    unique: true,
+    sparse: true, // allow null for legacy records during migration
+  },
+
+  recruiterId: {
+    type: String,
+    unique: true,
+    sparse: true,
+    required: false
+  },
+
+  name:     { type: String, required: true },
   username: { type: String },
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
+  email:    { type: String, required: true, unique: true },
+
+  // Password field kept ONLY for bcrypt legacy support during migration.
+  // New accounts created via Firebase should NOT use this field.
+  password: { type: String, required: false },
+
   phone: { type: String },
-  role: { 
-    type: String, 
+  role: {
+    type: String,
     enum: ['admin', 'recruiter'],
-    default: 'recruiter' 
+    default: 'recruiter'
   },
   profilePicture: { type: String },
   active: { type: Boolean, default: true },
-  
-  // Extended Profile Fields
-  location: { type: String },
+
+  // Extended Profile
+  location:       { type: String },
   specialization: { type: String },
-  experience: { type: String },
-  bio: { type: String },
+  experience:     { type: String },
+  bio:            { type: String },
   socials: {
     linkedin: String,
-    github: String,
-    twitter: String,
-    website: String
+    github:   String,
+    twitter:  String,
+    website:  String
   }
 }, {
   timestamps: true,
-});
-
-// Match Password
-userSchema.methods.matchPassword = async function (enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
-};
-
-// Hash Password before saving
-userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) {
-    next();
-  }
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
 });
 
 const User = mongoose.model('User', userSchema);

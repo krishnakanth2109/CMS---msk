@@ -1,32 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { DashboardSidebar } from '@/components/DashboardSidebar';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Search, Filter, Download, User, Phone, Mail, Building,
-  Plus, Edit, Eye, LayoutGrid, List,
-  FileText, Loader2, Award, MessageCircle, Users,
-  ArrowUpDown, ArrowUp, ArrowDown
+  Search, MessageCircle, Loader2, ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -89,30 +63,23 @@ export default function AdminCandidates() {
   const [resumeFile, setResumeFile] = useState(null);
 
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    contact: '',
-    position: '',
-    skills: '',
-    client: '',
-    status: 'Submitted',
-    recruiterId: '',
-    assignedJobId: '',
-    totalExperience: '',
-    relevantExperience: '',
-    ctc: '',
-    ectc: '',
-    servingNoticePeriod: 'false',
-    noticePeriodDays: '',
-    offersInHand: 'false',
-    offerPackage: '',
-    notes: '',
+    name: '', email: '', contact: '', position: '', skills: '', client: '',
+    status: 'Submitted', recruiterId: '', assignedJobId: '',
+    totalExperience: '', relevantExperience: '', ctc: '', ectc: '',
+    servingNoticePeriod: 'false', noticePeriodDays: '',
+    offersInHand: 'false', offerPackage: '', notes: '',
     dateAdded: new Date().toISOString().split('T')[0],
   });
 
-  const getAuthHeader = () => ({
-    Authorization: `Bearer ${sessionStorage.getItem('authToken')}`
-  });
+  const getAuthHeader = () => {
+    try {
+      const stored = sessionStorage.getItem('currentUser');
+      const token = stored ? JSON.parse(stored)?.idToken : null;
+      return { Authorization: `Bearer ${token || ''}` };
+    } catch {
+      return {};
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -146,9 +113,7 @@ export default function AdminCandidates() {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const validateForm = () => {
     const newErrors = {};
@@ -172,7 +137,6 @@ export default function AdminCandidates() {
 
     if (data.servingNoticePeriod === 'true' && !data.noticePeriodDays)
       newErrors.noticePeriodDays = 'Specify days';
-
     if (data.offersInHand === 'true' && !data.offerPackage)
       newErrors.offerPackage = 'Specify package';
 
@@ -207,9 +171,7 @@ export default function AdminCandidates() {
         c.recruiterId && typeof c.recruiterId === 'object'
           ? c.recruiterId._id
           : c.recruiterId;
-
-      const matchesRecruiter =
-        recruiterFilter === 'all' || cRecruiterId === recruiterFilter;
+      const matchesRecruiter = recruiterFilter === 'all' || cRecruiterId === recruiterFilter;
 
       let statCardMatch = true;
       if (activeStatFilter) {
@@ -224,13 +186,8 @@ export default function AdminCandidates() {
 
     if (sortConfig) {
       result.sort((a, b) => {
-        const aValue = sortConfig.key === 'candidateId'
-          ? a.candidateId
-          : a[sortConfig.key];
-        const bValue = sortConfig.key === 'candidateId'
-          ? b.candidateId
-          : b[sortConfig.key];
-
+        const aValue = sortConfig.key === 'candidateId' ? a.candidateId : a[sortConfig.key];
+        const bValue = sortConfig.key === 'candidateId' ? b.candidateId : b[sortConfig.key];
         if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
         if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
@@ -282,11 +239,172 @@ export default function AdminCandidates() {
     rejected: candidates.filter(c => c.status === 'Rejected').length
   }), [candidates]);
 
-  /* JSX below unchanged */
   return (
-    <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950">
-      <DashboardSidebar />
-      {/* UI unchanged */}
+    <div className="flex-1 p-4 md:p-6 overflow-y-auto">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Candidates</h1>
+            <p className="text-slate-500">Manage all candidate records</p>
+          </div>
+        </div>
+
+        {/* Stats Row */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+          <StatCard title="Total" value={stats.total} color="blue" onClick={() => setActiveStatFilter(null)} active={activeStatFilter === null} />
+          <StatCard title="Active" value={stats.active} color="green" onClick={() => setActiveStatFilter('active')} active={activeStatFilter === 'active'} />
+          <StatCard title="Submitted" value={stats.submitted} color="slate" onClick={() => setActiveStatFilter('submitted')} active={activeStatFilter === 'submitted'} />
+          <StatCard title="Interview" value={stats.interview} color="orange" onClick={() => setActiveStatFilter('interview')} active={activeStatFilter === 'interview'} />
+          <StatCard title="Offer" value={stats.offer} color="purple" onClick={() => setActiveStatFilter('offer')} active={activeStatFilter === 'offer'} />
+          <StatCard title="Joined" value={stats.joined} color="teal" />
+          <StatCard title="Rejected" value={stats.rejected} color="red" />
+        </div>
+
+        {/* Controls */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by name, email, client..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none"
+          >
+            <option value="all">All Status</option>
+            <option value="Submitted">Submitted</option>
+            <option value="L1 Interview">L1 Interview</option>
+            <option value="L2 Interview">L2 Interview</option>
+            <option value="Offer">Offer</option>
+            <option value="Joined">Joined</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+          <select
+            value={recruiterFilter}
+            onChange={e => setRecruiterFilter(e.target.value)}
+            className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none"
+          >
+            <option value="all">All Recruiters</option>
+            {recruiters.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+          </select>
+        </div>
+
+        {/* Table */}
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-slate-50 dark:bg-slate-800 text-xs uppercase text-slate-500 border-b border-slate-200 dark:border-slate-700">
+                <tr>
+                  <th className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      onChange={e => handleSelectAll(e.target.checked)}
+                      checked={selectedIds.length === filteredCandidates.length && filteredCandidates.length > 0}
+                      className="rounded"
+                    />
+                  </th>
+                  <th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('candidateId')}>
+                    <span className="flex items-center gap-1">
+                      ID
+                      {sortConfig?.key === 'candidateId'
+                        ? sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                        : <ArrowUpDown className="h-3 w-3 opacity-40" />}
+                    </span>
+                  </th>
+                  <th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('name')}>
+                    <span className="flex items-center gap-1">
+                      Name
+                      {sortConfig?.key === 'name'
+                        ? sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                        : <ArrowUpDown className="h-3 w-3 opacity-40" />}
+                    </span>
+                  </th>
+                  <th className="px-4 py-3">Contact</th>
+                  <th className="px-4 py-3">Position / Client</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Recruiter</th>
+                  <th className="px-4 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {filteredCandidates.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="text-center py-12 text-slate-400">No candidates found.</td>
+                  </tr>
+                ) : filteredCandidates.map(c => (
+                  <tr key={c._id || c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(c._id || c.id)}
+                        onChange={e => handleSelectOne(c._id || c.id, e.target.checked)}
+                        className="rounded"
+                      />
+                    </td>
+                    <td
+                      className="px-4 py-3 font-mono text-xs text-slate-500 cursor-pointer"
+                      onClick={() => copyCandidateId(c.candidateId)}
+                    >
+                      {getCandidateId(c)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold flex-shrink-0">
+                          {getInitials(c.name)}
+                        </div>
+                        <div>
+                          <div className="font-medium text-slate-900 dark:text-white">{c.name}</div>
+                          <div className="text-xs text-slate-400">{c.email}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-500">{c.contact || '-'}</td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium">{c.position || '-'}</div>
+                      <div className="text-xs text-slate-400">{c.client || '-'}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        c.status === 'Joined' ? 'bg-green-100 text-green-800' :
+                        c.status === 'Offer' ? 'bg-purple-100 text-purple-800' :
+                        c.status === 'Rejected' ? 'bg-red-100 text-red-800' :
+                        c.status?.includes('Interview') ? 'bg-orange-100 text-orange-800' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
+                        {c.status || 'Submitted'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-500">
+                      {typeof c.recruiterId === 'object'
+                        ? c.recruiterId?.name
+                        : recruiters.find(r => r.id === c.recruiterId)?.name || '-'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => handleWhatsApp(c)}
+                        className="p-1.5 text-green-600 hover:bg-green-50 rounded-md"
+                        title="WhatsApp"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
