@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { 
@@ -8,16 +8,13 @@ import {
   LogOut, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
-export default function Sidebar() {
+// Receive the state and toggle function as props from DashboardLayout
+export default function Sidebar({ isCollapsed, setIsCollapsed }) {
   const { userRole, logout, currentUser } = useAuth();
   
-  // State to control Sidebar Collapse/Expand
-  const [isCollapsed, setIsCollapsed] = useState(false);
-
   // 🔴 ADMIN LINKS
   const adminLinks = [
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
-    // { name: 'Candidates', path: '/admin/candidates', icon: Users },
     { name: 'Add Candidate', path: '/admin/add-candidate', icon: UserPlus },
     { name: 'Recruiters', path: '/admin/recruiters', icon: Briefcase },
     { name: 'Client Info', path: '/admin/clients', icon: Building2 },

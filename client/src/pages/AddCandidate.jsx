@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Search, Plus, Eye, Loader2, MessageCircle,
-  ArrowUpDown, ArrowUp, ArrowDown
+  ArrowUpDown, ArrowUp, ArrowDown, Users
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -81,6 +81,10 @@ export default function AdminCandidates() {
   const [activeStatFilter, setActiveStatFilter] = useState(null);
   const [sortConfig, setSortConfig]           = useState(null);
   const [selectedIds, setSelectedIds]         = useState([]);
+
+  // Bulk Assign States
+  const [bulkRecruiterId, setBulkRecruiterId] = useState('');
+  const [isBulkAssigning, setIsBulkAssigning] = useState(false);
 
   const [isDialogOpen, setIsDialogOpen]           = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen]   = useState(false);
@@ -277,6 +281,53 @@ export default function AdminCandidates() {
     };
   }, [candidates]);
 
+  // ── Bulk Selection Helpers ──────────────────────────────────────────────────
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedIds(filteredCandidates.map(c => c._id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (e, id) => {
+    if (e.target.checked) {
+      setSelectedIds(prev => [...prev, id]);
+    } else {
+      setSelectedIds(prev => prev.filter(item => item !== id));
+    }
+  };
+
+  const handleBulkAssign = async () => {
+    if (!bulkRecruiterId) {
+      toast({ title: 'Error', description: 'Please select a recruiter first', variant: 'destructive' });
+      return;
+    }
+    setIsBulkAssigning(true);
+    try {
+      const res = await fetch(`${API_URL}/candidates/bulk-assign`, {
+        method: 'PUT',
+        headers: getAuthHeader(),
+        body: JSON.stringify({
+          candidateIds: selectedIds,
+          recruiterId: bulkRecruiterId
+        })
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      
+      toast({ title: 'Success', description: data.message || `Successfully assigned ${selectedIds.length} candidates` });
+      setSelectedIds([]);
+      setBulkRecruiterId('');
+      fetchData(); // Refresh list to show new recruiters
+    } catch (err) {
+      toast({ title: 'Error', description: 'Failed to assign candidates', variant: 'destructive' });
+    } finally {
+      setIsBulkAssigning(false);
+    }
+  };
+
   return (
     <div className="flex-1 p-6 overflow-y-auto bg-slate-50 dark:bg-slate-950 min-h-screen">
       <div className="max-w-[1800px] mx-auto space-y-6">
@@ -310,20 +361,60 @@ export default function AdminCandidates() {
         </div>
 
         {/* Filters */}
-        <div className="p-4 border border-slate-200 dark:border-slate-800 rounded-xl bg-white shadow-sm">
-          <div className="flex flex-col md:flex-row gap-4 justify-between">
-            <div className="relative w-full md:max-w-md">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search name, email, ID..." className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div className="flex gap-3 w-full md:w-auto">
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
-                <option value="all">All Status</option>
-                {ALL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
+        <div className="p-4 border border-slate-200 dark:border-slate-800 rounded-xl bg-white shadow-sm flex flex-col md:flex-row gap-4 justify-between">
+          <div className="relative w-full md:max-w-md">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search name, email, ID..." className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+              <option value="all">All Status</option>
+              {ALL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <select value={recruiterFilter} onChange={(e) => setRecruiterFilter(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+              <option value="all">All Recruiters</option>
+              {recruiters.map((r) => <option key={r._id || r.id} value={r._id || r.id}>{r.name || `${r.firstName} ${r.lastName}`}</option>)}
+            </select>
           </div>
         </div>
+
+        {/* Bulk Action Bar */}
+        {selectedIds.length > 0 && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-4 flex-wrap animate-in fade-in slide-in-from-top-2">
+            <span className="text-sm font-semibold text-blue-800 bg-blue-100 px-3 py-1 rounded-full">
+              {selectedIds.length} Selected
+            </span>
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-blue-600" />
+              <select 
+                value={bulkRecruiterId} 
+                onChange={(e) => setBulkRecruiterId(e.target.value)}
+                className="border border-blue-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none min-w-[200px]"
+              >
+                <option value="">Assign to Recruiter...</option>
+                {recruiters.map((r) => (
+                  <option key={r._id || r.id} value={r._id || r.id}>
+                    {r.name || `${r.firstName} ${r.lastName}`}
+                  </option>
+                ))}
+              </select>
+              <button 
+                onClick={handleBulkAssign}
+                disabled={!bulkRecruiterId || isBulkAssigning}
+                className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition disabled:opacity-50"
+              >
+                {isBulkAssigning && <Loader2 className="h-3 w-3 animate-spin" />}
+                Assign Candidates
+              </button>
+            </div>
+            <button 
+              onClick={() => setSelectedIds([])} 
+              className="ml-auto text-sm text-slate-500 hover:text-slate-800 font-medium px-2 py-1"
+            >
+              Clear Selection
+            </button>
+          </div>
+        )}
 
         {/* Table */}
         <div className="overflow-hidden border border-slate-200 rounded-xl shadow-sm bg-white">
@@ -334,10 +425,19 @@ export default function AdminCandidates() {
               <table className="w-full text-sm text-left border-collapse">
                 <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                   <tr>
+                    <th className="px-4 py-3 w-12 text-center">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedIds.length === filteredCandidates.length && filteredCandidates.length > 0}
+                        onChange={handleSelectAll}
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+                      />
+                    </th>
                     <th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('candidateId')}>ID <SortIcon field="candidateId"/></th>
                     <th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('name')}>Name <SortIcon field="name"/></th>
                     <th className="px-4 py-3">Phone</th>
                     <th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('position')}>Role <SortIcon field="position"/></th>
+                    <th className="px-4 py-3">Recruiter</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Actions</th>
                   </tr>
@@ -345,8 +445,17 @@ export default function AdminCandidates() {
                 <tbody className="divide-y divide-slate-100">
                   {filteredCandidates.map((c) => {
                     const statusArr = Array.isArray(c.status) ? c.status : [c.status || 'Submitted'];
+                    const isSelected = selectedIds.includes(c._id);
                     return (
-                      <tr key={c._id} className="hover:bg-slate-50 transition-colors">
+                      <tr key={c._id} className={`transition-colors ${isSelected ? 'bg-blue-50/50 hover:bg-blue-50' : 'hover:bg-slate-50'}`}>
+                        <td className="px-4 py-3 text-center">
+                          <input 
+                            type="checkbox" 
+                            checked={isSelected}
+                            onChange={(e) => handleSelectOne(e, c._id)}
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+                          />
+                        </td>
                         <td className="px-4 py-3 font-mono text-xs text-blue-600 font-bold">{getCandidateId(c)}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
@@ -361,6 +470,11 @@ export default function AdminCandidates() {
                         <td className="px-4 py-3">
                           <div className="font-medium text-slate-900">{c.position || '-'}</div>
                           <div className="text-xs text-slate-400">{c.client || '-'}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-sm font-medium text-slate-700">
+                            {typeof c.recruiterId === 'object' ? c.recruiterId?.name || `${c.recruiterId?.firstName || ''} ${c.recruiterId?.lastName || ''}`.trim() : c.recruiterName || '-'}
+                          </div>
                         </td>
                         <td className="px-4 py-3">
                           {statusArr.map((s) => (
@@ -379,6 +493,9 @@ export default function AdminCandidates() {
                   })}
                 </tbody>
               </table>
+              {filteredCandidates.length === 0 && !loading && (
+                <div className="text-center py-12 text-slate-500">No candidates match your search filters.</div>
+              )}
             </div>
           )}
         </div>
@@ -563,7 +680,7 @@ export default function AdminCandidates() {
                     <label className="block text-sm font-medium mb-1 text-slate-700">Assign Recruiter</label>
                     <select value={formData.recruiterId} onChange={(e) => handleInputChange('recruiterId', e.target.value)} className={inputCls(false)}>
                       <option value="">Select Recruiter</option>
-                      {recruiters.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                      {recruiters.map((r) => <option key={r._id || r.id} value={r._id || r.id}>{r.name || `${r.firstName} ${r.lastName}`}</option>)}
                     </select>
                   </div>
                 </div>
@@ -618,7 +735,7 @@ export default function AdminCandidates() {
                   ['Reason for Change', viewCandidate.reasonForChange],
                   ['Offers in Hand', viewCandidate.offersInHand ? `Yes (${viewCandidate.offerPackage})` : 'No'],
                   ['Source', viewCandidate.source],
-                  ['Assigned Recruiter', typeof viewCandidate.recruiterId === 'object' ? viewCandidate.recruiterId?.name : viewCandidate.recruiterName],
+                  ['Assigned Recruiter', typeof viewCandidate.recruiterId === 'object' ? viewCandidate.recruiterId?.name || `${viewCandidate.recruiterId?.firstName} ${viewCandidate.recruiterId?.lastName}` : viewCandidate.recruiterName],
                   ['Status', Array.isArray(viewCandidate.status) ? viewCandidate.status.join(', ') : viewCandidate.status]
                 ].map(([label, val]) => val ? (
                   <div key={label} className="col-span-2 md:col-span-1 border-b border-slate-100 pb-2">
