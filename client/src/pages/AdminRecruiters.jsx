@@ -35,11 +35,27 @@ export default function AdminRecruiters() {
   const navigate = useNavigate();
   const { authHeaders } = useAuth();
 
-  // ── Auth helper (uses AuthContext idToken) ────────────────────────────────
-  const getAuthHeader = () => ({
-    'Content-Type': 'application/json',
-    ...authHeaders(),
-  });
+  // ── Auth helper ──────────────────────────────────────────────────────────
+  //
+  // ✅ ROOT CAUSE FIX:
+  //
+  // The previous code was:
+  //   const getAuthHeader = () => ({ ...authHeaders() })
+  //
+  // authHeaders() is an ASYNC function — it returns a Promise<object>.
+  // Spreading a Promise into an object gives {}, so no Authorization header
+  // was ever sent, causing every request to return 401 "no token provided".
+  //
+  // Fix: getAuthHeader is now async and properly awaits authHeaders().
+  // Every call site below uses:  const headers = await getAuthHeader();
+  //
+  const getAuthHeader = async () => {
+    const ah = await authHeaders();   // ← await the async authHeaders()
+    return {
+      'Content-Type': 'application/json',
+      ...ah,                          // ← spreads { Authorization: 'Bearer <token>' }
+    };
+  };
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const [recruiters,  setRecruiters]  = useState([]);
@@ -78,7 +94,6 @@ export default function AdminRecruiters() {
   const [errors, setErrors] = useState({});
 
   // ── Form State ────────────────────────────────────────────────────────────
-  // Fields match backend recruiterController.js / User model exactly
   const EMPTY_RECRUITER = {
     recruiterId: "", firstName: "", lastName: "", email: "", phone: "",
     username: "", password: "", profilePicture: "", role: "recruiter",
@@ -96,10 +111,10 @@ export default function AdminRecruiters() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const headers = getAuthHeader();
+      const headers = await getAuthHeader();   // ✅ await
       const [rr, rc] = await Promise.all([
-        fetch(`${API_URL}/recruiters`,  { headers }),
-        fetch(`${API_URL}/candidates`,  { headers }),
+        fetch(`${API_URL}/recruiters`, { headers }),
+        fetch(`${API_URL}/candidates`, { headers }),
       ]);
 
       if (!rr.ok) {
@@ -111,8 +126,8 @@ export default function AdminRecruiters() {
         throw new Error(e.message || 'Failed to fetch candidates');
       }
 
-      const recruiterData  = await rr.json();
-      const candidateData  = await rc.json();
+      const recruiterData = await rr.json();
+      const candidateData = await rc.json();
 
       setRecruiters(recruiterData.map((r) => ({ ...r, id: r._id })));
       setCandidates(candidateData.map((c) => ({ ...c, id: c._id })));
@@ -130,8 +145,8 @@ export default function AdminRecruiters() {
   const validateForm = (data, isEdit = false) => {
     const e = {};
     if (!data.firstName.trim()) e.firstName = "First name is required";
-    if (!data.lastName.trim()) e.lastName = "Last name is required";
-    if (!data.email.trim()) e.email = "Email is required";
+    if (!data.lastName.trim())  e.lastName  = "Last name is required";
+    if (!data.email.trim())     e.email     = "Email is required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = "Invalid email";
     if (data.phone && !/^\d{10}$/.test(data.phone)) e.phone = "Phone must be 10 digits";
     if (!isEdit && !data.password) e.password = "Password is required";
@@ -141,7 +156,6 @@ export default function AdminRecruiters() {
   };
 
   const handleInputChange = (field, value, isEdit) => {
-    // Restrict phone to digits only
     if (field === 'phone' && value && !/^\d*$/.test(value)) return;
     if (field === 'phone' && value.length > 10) return;
 
@@ -155,7 +169,7 @@ export default function AdminRecruiters() {
   const handleAddRecruiter = async () => {
     if (!validateForm(newRecruiter)) return;
     try {
-      const headers = getAuthHeader();
+      const headers = await getAuthHeader();   // ✅ await
       const res = await fetch(`${API_URL}/recruiters`, {
         method: 'POST',
         headers,
@@ -177,7 +191,7 @@ export default function AdminRecruiters() {
   const handleEditRecruiter = async () => {
     if (!validateForm(editRecruiter, true)) return;
     try {
-      const headers = getAuthHeader();
+      const headers = await getAuthHeader();   // ✅ await
       const payload = { ...editRecruiter, role: 'recruiter' };
       if (!payload.password) delete payload.password; // Don't send blank password
 
@@ -201,7 +215,7 @@ export default function AdminRecruiters() {
   const handleDeleteRecruiter = async () => {
     if (!recruiterToDelete) return;
     try {
-      const headers = getAuthHeader();
+      const headers = await getAuthHeader();   // ✅ await
       const res = await fetch(`${API_URL}/recruiters/${recruiterToDelete.id}`, {
         method: 'DELETE', headers,
       });
@@ -218,7 +232,7 @@ export default function AdminRecruiters() {
 
   const handleToggleStatus = async (recruiter) => {
     try {
-      const headers = getAuthHeader();
+      const headers = await getAuthHeader();   // ✅ await
       const res = await fetch(`${API_URL}/recruiters/${recruiter.id}/status`, {
         method: 'PATCH', headers,
       });
@@ -234,7 +248,7 @@ export default function AdminRecruiters() {
   // ── Modal openers ─────────────────────────────────────────────────────────
   const openEditModal = (r) => {
     setEditRecruiter({
-      id: r.id, recruiterId: r.recruiterId || "", 
+      id: r.id, recruiterId: r.recruiterId || "",
       firstName: r.firstName, lastName: r.lastName,
       email: r.email, phone: r.phone || "", username: r.username || "",
       profilePicture: r.profilePicture || "", role: "recruiter", password: "",
@@ -290,23 +304,23 @@ export default function AdminRecruiters() {
 
   const filteredRecruiters = recruiters
     .filter((r) => {
-      const q = searchTerm.toLowerCase();
+      const q        = searchTerm.toLowerCase();
       const fullName = `${r.firstName || ''} ${r.lastName || ''}`.toLowerCase();
       return fullName.includes(q) ||
-             (r.email || '').toLowerCase().includes(q) ||
-             (r.username || '').toLowerCase().includes(q) ||
+             (r.email      || '').toLowerCase().includes(q) ||
+             (r.username   || '').toLowerCase().includes(q) ||
              (r.recruiterId || '').toLowerCase().includes(q);
     })
     .sort((a, b) => {
       const sa = calcStats(a.id), sb = calcStats(b.id);
       let av = '', bv = '';
       switch (sortField) {
-        case 'name':      av = a.firstName;  bv = b.firstName; break;
-        case 'email':     av = a.email; bv = b.email; break;
-        case 'id':        av = a.recruiterId || ''; bv = b.recruiterId || ''; break;
-        case 'total':     av = sa.total;    bv = sb.total;    break;
-        case 'joined':    av = sa.joined;   bv = sb.joined;   break;
-        case 'selected':  av = sa.selected; bv = sb.selected; break;
+        case 'name':     av = a.firstName;  bv = b.firstName;  break;
+        case 'email':    av = a.email;      bv = b.email;      break;
+        case 'id':       av = a.recruiterId || ''; bv = b.recruiterId || ''; break;
+        case 'total':    av = sa.total;     bv = sb.total;     break;
+        case 'joined':   av = sa.joined;    bv = sb.joined;    break;
+        case 'selected': av = sa.selected;  bv = sb.selected;  break;
         default: break;
       }
       return (av > bv ? 1 : -1) * (sortOrder === 'asc' ? 1 : -1);
@@ -325,7 +339,7 @@ export default function AdminRecruiters() {
     return list;
   };
 
-  // ── Summary stats for top cards ────────────────────────────────────────────
+  // ── Summary stats ─────────────────────────────────────────────────────────
   const totalR    = recruiters.length;
   const activeR   = recruiters.filter((r) => r.active !== false).length;
   const inactiveR = recruiters.filter((r) => r.active === false).length;
@@ -343,7 +357,7 @@ export default function AdminRecruiters() {
     );
   };
 
-  // ── Performance report (demo data) ────────────────────────────────────────
+  // ── Performance report ────────────────────────────────────────────────────
   const generatePerformanceData = () => {
     if (!startDate || !endDate) {
       toast({ title: "Error", description: "Select start and end dates.", variant: "destructive" });
@@ -352,7 +366,7 @@ export default function AdminRecruiters() {
     const data = [];
     for (let d = new Date(startDate); d <= new Date(endDate); d.setDate(d.getDate() + 1)) {
       data.push({
-        date: d.toISOString().split("T")[0],
+        date:        d.toISOString().split("T")[0],
         submissions: Math.floor(Math.random() * 5),
         turnups:     Math.floor(Math.random() * 3),
         joined:      Math.floor(Math.random() * 2),
@@ -380,653 +394,651 @@ export default function AdminRecruiters() {
     <div className="flex-1 p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
 
-          {/* ── Header ──────────────────────────────────────────────────── */}
-          <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-                Recruiters Management
-              </h1>
-              <p className="text-gray-500 mt-1">Manage your recruitment team</p>
-            </div>
-            <Button
-              onClick={() => { setShowModal(true); setErrors({}); setNewRecruiter(EMPTY_RECRUITER); }}
-              className="bg-blue-600 hover:bg-blue-700">
-              <UserPlus className="h-4 w-4 mr-2" /> Add Recruiter
-            </Button>
+        {/* ── Header ──────────────────────────────────────────────────── */}
+        <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+              Recruiters Management
+            </h1>
+            <p className="text-gray-500 mt-1">Manage your recruitment team</p>
           </div>
+          <Button
+            onClick={() => { setShowModal(true); setErrors({}); setNewRecruiter(EMPTY_RECRUITER); }}
+            className="bg-blue-600 hover:bg-blue-700">
+            <UserPlus className="h-4 w-4 mr-2" /> Add Recruiter
+          </Button>
+        </div>
 
-          {/* ── Summary Cards ────────────────────────────────────────────── */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-            <Card className="bg-blue-600 text-white cursor-pointer hover:bg-blue-700 transition"
-              onClick={() => { setSelectedStatsRecruiters(recruiters); setStatsModalTitle("All Recruiters"); setShowStatsModal(true); }}>
-              <CardContent className="p-4 flex justify-between items-center">
-                <div><p className="text-blue-100 text-sm">Total</p><p className="text-3xl font-bold">{totalR}</p></div>
-                <Users className="h-10 w-10 opacity-70" />
-              </CardContent>
-            </Card>
-            <Card className="bg-green-600 text-white cursor-pointer hover:bg-green-700 transition"
-              onClick={() => { setSelectedStatsRecruiters(recruiters.filter((r) => r.active !== false)); setStatsModalTitle("Active Recruiters"); setShowStatsModal(true); }}>
-              <CardContent className="p-4 flex justify-between items-center">
-                <div><p className="text-green-100 text-sm">Active</p><p className="text-3xl font-bold">{activeR}</p></div>
-                <UserCheck className="h-10 w-10 opacity-70" />
-              </CardContent>
-            </Card>
-            <Card className="bg-red-500 text-white cursor-pointer hover:bg-red-600 transition"
-              onClick={() => { setSelectedStatsRecruiters(recruiters.filter((r) => r.active === false)); setStatsModalTitle("Inactive Recruiters"); setShowStatsModal(true); }}>
-              <CardContent className="p-4 flex justify-between items-center">
-                <div><p className="text-red-100 text-sm">Inactive</p><p className="text-3xl font-bold">{inactiveR}</p></div>
-                <UserX className="h-10 w-10 opacity-70" />
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* ── Controls ─────────────────────────────────────────────────── */}
-          <Card>
-            <CardContent className="p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
-              <div className="relative w-full md:max-w-md">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search by name, email, ID…"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Select value={sortField} onValueChange={setSortField}>
-                  <SelectTrigger className="w-[140px]"><SelectValue placeholder="Sort by" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="name">Name</SelectItem>
-                    <SelectItem value="email">Email</SelectItem>
-                    <SelectItem value="id">Recruiter ID</SelectItem>
-                    <SelectItem value="total">Candidates</SelectItem>
-                    <SelectItem value="joined">Joined</SelectItem>
-                    <SelectItem value="selected">Selected</SelectItem>
-                  </SelectContent>
-                </Select>
-                <div className="flex border rounded-md overflow-hidden">
-                  <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('grid')}><Grid3X3 className="h-4 w-4" /></Button>
-                  <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('list')}><List    className="h-4 w-4" /></Button>
-                </div>
-              </div>
+        {/* ── Summary Cards ────────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          <Card className="bg-blue-600 text-white cursor-pointer hover:bg-blue-700 transition"
+            onClick={() => { setSelectedStatsRecruiters(recruiters); setStatsModalTitle("All Recruiters"); setShowStatsModal(true); }}>
+            <CardContent className="p-4 flex justify-between items-center">
+              <div><p className="text-blue-100 text-sm">Total</p><p className="text-3xl font-bold">{totalR}</p></div>
+              <Users className="h-10 w-10 opacity-70" />
             </CardContent>
           </Card>
+          <Card className="bg-green-600 text-white cursor-pointer hover:bg-green-700 transition"
+            onClick={() => { setSelectedStatsRecruiters(recruiters.filter((r) => r.active !== false)); setStatsModalTitle("Active Recruiters"); setShowStatsModal(true); }}>
+            <CardContent className="p-4 flex justify-between items-center">
+              <div><p className="text-green-100 text-sm">Active</p><p className="text-3xl font-bold">{activeR}</p></div>
+              <UserCheck className="h-10 w-10 opacity-70" />
+            </CardContent>
+          </Card>
+          <Card className="bg-red-500 text-white cursor-pointer hover:bg-red-600 transition"
+            onClick={() => { setSelectedStatsRecruiters(recruiters.filter((r) => r.active === false)); setStatsModalTitle("Inactive Recruiters"); setShowStatsModal(true); }}>
+            <CardContent className="p-4 flex justify-between items-center">
+              <div><p className="text-red-100 text-sm">Inactive</p><p className="text-3xl font-bold">{inactiveR}</p></div>
+              <UserX className="h-10 w-10 opacity-70" />
+            </CardContent>
+          </Card>
+        </div>
 
-          {/* ── Loading ───────────────────────────────────────────────────── */}
-          {isLoading ? (
-            <div className="flex justify-center py-16">
-              <div className="animate-spin h-10 w-10 border-4 border-blue-500 rounded-full border-t-transparent" />
+        {/* ── Controls ─────────────────────────────────────────────────── */}
+        <Card>
+          <CardContent className="p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="relative w-full md:max-w-md">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search by name, email, ID…"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
             </div>
-          ) : filteredRecruiters.length === 0 ? (
-            <div className="text-center py-16 text-gray-500">
-              <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p className="text-lg font-medium">No recruiters found</p>
+            <div className="flex gap-2">
+              <Select value={sortField} onValueChange={setSortField}>
+                <SelectTrigger className="w-[140px]"><SelectValue placeholder="Sort by" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Name</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="id">Recruiter ID</SelectItem>
+                  <SelectItem value="total">Candidates</SelectItem>
+                  <SelectItem value="joined">Joined</SelectItem>
+                  <SelectItem value="selected">Selected</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="flex border rounded-md overflow-hidden">
+                <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('grid')}><Grid3X3 className="h-4 w-4" /></Button>
+                <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('list')}><List    className="h-4 w-4" /></Button>
+              </div>
             </div>
-          ) : (
-            <>
-              {/* ── Grid View ──────────────────────────────────────────────── */}
-              {viewMode === "grid" && (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {filteredRecruiters.map((r) => {
-                    const st = calcStats(r.id);
-                    return (
-                      <Card key={r.id} className="hover:shadow-lg transition-shadow">
-                        <CardHeader className="flex flex-row items-start justify-between pb-2">
-                          <div className="flex items-center gap-3">
-                            <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600
-                              flex items-center justify-center text-white font-bold overflow-hidden">
-                              {r.profilePicture
-                                ? <img src={r.profilePicture} className="w-full h-full object-cover" alt="pfp" />
-                                : getInitials(r.firstName, r.lastName)}
-                            </div>
-                            <div>
-                              <CardTitle className="text-base">{r.firstName} {r.lastName}</CardTitle>
-                              <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                {r.recruiterId && <Badge variant="outline" className="text-xs">{r.recruiterId}</Badge>}
-                                <StatusBadge recruiter={r} />
-                              </div>
+          </CardContent>
+        </Card>
+
+        {/* ── Loading / Empty / Content ─────────────────────────────────── */}
+        {isLoading ? (
+          <div className="flex justify-center py-16">
+            <div className="animate-spin h-10 w-10 border-4 border-blue-500 rounded-full border-t-transparent" />
+          </div>
+        ) : filteredRecruiters.length === 0 ? (
+          <div className="text-center py-16 text-gray-500">
+            <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
+            <p className="text-lg font-medium">No recruiters found</p>
+          </div>
+        ) : (
+          <>
+            {/* ── Grid View ──────────────────────────────────────────────── */}
+            {viewMode === "grid" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {filteredRecruiters.map((r) => {
+                  const st = calcStats(r.id);
+                  return (
+                    <Card key={r.id} className="hover:shadow-lg transition-shadow">
+                      <CardHeader className="flex flex-row items-start justify-between pb-2">
+                        <div className="flex items-center gap-3">
+                          <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600
+                            flex items-center justify-center text-white font-bold overflow-hidden">
+                            {r.profilePicture
+                              ? <img src={r.profilePicture} className="w-full h-full object-cover" alt="pfp" />
+                              : getInitials(r.firstName, r.lastName)}
+                          </div>
+                          <div>
+                            <CardTitle className="text-base">{r.firstName} {r.lastName}</CardTitle>
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                              {r.recruiterId && <Badge variant="outline" className="text-xs">{r.recruiterId}</Badge>}
+                              <StatusBadge recruiter={r} />
                             </div>
                           </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openEditModal(r)}>
-                                <Edit className="h-4 w-4 mr-2" /> Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { setSelectedRecruiter(r); setShowPerformanceModal(true); setPerformanceData([]); }}>
-                                <TrendingUp className="h-4 w-4 mr-2" /> Performance Report
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => {
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEditModal(r)}>
+                              <Edit className="h-4 w-4 mr-2" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setSelectedRecruiter(r); setShowPerformanceModal(true); setPerformanceData([]); }}>
+                              <TrendingUp className="h-4 w-4 mr-2" /> Performance Report
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => {
+                              setSelectedRecruiter(r);
+                              setCandidatesModalTitle(`All Candidates — ${r.firstName} ${r.lastName}`);
+                              setCandidateFilterType(null);
+                              setShowCandidatesModal(true);
+                            }}>
+                              <Users className="h-4 w-4 mr-2" /> View Candidates
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleToggleStatus(r)}>
+                              {r.active !== false ? 'Deactivate' : 'Activate'}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-red-600"
+                              onClick={() => { setRecruiterToDelete(r); setShowDeleteModal(true); }}>
+                              <Trash2 className="h-4 w-4 mr-2" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </CardHeader>
+
+                      <CardContent>
+                        <div className="space-y-1.5 text-sm text-gray-500 mb-4">
+                          <div className="flex items-center gap-2"><Mail      className="h-4 w-4 flex-shrink-0" /> {r.email}</div>
+                          {r.phone && <div className="flex items-center gap-2"><Phone className="h-4 w-4 flex-shrink-0" /> {r.phone}</div>}
+                          <div className="flex items-center gap-2"><Briefcase className="h-4 w-4 flex-shrink-0" /> {r.role || 'recruiter'}</div>
+                        </div>
+
+                        {/* Per-recruiter mini stats */}
+                        <div className="grid grid-cols-4 gap-2 border-t pt-3 text-center">
+                          {[
+                            { label: 'Total',    val: st.total,    filter: null,       color: 'text-blue-600' },
+                            { label: 'Turnups',  val: st.turnups,  filter: 'turnups',  color: 'text-teal-600' },
+                            { label: 'Selected', val: st.selected, filter: 'selected', color: 'text-purple-600' },
+                            { label: 'Joined',   val: st.joined,   filter: 'joined',   color: 'text-green-600' },
+                          ].map(({ label, val, filter, color }) => (
+                            <div key={label}
+                              className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded p-1 transition"
+                              onClick={() => {
                                 setSelectedRecruiter(r);
-                                setCandidatesModalTitle(`All Candidates — ${r.firstName} ${r.lastName}`);
-                                setCandidateFilterType(null);
+                                setCandidatesModalTitle(`${label} — ${r.firstName} ${r.lastName}`);
+                                setCandidateFilterType(filter);
                                 setShowCandidatesModal(true);
                               }}>
-                                <Users className="h-4 w-4 mr-2" /> View Candidates
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleToggleStatus(r)}>
-                                {r.active !== false ? 'Deactivate' : 'Activate'}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="text-red-600"
-                                onClick={() => { setRecruiterToDelete(r); setShowDeleteModal(true); }}>
-                                <Trash2 className="h-4 w-4 mr-2" /> Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </CardHeader>
-
-                        <CardContent>
-                          <div className="space-y-1.5 text-sm text-gray-500 mb-4">
-                            <div className="flex items-center gap-2"><Mail className="h-4 w-4 flex-shrink-0" /> {r.email}</div>
-                            {r.phone && <div className="flex items-center gap-2"><Phone className="h-4 w-4 flex-shrink-0" /> {r.phone}</div>}
-                            <div className="flex items-center gap-2"><Briefcase className="h-4 w-4 flex-shrink-0" /> {r.role || 'recruiter'}</div>
-                          </div>
-
-                          {/* Per-recruiter mini stats */}
-                          <div className="grid grid-cols-4 gap-2 border-t pt-3 text-center">
-                            {[
-                              { label: 'Total',    val: st.total,    filter: null,       color: 'text-blue-600' },
-                              { label: 'Turnups',  val: st.turnups,  filter: 'turnups',  color: 'text-teal-600' },
-                              { label: 'Selected', val: st.selected, filter: 'selected', color: 'text-purple-600' },
-                              { label: 'Joined',   val: st.joined,   filter: 'joined',   color: 'text-green-600' },
-                            ].map(({ label, val, filter, color }) => (
-                              <div key={label}
-                                className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded p-1 transition`}
-                                onClick={() => {
-                                  setSelectedRecruiter(r);
-                                  setCandidatesModalTitle(`${label} — ${r.firstName} ${r.lastName}`);
-                                  setCandidateFilterType(filter);
-                                  setShowCandidatesModal(true);
-                                }}>
-                                <div className={`font-bold text-lg ${color}`}>{val}</div>
-                                <div className="text-[10px] text-gray-500">{label}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* ── List View ──────────────────────────────────────────────── */}
-              {viewMode === "list" && (
-                <Card>
-                  <CardContent className="p-0 overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                      <thead className="bg-gray-50 dark:bg-gray-800 text-xs uppercase text-gray-500">
-                        <tr>
-                          <th className="px-4 py-3 cursor-pointer" onClick={() => toggleSort('name')}>
-                            <span className="flex items-center">Recruiter <SortIcon field="name" /></span>
-                          </th>
-                          <th className="px-4 py-3 cursor-pointer" onClick={() => toggleSort('id')}>
-                            <span className="flex items-center">ID <SortIcon field="id" /></span>
-                          </th>
-                          <th className="px-4 py-3">Status</th>
-                          <th className="px-4 py-3 text-center cursor-pointer" onClick={() => toggleSort('total')}>
-                            <span className="flex items-center justify-center">Total <SortIcon field="total" /></span>
-                          </th>
-                          <th className="px-4 py-3 text-center">Turnups</th>
-                          <th className="px-4 py-3 text-center cursor-pointer" onClick={() => toggleSort('selected')}>
-                            <span className="flex items-center justify-center">Selected <SortIcon field="selected" /></span>
-                          </th>
-                          <th className="px-4 py-3 text-center cursor-pointer" onClick={() => toggleSort('joined')}>
-                            <span className="flex items-center justify-center">Joined <SortIcon field="joined" /></span>
-                          </th>
-                          <th className="px-4 py-3 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredRecruiters.map((r) => {
-                          const st = calcStats(r.id);
-                          return (
-                            <tr key={r.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-2">
-                                  <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold overflow-hidden flex-shrink-0">
-                                    {r.profilePicture
-                                      ? <img src={r.profilePicture} className="w-full h-full object-cover rounded-full" alt="pfp" />
-                                      : getInitials(r.firstName, r.lastName)}
-                                  </div>
-                                  <div>
-                                    <div className="font-medium">{r.firstName} {r.lastName}</div>
-                                    <div className="text-xs text-gray-500">{r.email}</div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 text-gray-500">{r.recruiterId || '-'}</td>
-                              <td className="px-4 py-3"><StatusBadge recruiter={r} /></td>
-                              <td className="px-4 py-3 text-center font-bold text-blue-600 cursor-pointer hover:underline"
-                                onClick={() => { setSelectedRecruiter(r); setCandidatesModalTitle(`All — ${r.firstName} ${r.lastName}`); setCandidateFilterType(null); setShowCandidatesModal(true); }}>
-                                {st.total}
-                              </td>
-                              <td className="px-4 py-3 text-center font-bold text-teal-600">{st.turnups}</td>
-                              <td className="px-4 py-3 text-center font-bold text-purple-600 cursor-pointer hover:underline"
-                                onClick={() => { setSelectedRecruiter(r); setCandidatesModalTitle(`Selected — ${r.firstName} ${r.lastName}`); setCandidateFilterType('selected'); setShowCandidatesModal(true); }}>
-                                {st.selected}
-                              </td>
-                              <td className="px-4 py-3 text-center font-bold text-green-600 cursor-pointer hover:underline"
-                                onClick={() => { setSelectedRecruiter(r); setCandidatesModalTitle(`Joined — ${r.firstName} ${r.lastName}`); setCandidateFilterType('joined'); setShowCandidatesModal(true); }}>
-                                {st.joined}
-                              </td>
-                              <td className="px-4 py-3 text-right">
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => openEditModal(r)}>
-                                      <Edit className="h-4 w-4 mr-2" /> Edit
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => { setSelectedRecruiter(r); setShowPerformanceModal(true); setPerformanceData([]); }}>
-                                      <TrendingUp className="h-4 w-4 mr-2" /> Performance
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => handleToggleStatus(r)}>
-                                      {r.active !== false ? 'Deactivate' : 'Activate'}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem className="text-red-600"
-                                      onClick={() => { setRecruiterToDelete(r); setShowDeleteModal(true); }}>
-                                      <Trash2 className="h-4 w-4 mr-2" /> Delete
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </CardContent>
-                </Card>
-              )}
-            </>
-          )}
-
-          {/* ════════════════════════════════════════════════════════════
-              MODALS
-          ════════════════════════════════════════════════════════════ */}
-
-          {/* ── Add Recruiter ──────────────────────────────────────────── */}
-          <Dialog open={showModal} onClose={() => setShowModal(false)} className="relative z-50">
-            <DialogBackdrop className="fixed inset-0 bg-black/50" />
-            <div className="fixed inset-0 flex items-center justify-center p-4">
-              <DialogPanel className="bg-white dark:bg-gray-900 w-full max-w-lg rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
-                <DialogTitle className="text-xl font-bold mb-1">Add Recruiter</DialogTitle>
-                <p className="text-sm text-gray-500 mb-4">Name & Email required. Everything else optional.</p>
-
-                <div className="space-y-4">
-                  {/* Profile picture */}
-                  <div className="flex items-center gap-4">
-                    <div className="h-16 w-16 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
-                      {newRecruiter.profilePicture
-                        ? <img src={newRecruiter.profilePicture} className="w-full h-full object-cover" alt="preview" />
-                        : <Camera className="h-6 w-6 text-gray-400" />}
-                    </div>
-                    <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={(e) => handleFileUpload(e, false)} />
-                    <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>Upload Photo</Button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium">Recruiter ID</label>
-                      <Input value={newRecruiter.recruiterId}
-                        onChange={(e) => handleInputChange('recruiterId', e.target.value, false)}
-                        placeholder="e.g. REC001" />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium">First Name <span className="text-red-500">*</span></label>
-                      <Input value={newRecruiter.firstName}
-                        onChange={(e) => handleInputChange('firstName', e.target.value, false)}
-                        className={errors.firstName ? "border-red-500" : ""} />
-                      {errors.firstName && <p className="text-xs text-red-500 mt-1">{errors.firstName}</p>}
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Last Name <span className="text-red-500">*</span></label>
-                      <Input value={newRecruiter.lastName}
-                        onChange={(e) => handleInputChange('lastName', e.target.value, false)}
-                        className={errors.lastName ? "border-red-500" : ""} />
-                      {errors.lastName && <p className="text-xs text-red-500 mt-1">{errors.lastName}</p>}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium">Email <span className="text-red-500">*</span></label>
-                    <Input type="email" value={newRecruiter.email}
-                      onChange={(e) => handleInputChange('email', e.target.value, false)}
-                      className={errors.email ? "border-red-500" : ""} />
-                    {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium">Phone</label>
-                      <Input value={newRecruiter.phone} maxLength={10}
-                        onChange={(e) => handleInputChange('phone', e.target.value, false)}
-                        className={errors.phone ? "border-red-500" : ""}
-                        placeholder="10 digits" />
-                      {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Role</label>
-                      <Input value="Recruiter" disabled className="bg-gray-100 dark:bg-gray-800 text-gray-500" />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium">Username</label>
-                      <Input value={newRecruiter.username}
-                        onChange={(e) => handleInputChange('username', e.target.value, false)} />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Password <span className="text-red-500">*</span></label>
-                      <div className="relative">
-                        <Input type={showPassword ? "text" : "password"}
-                          value={newRecruiter.password}
-                          onChange={(e) => handleInputChange('password', e.target.value, false)}
-                          className={errors.password ? "border-red-500 pr-10" : "pr-10"}
-                          placeholder="Min 6 characters" />
-                        <button type="button"
-                          onClick={() => setShowPassword((p) => !p)}
-                          className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600">
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                      {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end gap-2 pt-2">
-                    <Button variant="outline" onClick={() => setShowModal(false)}>Cancel</Button>
-                    <Button onClick={handleAddRecruiter} className="bg-blue-600 hover:bg-blue-700">Save Recruiter</Button>
-                  </div>
-                </div>
-              </DialogPanel>
-            </div>
-          </Dialog>
-
-          {/* ── Edit Recruiter ─────────────────────────────────────────── */}
-          <Dialog open={showEditModal} onClose={() => setShowEditModal(false)} className="relative z-50">
-            <DialogBackdrop className="fixed inset-0 bg-black/50" />
-            <div className="fixed inset-0 flex items-center justify-center p-4">
-              <DialogPanel className="bg-white dark:bg-gray-900 w-full max-w-lg rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
-                <DialogTitle className="text-xl font-bold mb-4">Edit Recruiter</DialogTitle>
-
-                <div className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    <div className="h-16 w-16 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
-                      {editRecruiter.profilePicture
-                        ? <img src={editRecruiter.profilePicture} className="w-full h-full object-cover" alt="edit-preview" />
-                        : <Camera className="h-6 w-6 text-gray-400" />}
-                    </div>
-                    <input type="file" ref={editFileInputRef} hidden accept="image/*" onChange={(e) => handleFileUpload(e, true)} />
-                    <Button variant="outline" size="sm" onClick={() => editFileInputRef.current?.click()}>Change Photo</Button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium">Recruiter ID</label>
-                      <Input value={editRecruiter.recruiterId}
-                        onChange={(e) => handleInputChange('recruiterId', e.target.value, true)} />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium">First Name <span className="text-red-500">*</span></label>
-                      <Input value={editRecruiter.firstName}
-                        onChange={(e) => handleInputChange('firstName', e.target.value, true)}
-                        className={errors.firstName ? "border-red-500" : ""} />
-                      {errors.firstName && <p className="text-xs text-red-500 mt-1">{errors.firstName}</p>}
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Last Name <span className="text-red-500">*</span></label>
-                      <Input value={editRecruiter.lastName}
-                        onChange={(e) => handleInputChange('lastName', e.target.value, true)}
-                        className={errors.lastName ? "border-red-500" : ""} />
-                      {errors.lastName && <p className="text-xs text-red-500 mt-1">{errors.lastName}</p>}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium">Email <span className="text-red-500">*</span></label>
-                    <Input type="email" value={editRecruiter.email}
-                      onChange={(e) => handleInputChange('email', e.target.value, true)}
-                      className={errors.email ? "border-red-500" : ""} />
-                    {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium">Phone</label>
-                      <Input value={editRecruiter.phone} maxLength={10}
-                        onChange={(e) => handleInputChange('phone', e.target.value, true)}
-                        className={errors.phone ? "border-red-500" : ""} />
-                      {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Role</label>
-                      <Input value="Recruiter" disabled className="bg-gray-100 dark:bg-gray-800 text-gray-500" />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium">Username</label>
-                      <Input value={editRecruiter.username}
-                        onChange={(e) => handleInputChange('username', e.target.value, true)} />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">New Password</label>
-                      <div className="relative">
-                        <Input type={showEditPassword ? "text" : "password"}
-                          value={editRecruiter.password}
-                          onChange={(e) => handleInputChange('password', e.target.value, true)}
-                          className={`pr-10 ${errors.password ? "border-red-500" : ""}`}
-                          placeholder="Leave blank to keep current" />
-                        <button type="button"
-                          onClick={() => setShowEditPassword((p) => !p)}
-                          className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600">
-                          {showEditPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                      {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end gap-2 pt-2">
-                    <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
-                    <Button onClick={handleEditRecruiter} className="bg-blue-600 hover:bg-blue-700">Update Recruiter</Button>
-                  </div>
-                </div>
-              </DialogPanel>
-            </div>
-          </Dialog>
-
-          {/* ── Delete Confirm ─────────────────────────────────────────── */}
-          <Dialog open={showDeleteModal} onClose={() => setShowDeleteModal(false)} className="relative z-50">
-            <DialogBackdrop className="fixed inset-0 bg-black/50" />
-            <div className="fixed inset-0 flex items-center justify-center p-4">
-              <DialogPanel className="bg-white dark:bg-gray-900 rounded-xl p-6 max-w-md shadow-2xl">
-                <DialogTitle className="text-lg font-bold text-red-600 flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5" /> Confirm Deletion
-                </DialogTitle>
-                <p className="mt-2 text-gray-600 dark:text-gray-300">
-                  Delete <strong>{recruiterToDelete?.firstName} {recruiterToDelete?.lastName}</strong>? This cannot be undone.
-                </p>
-                <div className="flex justify-end gap-2 mt-4">
-                  <Button variant="outline" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
-                  <Button variant="destructive" onClick={handleDeleteRecruiter}>Delete</Button>
-                </div>
-              </DialogPanel>
-            </div>
-          </Dialog>
-
-          {/* ── Performance Modal ──────────────────────────────────────── */}
-          <Dialog open={showPerformanceModal} onClose={() => setShowPerformanceModal(false)} className="relative z-50">
-            <DialogBackdrop className="fixed inset-0 bg-black/50" />
-            <div className="fixed inset-0 flex items-center justify-center p-4">
-              <DialogPanel className="bg-white dark:bg-gray-900 w-full max-w-3xl rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
-                <DialogTitle className="text-xl font-bold mb-4">
-                  Performance Report — {selectedRecruiter?.firstName} {selectedRecruiter?.lastName}
-                </DialogTitle>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="text-sm font-medium">Start Date</label>
-                      <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">End Date</label>
-                      <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-                    </div>
-                    <div className="flex items-end">
-                      <Button onClick={generatePerformanceData} className="w-full">Generate</Button>
-                    </div>
-                  </div>
-
-                  {performanceData.length > 0 ? (
-                    <>
-                      <div className="border rounded-lg overflow-hidden">
-                        <table className="w-full text-sm">
-                          <thead className="bg-gray-50 dark:bg-gray-800">
-                            <tr>
-                              <th className="p-2 text-left">Date</th>
-                              <th className="p-2 text-center">Submissions</th>
-                              <th className="p-2 text-center">Turnups</th>
-                              <th className="p-2 text-center">Joined</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {performanceData.map((d, i) => (
-                              <tr key={i} className="border-t">
-                                <td className="p-2">{d.date}</td>
-                                <td className="p-2 text-center">{d.submissions}</td>
-                                <td className="p-2 text-center">{d.turnups}</td>
-                                <td className="p-2 text-center">{d.joined}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                      <div className="flex justify-end">
-                        <Button onClick={downloadPDF} variant="outline">
-                          <Download className="h-4 w-4 mr-2" /> Download PDF
-                        </Button>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-center py-8 text-gray-400">
-                      Select dates and click Generate to view performance data.
-                    </div>
-                  )}
-
-                  <div className="flex justify-end">
-                    <Button variant="ghost" onClick={() => setShowPerformanceModal(false)}>Close</Button>
-                  </div>
-                </div>
-              </DialogPanel>
-            </div>
-          </Dialog>
-
-          {/* ── Stats Modal ────────────────────────────────────────────── */}
-          <Dialog open={showStatsModal} onClose={() => setShowStatsModal(false)} className="relative z-50">
-            <DialogBackdrop className="fixed inset-0 bg-black/50" />
-            <div className="fixed inset-0 flex items-center justify-center p-4">
-              <DialogPanel className="bg-white dark:bg-gray-900 w-full max-w-xl rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
-                <DialogTitle className="text-xl font-bold mb-4">{statsModalTitle}</DialogTitle>
-                <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {selectedStatsRecruiters.map((r) => (
-                    <div key={r.id} className="flex items-center justify-between py-2.5">
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold overflow-hidden">
-                          {r.profilePicture
-                            ? <img src={r.profilePicture} className="w-full h-full object-cover" alt="pfp" />
-                            : getInitials(r.firstName, r.lastName)}
+                              <div className={`font-bold text-lg ${color}`}>{val}</div>
+                              <div className="text-[10px] text-gray-500">{label}</div>
+                            </div>
+                          ))}
                         </div>
-                        <div>
-                          <div className="font-medium">{r.firstName} {r.lastName}</div>
-                          <div className="text-xs text-gray-500">{r.email}</div>
-                        </div>
-                      </div>
-                      <StatusBadge recruiter={r} />
-                    </div>
-                  ))}
-                  {selectedStatsRecruiters.length === 0 && (
-                    <p className="text-center text-gray-400 py-6">No recruiters in this category.</p>
-                  )}
-                </div>
-                <div className="flex justify-end mt-4">
-                  <Button onClick={() => setShowStatsModal(false)}>Close</Button>
-                </div>
-              </DialogPanel>
-            </div>
-          </Dialog>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
 
-          {/* ── Candidates Modal ───────────────────────────────────────── */}
-          <Dialog open={showCandidatesModal} onClose={() => setShowCandidatesModal(false)} className="relative z-50">
-            <DialogBackdrop className="fixed inset-0 bg-black/50" />
-            <div className="fixed inset-0 flex items-center justify-center p-4">
-              <DialogPanel className="bg-white dark:bg-gray-900 w-full max-w-4xl rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
-                <DialogTitle className="text-xl font-bold mb-4">{candidatesModalTitle}</DialogTitle>
-                <div className="overflow-x-auto">
+            {/* ── List View ──────────────────────────────────────────────── */}
+            {viewMode === "list" && (
+              <Card>
+                <CardContent className="p-0 overflow-x-auto">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-gray-50 dark:bg-gray-800 text-xs uppercase text-gray-500">
                       <tr>
-                        <th className="p-3">Name</th>
-                        <th className="p-3">Role / Client</th>
-                        <th className="p-3">Status</th>
-                        <th className="p-3">Email</th>
-                        <th className="p-3">Phone</th>
+                        <th className="px-4 py-3 cursor-pointer" onClick={() => toggleSort('name')}>
+                          <span className="flex items-center">Recruiter <SortIcon field="name" /></span>
+                        </th>
+                        <th className="px-4 py-3 cursor-pointer" onClick={() => toggleSort('id')}>
+                          <span className="flex items-center">ID <SortIcon field="id" /></span>
+                        </th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3 text-center cursor-pointer" onClick={() => toggleSort('total')}>
+                          <span className="flex items-center justify-center">Total <SortIcon field="total" /></span>
+                        </th>
+                        <th className="px-4 py-3 text-center">Turnups</th>
+                        <th className="px-4 py-3 text-center cursor-pointer" onClick={() => toggleSort('selected')}>
+                          <span className="flex items-center justify-center">Selected <SortIcon field="selected" /></span>
+                        </th>
+                        <th className="px-4 py-3 text-center cursor-pointer" onClick={() => toggleSort('joined')}>
+                          <span className="flex items-center justify-center">Joined <SortIcon field="joined" /></span>
+                        </th>
+                        <th className="px-4 py-3 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredCandidatesForModal().length > 0
-                        ? filteredCandidatesForModal().map((c, i) => (
-                          <tr key={i} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
-                            <td className="p-3 font-medium">{c.name}</td>
-                            <td className="p-3">
-                              <div>{c.position}</div>
-                              <div className="text-xs text-gray-400">{c.client}</div>
-                            </td>
-                            <td className="p-3">
-                              <div className="flex flex-wrap gap-1">
-                                {(Array.isArray(c.status) ? c.status : [c.status || '']).map((s) => (
-                                  <Badge key={s} variant="outline" className="text-xs">{s}</Badge>
-                                ))}
+                      {filteredRecruiters.map((r) => {
+                        const st = calcStats(r.id);
+                        return (
+                          <tr key={r.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold overflow-hidden flex-shrink-0">
+                                  {r.profilePicture
+                                    ? <img src={r.profilePicture} className="w-full h-full object-cover rounded-full" alt="pfp" />
+                                    : getInitials(r.firstName, r.lastName)}
+                                </div>
+                                <div>
+                                  <div className="font-medium">{r.firstName} {r.lastName}</div>
+                                  <div className="text-xs text-gray-500">{r.email}</div>
+                                </div>
                               </div>
                             </td>
-                            <td className="p-3 text-gray-500">{c.email}</td>
-                            <td className="p-3 text-gray-500">{c.contact}</td>
-                          </tr>
-                        ))
-                        : (
-                          <tr>
-                            <td colSpan={5} className="p-6 text-center text-gray-400">
-                              No candidates found.
+                            <td className="px-4 py-3 text-gray-500">{r.recruiterId || '-'}</td>
+                            <td className="px-4 py-3"><StatusBadge recruiter={r} /></td>
+                            <td className="px-4 py-3 text-center font-bold text-blue-600 cursor-pointer hover:underline"
+                              onClick={() => { setSelectedRecruiter(r); setCandidatesModalTitle(`All — ${r.firstName} ${r.lastName}`); setCandidateFilterType(null); setShowCandidatesModal(true); }}>
+                              {st.total}
+                            </td>
+                            <td className="px-4 py-3 text-center font-bold text-teal-600">{st.turnups}</td>
+                            <td className="px-4 py-3 text-center font-bold text-purple-600 cursor-pointer hover:underline"
+                              onClick={() => { setSelectedRecruiter(r); setCandidatesModalTitle(`Selected — ${r.firstName} ${r.lastName}`); setCandidateFilterType('selected'); setShowCandidatesModal(true); }}>
+                              {st.selected}
+                            </td>
+                            <td className="px-4 py-3 text-center font-bold text-green-600 cursor-pointer hover:underline"
+                              onClick={() => { setSelectedRecruiter(r); setCandidatesModalTitle(`Joined — ${r.firstName} ${r.lastName}`); setCandidateFilterType('joined'); setShowCandidatesModal(true); }}>
+                              {st.joined}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => openEditModal(r)}>
+                                    <Edit className="h-4 w-4 mr-2" /> Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => { setSelectedRecruiter(r); setShowPerformanceModal(true); setPerformanceData([]); }}>
+                                    <TrendingUp className="h-4 w-4 mr-2" /> Performance
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => handleToggleStatus(r)}>
+                                    {r.active !== false ? 'Deactivate' : 'Activate'}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="text-red-600"
+                                    onClick={() => { setRecruiterToDelete(r); setShowDeleteModal(true); }}>
+                                    <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </td>
                           </tr>
-                        )
-                      }
+                        );
+                      })}
                     </tbody>
                   </table>
-                </div>
-                <div className="flex justify-end mt-4">
-                  <Button onClick={() => setShowCandidatesModal(false)}>Close</Button>
-                </div>
-              </DialogPanel>
-            </div>
-          </Dialog>
+                </CardContent>
+              </Card>
+            )}
+          </>
+        )}
 
-        </div>
+        {/* ════════════════════════════════════════════════════════════
+            MODALS
+        ════════════════════════════════════════════════════════════ */}
+
+        {/* ── Add Recruiter ──────────────────────────────────────────── */}
+        <Dialog open={showModal} onClose={() => setShowModal(false)} className="relative z-50">
+          <DialogBackdrop className="fixed inset-0 bg-black/50" />
+          <div className="fixed inset-0 flex items-center justify-center p-4">
+            <DialogPanel className="bg-white dark:bg-gray-900 w-full max-w-lg rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
+              <DialogTitle className="text-xl font-bold mb-1">Add Recruiter</DialogTitle>
+              <p className="text-sm text-gray-500 mb-4">First name, last name, email & password are required.</p>
+
+              <div className="space-y-4">
+                {/* Profile picture */}
+                <div className="flex items-center gap-4">
+                  <div className="h-16 w-16 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
+                    {newRecruiter.profilePicture
+                      ? <img src={newRecruiter.profilePicture} className="w-full h-full object-cover" alt="preview" />
+                      : <Camera className="h-6 w-6 text-gray-400" />}
+                  </div>
+                  <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={(e) => handleFileUpload(e, false)} />
+                  <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>Upload Photo</Button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Recruiter ID</label>
+                    <Input value={newRecruiter.recruiterId}
+                      onChange={(e) => handleInputChange('recruiterId', e.target.value, false)}
+                      placeholder="e.g. REC001" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Role</label>
+                    <Input value="Recruiter" disabled className="bg-gray-100 dark:bg-gray-800 text-gray-500" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">First Name <span className="text-red-500">*</span></label>
+                    <Input value={newRecruiter.firstName}
+                      onChange={(e) => handleInputChange('firstName', e.target.value, false)}
+                      className={errors.firstName ? "border-red-500" : ""} />
+                    {errors.firstName && <p className="text-xs text-red-500 mt-1">{errors.firstName}</p>}
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Last Name <span className="text-red-500">*</span></label>
+                    <Input value={newRecruiter.lastName}
+                      onChange={(e) => handleInputChange('lastName', e.target.value, false)}
+                      className={errors.lastName ? "border-red-500" : ""} />
+                    {errors.lastName && <p className="text-xs text-red-500 mt-1">{errors.lastName}</p>}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Email <span className="text-red-500">*</span></label>
+                  <Input type="email" value={newRecruiter.email}
+                    onChange={(e) => handleInputChange('email', e.target.value, false)}
+                    className={errors.email ? "border-red-500" : ""} />
+                  {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Phone</label>
+                    <Input value={newRecruiter.phone} maxLength={10}
+                      onChange={(e) => handleInputChange('phone', e.target.value, false)}
+                      className={errors.phone ? "border-red-500" : ""}
+                      placeholder="10 digits" />
+                    {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Username</label>
+                    <Input value={newRecruiter.username}
+                      onChange={(e) => handleInputChange('username', e.target.value, false)} />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Password <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <Input type={showPassword ? "text" : "password"}
+                      value={newRecruiter.password}
+                      onChange={(e) => handleInputChange('password', e.target.value, false)}
+                      className={errors.password ? "border-red-500 pr-10" : "pr-10"}
+                      placeholder="Min 6 characters" />
+                    <button type="button"
+                      onClick={() => setShowPassword((p) => !p)}
+                      className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600">
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={() => setShowModal(false)}>Cancel</Button>
+                  <Button onClick={handleAddRecruiter} className="bg-blue-600 hover:bg-blue-700">Save Recruiter</Button>
+                </div>
+              </div>
+            </DialogPanel>
+          </div>
+        </Dialog>
+
+        {/* ── Edit Recruiter ─────────────────────────────────────────── */}
+        <Dialog open={showEditModal} onClose={() => setShowEditModal(false)} className="relative z-50">
+          <DialogBackdrop className="fixed inset-0 bg-black/50" />
+          <div className="fixed inset-0 flex items-center justify-center p-4">
+            <DialogPanel className="bg-white dark:bg-gray-900 w-full max-w-lg rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
+              <DialogTitle className="text-xl font-bold mb-4">Edit Recruiter</DialogTitle>
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="h-16 w-16 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
+                    {editRecruiter.profilePicture
+                      ? <img src={editRecruiter.profilePicture} className="w-full h-full object-cover" alt="edit-preview" />
+                      : <Camera className="h-6 w-6 text-gray-400" />}
+                  </div>
+                  <input type="file" ref={editFileInputRef} hidden accept="image/*" onChange={(e) => handleFileUpload(e, true)} />
+                  <Button variant="outline" size="sm" onClick={() => editFileInputRef.current?.click()}>Change Photo</Button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Recruiter ID</label>
+                    <Input value={editRecruiter.recruiterId}
+                      onChange={(e) => handleInputChange('recruiterId', e.target.value, true)} />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Role</label>
+                    <Input value="Recruiter" disabled className="bg-gray-100 dark:bg-gray-800 text-gray-500" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">First Name <span className="text-red-500">*</span></label>
+                    <Input value={editRecruiter.firstName}
+                      onChange={(e) => handleInputChange('firstName', e.target.value, true)}
+                      className={errors.firstName ? "border-red-500" : ""} />
+                    {errors.firstName && <p className="text-xs text-red-500 mt-1">{errors.firstName}</p>}
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Last Name <span className="text-red-500">*</span></label>
+                    <Input value={editRecruiter.lastName}
+                      onChange={(e) => handleInputChange('lastName', e.target.value, true)}
+                      className={errors.lastName ? "border-red-500" : ""} />
+                    {errors.lastName && <p className="text-xs text-red-500 mt-1">{errors.lastName}</p>}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Email <span className="text-red-500">*</span></label>
+                  <Input type="email" value={editRecruiter.email}
+                    onChange={(e) => handleInputChange('email', e.target.value, true)}
+                    className={errors.email ? "border-red-500" : ""} />
+                  {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Phone</label>
+                    <Input value={editRecruiter.phone} maxLength={10}
+                      onChange={(e) => handleInputChange('phone', e.target.value, true)}
+                      className={errors.phone ? "border-red-500" : ""} />
+                    {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Username</label>
+                    <Input value={editRecruiter.username}
+                      onChange={(e) => handleInputChange('username', e.target.value, true)} />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">
+                    New Password <span className="text-gray-400 font-normal">(leave blank to keep current)</span>
+                  </label>
+                  <div className="relative">
+                    <Input type={showEditPassword ? "text" : "password"}
+                      value={editRecruiter.password}
+                      onChange={(e) => handleInputChange('password', e.target.value, true)}
+                      className={`pr-10 ${errors.password ? "border-red-500" : ""}`}
+                      placeholder="Leave blank to keep current" />
+                    <button type="button"
+                      onClick={() => setShowEditPassword((p) => !p)}
+                      className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600">
+                      {showEditPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
+                  <Button onClick={handleEditRecruiter} className="bg-blue-600 hover:bg-blue-700">Update Recruiter</Button>
+                </div>
+              </div>
+            </DialogPanel>
+          </div>
+        </Dialog>
+
+        {/* ── Delete Confirm ─────────────────────────────────────────── */}
+        <Dialog open={showDeleteModal} onClose={() => setShowDeleteModal(false)} className="relative z-50">
+          <DialogBackdrop className="fixed inset-0 bg-black/50" />
+          <div className="fixed inset-0 flex items-center justify-center p-4">
+            <DialogPanel className="bg-white dark:bg-gray-900 rounded-xl p-6 max-w-md shadow-2xl">
+              <DialogTitle className="text-lg font-bold text-red-600 flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" /> Confirm Deletion
+              </DialogTitle>
+              <p className="mt-2 text-gray-600 dark:text-gray-300">
+                Delete <strong>{recruiterToDelete?.firstName} {recruiterToDelete?.lastName}</strong>? This cannot be undone.
+              </p>
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
+                <Button variant="destructive" onClick={handleDeleteRecruiter}>Delete</Button>
+              </div>
+            </DialogPanel>
+          </div>
+        </Dialog>
+
+        {/* ── Performance Modal ──────────────────────────────────────── */}
+        <Dialog open={showPerformanceModal} onClose={() => setShowPerformanceModal(false)} className="relative z-50">
+          <DialogBackdrop className="fixed inset-0 bg-black/50" />
+          <div className="fixed inset-0 flex items-center justify-center p-4">
+            <DialogPanel className="bg-white dark:bg-gray-900 w-full max-w-3xl rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
+              <DialogTitle className="text-xl font-bold mb-4">
+                Performance Report — {selectedRecruiter?.firstName} {selectedRecruiter?.lastName}
+              </DialogTitle>
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Start Date</label>
+                    <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">End Date</label>
+                    <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                  </div>
+                  <div className="flex items-end">
+                    <Button onClick={generatePerformanceData} className="w-full">Generate</Button>
+                  </div>
+                </div>
+
+                {performanceData.length > 0 ? (
+                  <>
+                    <div className="border rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 dark:bg-gray-800">
+                          <tr>
+                            <th className="p-2 text-left">Date</th>
+                            <th className="p-2 text-center">Submissions</th>
+                            <th className="p-2 text-center">Turnups</th>
+                            <th className="p-2 text-center">Joined</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {performanceData.map((d, i) => (
+                            <tr key={i} className="border-t">
+                              <td className="p-2">{d.date}</td>
+                              <td className="p-2 text-center">{d.submissions}</td>
+                              <td className="p-2 text-center">{d.turnups}</td>
+                              <td className="p-2 text-center">{d.joined}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button onClick={downloadPDF} variant="outline">
+                        <Download className="h-4 w-4 mr-2" /> Download PDF
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-8 text-gray-400">
+                    Select dates and click Generate to view performance data.
+                  </div>
+                )}
+
+                <div className="flex justify-end">
+                  <Button variant="ghost" onClick={() => setShowPerformanceModal(false)}>Close</Button>
+                </div>
+              </div>
+            </DialogPanel>
+          </div>
+        </Dialog>
+
+        {/* ── Stats Modal ────────────────────────────────────────────── */}
+        <Dialog open={showStatsModal} onClose={() => setShowStatsModal(false)} className="relative z-50">
+          <DialogBackdrop className="fixed inset-0 bg-black/50" />
+          <div className="fixed inset-0 flex items-center justify-center p-4">
+            <DialogPanel className="bg-white dark:bg-gray-900 w-full max-w-xl rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
+              <DialogTitle className="text-xl font-bold mb-4">{statsModalTitle}</DialogTitle>
+              <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                {selectedStatsRecruiters.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between py-2.5">
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold overflow-hidden">
+                        {r.profilePicture
+                          ? <img src={r.profilePicture} className="w-full h-full object-cover" alt="pfp" />
+                          : getInitials(r.firstName, r.lastName)}
+                      </div>
+                      <div>
+                        <div className="font-medium">{r.firstName} {r.lastName}</div>
+                        <div className="text-xs text-gray-500">{r.email}</div>
+                      </div>
+                    </div>
+                    <StatusBadge recruiter={r} />
+                  </div>
+                ))}
+                {selectedStatsRecruiters.length === 0 && (
+                  <p className="text-center text-gray-400 py-6">No recruiters in this category.</p>
+                )}
+              </div>
+              <div className="flex justify-end mt-4">
+                <Button onClick={() => setShowStatsModal(false)}>Close</Button>
+              </div>
+            </DialogPanel>
+          </div>
+        </Dialog>
+
+        {/* ── Candidates Modal ───────────────────────────────────────── */}
+        <Dialog open={showCandidatesModal} onClose={() => setShowCandidatesModal(false)} className="relative z-50">
+          <DialogBackdrop className="fixed inset-0 bg-black/50" />
+          <div className="fixed inset-0 flex items-center justify-center p-4">
+            <DialogPanel className="bg-white dark:bg-gray-900 w-full max-w-4xl rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
+              <DialogTitle className="text-xl font-bold mb-4">{candidatesModalTitle}</DialogTitle>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-gray-50 dark:bg-gray-800 text-xs uppercase text-gray-500">
+                    <tr>
+                      <th className="p-3">Name</th>
+                      <th className="p-3">Role / Client</th>
+                      <th className="p-3">Status</th>
+                      <th className="p-3">Email</th>
+                      <th className="p-3">Phone</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCandidatesForModal().length > 0
+                      ? filteredCandidatesForModal().map((c, i) => (
+                        <tr key={i} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
+                          <td className="p-3 font-medium">{c.name}</td>
+                          <td className="p-3">
+                            <div>{c.position}</div>
+                            <div className="text-xs text-gray-400">{c.client}</div>
+                          </td>
+                          <td className="p-3">
+                            <div className="flex flex-wrap gap-1">
+                              {(Array.isArray(c.status) ? c.status : [c.status || '']).map((s) => (
+                                <Badge key={s} variant="outline" className="text-xs">{s}</Badge>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="p-3 text-gray-500">{c.email}</td>
+                          <td className="p-3 text-gray-500">{c.contact}</td>
+                        </tr>
+                      ))
+                      : (
+                        <tr>
+                          <td colSpan={5} className="p-6 text-center text-gray-400">
+                            No candidates found.
+                          </td>
+                        </tr>
+                      )
+                    }
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex justify-end mt-4">
+                <Button onClick={() => setShowCandidatesModal(false)}>Close</Button>
+              </div>
+            </DialogPanel>
+          </div>
+        </Dialog>
+
+      </div>
     </div>
   );
 }
