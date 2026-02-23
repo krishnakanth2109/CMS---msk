@@ -1,28 +1,19 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   Plus, Search, Edit, Download, Phone, Mail,
   Building, Briefcase, Loader2, Ban, List, LayoutGrid,
-  Calendar, GraduationCap, Award, UserCircle, Star, Target, 
-  MessageSquare, Linkedin, MessageCircle, Eye, IndianRupee, Upload, FileUp, FileText, X, CheckSquare,
-  Trash2, AlertTriangle, FileSpreadsheet
+  Calendar, GraduationCap, Award, UserCircle, Target, 
+  MessageCircle, Eye, IndianRupee, Upload, FileUp, X,
+  Trash2, AlertTriangle, FileSpreadsheet, Linkedin
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
+const API_URL  = `${BASE_URL}/api`;
 
-// ── Plain Tailwind replacements ──────────────────────────────────────────────
-
-const Card = ({ children, className = '' }) => (
-  <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl ${className}`}>{children}</div>
-);
-const CardContent = ({ children, className = '' }) => (
-  <div className={className}>{children}</div>
-);
+// ── UI Components ─────────────────────────────────────────────────────────────
 
 const Button = ({ children, onClick, disabled, className = '', variant = 'default', size = 'md', type = 'button' }) => {
   const base = 'inline-flex items-center justify-center font-medium rounded-lg transition-colors focus:outline-none disabled:opacity-50 disabled:pointer-events-none';
@@ -63,7 +54,7 @@ const Badge = ({ children, variant = 'default', className = '' }) => {
   );
 };
 
-// ── Modal (replaces Dialog) ──────────────────────────────────────────────────
+// ── Modal ─────────────────────────────────────────────────────────────────────
 const Modal = ({ open, onClose, children, maxWidth = 'max-w-2xl' }) => {
   if (!open) return null;
   return (
@@ -81,7 +72,6 @@ const ModalDesc = ({ children }) => <p className="text-sm text-slate-500 mt-1">{
 const ModalFooter = ({ children }) => <div className="px-6 pb-6 pt-4 flex justify-end gap-3">{children}</div>;
 const ModalBody = ({ children }) => <div className="px-6 py-4">{children}</div>;
 
-// ── Inline Select replacement (native) ──────────────────────────────────────
 const NativeSelect = ({ value, onChange, children, className = '', disabled }) => (
   <select
     value={value}
@@ -93,10 +83,11 @@ const NativeSelect = ({ value, onChange, children, className = '', disabled }) =
   </select>
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Main Component ────────────────────────────────────────────────────────────
 
 export default function RecruiterCandidates() {
-  const { user } = useAuth();
+  const { currentUser, authHeaders } = useAuth();
+  // currentUser contains: { _id, name, email, role, idToken, refreshToken, ... }
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   
@@ -129,7 +120,7 @@ export default function RecruiterCandidates() {
 
   const [errors, setErrors] = useState({});
 
-  const standardSources = ['Portal', 'LinkedIn', 'Referral', 'Direct', 'Agency'];
+  const standardSources = ['Portal', 'LinkedIn', 'Referral', 'Direct', 'Agency', 'Naukri', 'Indeed'];
   
   const allStatuses = [
     'Shared Profiles','Yet to attend','Turnups','No Show','Selected',
@@ -145,12 +136,13 @@ export default function RecruiterCandidates() {
     totalExperience: '', relevantExperience: '',
     education: '',
     ctc: '', ectc: '', 
-    takeHomeSalary: '',
     currentTakeHome: '',
     expectedTakeHome: '',
     noticePeriod: '',
     servingNoticePeriod: 'false',
     noticePeriodDays: '',
+    lwd: '', // Last Working Day
+    reasonForChange: '',
     offersInHand: 'false',
     offerPackage: '',
     source: 'Portal', 
@@ -181,9 +173,10 @@ export default function RecruiterCandidates() {
     try {
       const uploadFormData = new FormData();
       uploadFormData.append('resume', file);
+      const authH = await authHeaders();
       const response = await fetch(`${API_URL}/candidates/parse-resume`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('authToken')}` },
+        headers: { ...authH },
         body: uploadFormData
       });
       const result = await response.json();
@@ -215,7 +208,8 @@ export default function RecruiterCandidates() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const headers = { 'Authorization': `Bearer ${sessionStorage.getItem('authToken')}` };
+      const authH = await authHeaders();
+      const headers = { ...authH };
       const [candRes, jobRes, clientRes] = await Promise.all([
         fetch(`${API_URL}/candidates`, { headers }),
         fetch(`${API_URL}/jobs`, { headers }),
@@ -225,11 +219,10 @@ export default function RecruiterCandidates() {
         const allCandidates = await candRes.json();
         const allJobs = await jobRes.json();
         const allClients = await clientRes.json();
-        const myCandidates = allCandidates.filter((c) =>
-          (c.recruiterId === user?.id || (typeof c.recruiterId === 'object' && c.recruiterId._id === user?.id))
-        );
-        myCandidates.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        const fixedCandidates = myCandidates.map((c) => ({
+        // Backend already filters by recruiter for non-admins — trust that
+        // and just normalise status to array
+        allCandidates.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        const fixedCandidates = allCandidates.map((c) => ({
           ...c,
           status: Array.isArray(c.status) ? c.status : [c.status || 'Submitted']
         }));
@@ -262,9 +255,6 @@ export default function RecruiterCandidates() {
       newValue = value.replace(/\D/g, '');
       if (newValue.length > 10) return;
     }
-    if (['totalExperience','relevantExperience','ctc','ectc','takeHomeSalary','currentTakeHome','expectedTakeHome'].includes(key)) {
-      if (!/^\d*\.?\d*$/.test(value)) return;
-    }
     setFormData(prev => ({ ...prev, [key]: newValue }));
     if (errors[key]) setErrors(prev => { const n = { ...prev }; delete n[key]; return n; });
   };
@@ -285,15 +275,17 @@ export default function RecruiterCandidates() {
     const newErrors = {};
     const data = formData;
     if (!data.name.trim()) newErrors.name = "Name is required";
-    else if (!/^[A-Z][a-zA-Z\s]*$/.test(data.name)) newErrors.name = "Name must start with Uppercase";
     if (!data.email.trim()) newErrors.email = "Email is required";
     if (!data.contact.trim()) newErrors.contact = "Phone is required";
     else if (data.contact.length !== 10) newErrors.contact = "Phone must be exactly 10 digits";
-    if (!data.position.trim()) newErrors.position = "Position is required";
-    if (!data.client.trim()) newErrors.client = "Client is required";
+    
+    // REMOVED REQUIRED CHECKS FOR POSITION AND CLIENT
+    // if (!data.position.trim()) newErrors.position = "Position is required";
+    // if (!data.client.trim()) newErrors.client = "Client is required";
+
     if (!data.skills.toString().trim()) newErrors.skills = "Skills are required";
     if (isCustomSource && !data.source.trim()) newErrors.source = "Please specify source";
-    if (data.servingNoticePeriod === 'true' && !data.noticePeriodDays.trim()) newErrors.noticePeriodDays = "Please specify days";
+    if (data.servingNoticePeriod === 'true' && !data.lwd.trim()) newErrors.lwd = "LWD is required";
     if (data.offersInHand === 'true' && !data.offerPackage.trim()) newErrors.offerPackage = "Please specify package amount";
     if (data.status.length === 0) newErrors.status = "At least one status is required";
     setErrors(newErrors);
@@ -336,12 +328,12 @@ export default function RecruiterCandidates() {
 
   const handleExport = () => {
     if (getFilteredCandidates.length === 0) { toast({ title: "No data to export", variant: "destructive" }); return; }
-    const headers = ["Candidate ID","Name","Email","Phone","Client","Position","Status","Total Exp","Current CTC","Expected CTC","Take Home","Skills","Date Added"];
+    const headers = ["Candidate ID","Name","Email","Phone","Client","Position","Status","Total Exp","Current CTC","Expected CTC","Skills","Date Added"];
     const escapeCsv = (str) => str ? `"${String(str).replace(/"/g, '""')}"` : '""';
     const rows = getFilteredCandidates.map(c => [
-      escapeCsv(getCandidateId(c)), escapeCsv(c.name), escapeCsv(c.email), escapeCsv(c.contact),
+      escapeCsv(c.candidateId), escapeCsv(c.name), escapeCsv(c.email), escapeCsv(c.contact),
       escapeCsv(c.client), escapeCsv(c.position), escapeCsv(Array.isArray(c.status) ? c.status.join(' | ') : c.status),
-      escapeCsv(c.totalExperience), escapeCsv(c.ctc), escapeCsv(c.ectc), escapeCsv(c.takeHomeSalary),
+      escapeCsv(c.totalExperience), escapeCsv(c.ctc), escapeCsv(c.ectc), 
       escapeCsv(Array.isArray(c.skills) ? c.skills.join(', ') : c.skills),
       escapeCsv(new Date(c.dateAdded || c.createdAt || new Date()).toLocaleDateString())
     ]);
@@ -367,13 +359,6 @@ export default function RecruiterCandidates() {
   const toggleSelectCandidate = (id) => setSelectedCandidates(prev => prev.includes(id) ? prev.filter(cid => cid !== id) : [...prev, id]);
   const selectAllCandidates = () => setSelectedCandidates(selectedCandidates.length === getFilteredCandidates.length ? [] : getFilteredCandidates.map(c => c._id));
   
-  const getAssignedJobTitle = (jobId) => {
-    if(!jobId) return 'Not Assigned';
-    if(typeof jobId === 'object') return `${jobId.position} (${jobId.clientName})`;
-    const job = jobs.find(j => j._id === jobId);
-    return job ? `${job.position} (${job.clientName})` : jobId;
-  };
-
   const openViewDialog = (c) => { setViewingCandidate(c); setIsViewDialogOpen(true); };
 
   const openEditDialog = (c) => {
@@ -390,12 +375,13 @@ export default function RecruiterCandidates() {
       currentCompany: c.currentCompany || '', skills: Array.isArray(c.skills) ? c.skills.join(', ') : c.skills || '',
       totalExperience: c.totalExperience ? String(c.totalExperience) : '',
       relevantExperience: c.relevantExperience ? String(c.relevantExperience) : '',
-      education: c.education || '', ctc: c.ctc ? String(c.ctc) : '', ectc: c.ectc ? String(c.ectc) : '',
-      takeHomeSalary: c.takeHomeSalary ? String(c.takeHomeSalary) : '',
-      currentTakeHome: '', expectedTakeHome: '',
+      education: c.education || '', 
+      ctc: c.ctc ? String(c.ctc) : '', ectc: c.ectc ? String(c.ectc) : '',
+      currentTakeHome: c.currentTakeHome || '', expectedTakeHome: c.expectedTakeHome || '',
       noticePeriod: c.noticePeriod ? String(c.noticePeriod) : '',
       servingNoticePeriod: c.servingNoticePeriod ? 'true' : 'false',
-      noticePeriodDays: c.noticePeriodDays || '',
+      lwd: c.lwd ? new Date(c.lwd).toISOString().split('T')[0] : '',
+      reasonForChange: c.reasonForChange || '',
       offersInHand: c.offersInHand ? 'true' : 'false',
       offerPackage: c.offerPackage || '',
       source: c.source || 'Portal',
@@ -412,31 +398,46 @@ export default function RecruiterCandidates() {
     if (!validateForm()) { toast({ title: "Validation Error", description: "Please fix form errors", variant: "destructive" }); return; }
     setIsSubmitting(true);
     try {
-      const headers = { 'Authorization': `Bearer ${sessionStorage.getItem('authToken')}`, 'Content-Type': 'application/json' };
+      const authH = await authHeaders();
+      const headers = { ...authH, 'Content-Type': 'application/json' };
+
+      // Split full name into firstName / lastName for the backend model
+      const nameParts = (formData.name || '').trim().split(/\s+/);
+      const firstName = nameParts[0] || formData.name || '';
+      const lastName  = nameParts.slice(1).join(' ') || nameParts[0] || '';
+
       const payload = {
         ...formData,
+        firstName,
+        lastName,
+        name: formData.name,
         assignedJobId: typeof formData.assignedJobId === 'object' ? formData.assignedJobId._id : formData.assignedJobId,
-        recruiterId: user?.id, recruiterName: user?.name,
-        skills: formData.skills.split(',').map((s) => s.trim()),
-        rating: parseInt(formData.rating) || 0
+        skills: typeof formData.skills === 'string' ? formData.skills.split(',').map((s) => s.trim()).filter(Boolean) : formData.skills,
+        rating: parseInt(formData.rating) || 0,
+        servingNoticePeriod: formData.servingNoticePeriod === 'true',
+        offersInHand: formData.offersInHand === 'true'
       };
       const url = isEdit ? `${API_URL}/candidates/${selectedCandidateId}` : `${API_URL}/candidates`;
       const method = isEdit ? 'PUT' : 'POST';
       const res = await fetch(url, { method, headers, body: JSON.stringify(payload) });
+      const data = await res.json();
       if (res.ok) {
         toast({ title: "Success", description: `Candidate ${isEdit ? 'updated' : 'added'} successfully` });
         setIsAddDialogOpen(false); setIsEditDialogOpen(false);
         fetchData(); setFormData(initialFormState);
-      } else { throw new Error(); }
+      } else {
+        throw new Error(data.message || 'Operation failed');
+      }
     } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "Operation failed" });
+      toast({ variant: "destructive", title: "Error", description: error.message || "Operation failed" });
     } finally { setIsSubmitting(false); }
   };
 
   const toggleActiveStatus = async (id, currentStatus) => {
     if(!confirm(`Are you sure you want to ${currentStatus ? 'deactivate' : 'activate'}?`)) return;
     try {
-      const headers = { 'Authorization': `Bearer ${sessionStorage.getItem('authToken')}`, 'Content-Type': 'application/json' };
+      const authH = await authHeaders();
+      const headers = { ...authH, 'Content-Type': 'application/json' };
       await fetch(`${API_URL}/candidates/${id}`, { method: 'PUT', headers, body: JSON.stringify({ active: !currentStatus }) });
       toast({ title: "Status Updated" }); fetchData();
     } catch (error) { toast({ variant: "destructive", title: "Error" }); }
@@ -446,7 +447,8 @@ export default function RecruiterCandidates() {
     if (selectedCandidates.length === 0) return;
     setIsDeleting(true);
     try {
-      const headers = { 'Authorization': `Bearer ${sessionStorage.getItem('authToken')}` };
+      const authH = await authHeaders();
+      const headers = { ...authH };
       const deletePromises = selectedCandidates.map(id => fetch(`${API_URL}/candidates/${id}`, { method: 'DELETE', headers }));
       await Promise.all(deletePromises);
       toast({ title: "Deleted", description: `${selectedCandidates.length} candidate(s) deleted successfully` });
@@ -461,9 +463,10 @@ export default function RecruiterCandidates() {
     setIsImporting(true); setImportResult(null);
     try {
       const fd = new FormData(); fd.append('file', importFile);
+      const authH = await authHeaders();
       const response = await fetch(`${API_URL}/candidates/bulk-import`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('authToken')}` },
+        headers: { ...authH },
         body: fd,
       });
       const result = await response.json();
@@ -475,10 +478,7 @@ export default function RecruiterCandidates() {
       const errorMessages = (result.errors || []).map((e) => typeof e === 'string' ? e : `Row ${e.row} (${e.candidate}): ${e.error}`);
       setImportResult({ success: successCount, failed: failCount, errors: errorMessages });
       if (successCount > 0) {
-        const parts = [];
-        if (createdCount > 0) parts.push(`${createdCount} new added`);
-        if (updatedCount > 0) parts.push(`${updatedCount} existing updated`);
-        toast({ title: 'Import Successful', description: parts.join(', ') + '.' });
+        toast({ title: 'Import Successful', description: `${createdCount} added, ${updatedCount} updated.` });
         fetchData();
       } else {
         toast({ title: 'Nothing Imported', description: result.message || 'No candidates were added.', variant: 'destructive' });
@@ -499,9 +499,10 @@ export default function RecruiterCandidates() {
 
   if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>;
 
-  // Candidate form (shared between add/edit)
+  // ── Candidate Form ─────────────────────────────────────────────────────────
   const CandidateForm = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 py-4">
+      {/* ── Section 1: Personal ── */}
       <div className="md:col-span-3 font-semibold border-b pb-1 text-slate-500 flex items-center gap-2"><UserCircle className="h-4 w-4"/> Personal Information</div>
       
       <div className="space-y-1">
@@ -519,7 +520,6 @@ export default function RecruiterCandidates() {
         <Input value={formData.contact} onChange={e => handleInputChange('contact', e.target.value)} className={errors.contact ? "border-red-500" : ""} placeholder="10 Digits Only"/>
         {errors.contact && <span className="text-xs text-red-500">{errors.contact}</span>}
       </div>
-      
       <div className="space-y-1"><Label>Date of Birth</Label><Input type="date" value={formData.dateOfBirth} onChange={e => handleInputChange('dateOfBirth', e.target.value)}/></div>
       <div className="space-y-1">
         <Label>Gender</Label>
@@ -537,23 +537,19 @@ export default function RecruiterCandidates() {
       <div className="space-y-1"><Label>Current Location</Label><Input value={formData.currentLocation} onChange={e => handleInputChange('currentLocation', e.target.value)}/></div>
       <div className="space-y-1"><Label>Preferred Location</Label><Input value={formData.preferredLocation} onChange={e => handleInputChange('preferredLocation', e.target.value)}/></div>
 
+      {/* ── Section 2: Professional ── */}
       <div className="md:col-span-3 font-semibold border-b pb-1 text-slate-500 mt-4 flex items-center gap-2"><Briefcase className="h-4 w-4"/> Professional Information</div>
       
       <div className="space-y-1">
-        <Label className={errors.position ? "text-red-500" : ""}>Position *</Label>
-        <NativeSelect value={formData.position} onChange={val => handleInputChange('position', val)} className={errors.position ? "border-red-500" : ""}>
-          <option value="">Select Position</option>
-          {uniquePositions.map(pos => <option key={pos} value={pos}>{pos}</option>)}
-        </NativeSelect>
-        {errors.position && <span className="text-xs text-red-500">{errors.position}</span>}
+        <Label>Role (Position)</Label>
+        <Input value={formData.position} onChange={e => handleInputChange('position', e.target.value)} placeholder="e.g. Frontend Developer"/>
       </div>
       <div className="space-y-1">
-        <Label className={errors.client ? "text-red-500" : ""}>Client *</Label>
-        <NativeSelect value={formData.client} onChange={val => handleInputChange('client', val)} className={errors.client ? "border-red-500" : ""}>
+        <Label>Client</Label>
+        <NativeSelect value={formData.client} onChange={val => handleInputChange('client', val)}>
           <option value="">Select Client</option>
           {clients.map(client => <option key={client._id} value={client.companyName}>{client.companyName}</option>)}
         </NativeSelect>
-        {errors.client && <span className="text-xs text-red-500">{errors.client}</span>}
       </div>
       <div className="space-y-1"><Label>Current Company</Label><Input value={formData.currentCompany} onChange={e => handleInputChange('currentCompany', e.target.value)}/></div>
       <div className="space-y-1"><Label>Industry</Label><Input value={formData.industry} onChange={e => handleInputChange('industry', e.target.value)}/></div>
@@ -566,9 +562,23 @@ export default function RecruiterCandidates() {
       <div className="md:col-span-3 font-semibold text-slate-500 border-b pb-1 mt-4 flex items-center gap-2"><GraduationCap className="h-4 w-4"/> Education</div>
       <div className="md:col-span-3 space-y-1"><Label>Qualification</Label><Input value={formData.education} onChange={e => handleInputChange('education', e.target.value)} placeholder="e.g. B.Tech from IIT Delhi"/></div>
 
-      <div className="md:col-span-3 font-semibold text-slate-500 border-b pb-1 mt-4 flex items-center gap-2"><IndianRupee className="h-4 w-4"/> Experience & Pay</div>
+      {/* ── Section 3: Financial & Availability ── */}
+      <div className="md:col-span-3 font-semibold text-slate-500 border-b pb-1 mt-4 flex items-center gap-2"><IndianRupee className="h-4 w-4"/> Experience & Availability</div>
+      
       <div className="space-y-1"><Label>Total Exp (Yrs)</Label><Input value={formData.totalExperience} onChange={e => handleInputChange('totalExperience', e.target.value)} placeholder="Numbers only"/></div>
       <div className="space-y-1"><Label>Relevant Exp (Yrs)</Label><Input value={formData.relevantExperience} onChange={e => handleInputChange('relevantExperience', e.target.value)} placeholder="Numbers only"/></div>
+      
+      <div className="space-y-1"><Label>Current CTC (LPA)</Label><Input value={formData.ctc} onChange={e => handleInputChange('ctc', e.target.value)}/></div>
+      <div className="space-y-1"><Label>Expected CTC (LPA)</Label><Input value={formData.ectc} onChange={e => handleInputChange('ectc', e.target.value)}/></div>
+      
+      <div className="space-y-1"><Label>Current Take Home (Monthly)</Label><Input value={formData.currentTakeHome} onChange={e => handleInputChange('currentTakeHome', e.target.value)}/></div>
+      <div className="space-y-1"><Label>Expected Take Home (Monthly)</Label><Input value={formData.expectedTakeHome} onChange={e => handleInputChange('expectedTakeHome', e.target.value)}/></div>
+
+      <div className="space-y-1">
+        <Label>Notice Period (Days/Months)</Label>
+        <Input value={formData.noticePeriod} onChange={e => handleInputChange('noticePeriod', e.target.value)} placeholder="e.g. 30 Days"/>
+      </div>
+      
       <div className="space-y-1">
         <Label>Serving Notice?</Label>
         <NativeSelect value={formData.servingNoticePeriod} onChange={val => handleInputChange('servingNoticePeriod', val)}>
@@ -576,15 +586,17 @@ export default function RecruiterCandidates() {
           <option value="true">Yes</option>
         </NativeSelect>
       </div>
+      
       {formData.servingNoticePeriod === 'true' && (
         <div className="space-y-1">
-          <Label className={errors.noticePeriodDays ? "text-red-500" : ""}>Days Remaining *</Label>
-          <Input value={formData.noticePeriodDays} onChange={e => handleInputChange('noticePeriodDays', e.target.value)} placeholder="e.g. 30"/>
-          {errors.noticePeriodDays && <span className="text-xs text-red-500">{errors.noticePeriodDays}</span>}
+          <Label className={errors.lwd ? "text-red-500" : ""}>LWD (Last Working Day) *</Label>
+          <Input type="date" value={formData.lwd} onChange={e => handleInputChange('lwd', e.target.value)} className={errors.lwd ? "border-red-500" : ""}/>
+          {errors.lwd && <span className="text-xs text-red-500">{errors.lwd}</span>}
         </div>
       )}
-      <div className="space-y-1"><Label>Current CTC (Lakhs)</Label><Input value={formData.ctc} onChange={e => handleInputChange('ctc', e.target.value)} placeholder="Numbers only"/></div>
-      <div className="space-y-1"><Label>Expected CTC (Lakhs)</Label><Input value={formData.ectc} onChange={e => handleInputChange('ectc', e.target.value)} placeholder="Numbers only"/></div>
+
+      <div className="space-y-1"><Label>Reason For Change</Label><textarea value={formData.reasonForChange} onChange={e => handleInputChange('reasonForChange', e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm h-10"/></div>
+
       <div className="space-y-1">
         <Label>Offers in Hand?</Label>
         <NativeSelect value={formData.offersInHand} onChange={val => handleInputChange('offersInHand', val)}>
@@ -592,9 +604,6 @@ export default function RecruiterCandidates() {
           <option value="true">Yes</option>
         </NativeSelect>
       </div>
-      <div className="space-y-1"><Label>Current Take Home (Thousands)</Label><Input value={formData.currentTakeHome} onChange={e => handleInputChange('currentTakeHome', e.target.value)} placeholder="Numbers only"/></div>
-      <div className="space-y-1"><Label>Expected Take Home (Thousands)</Label><Input value={formData.expectedTakeHome} onChange={e => handleInputChange('expectedTakeHome', e.target.value)} placeholder="Numbers only"/></div>
-      <div className="space-y-1"><Label>Reason For Change</Label><textarea value={formData.notes} onChange={e => handleInputChange('notes', e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm h-10" placeholder="Reason for changing"/></div>
       {formData.offersInHand === 'true' && (
         <div className="space-y-1">
           <Label className={errors.offerPackage ? "text-red-500" : ""}>Package Amount *</Label>
@@ -603,7 +612,9 @@ export default function RecruiterCandidates() {
         </div>
       )}
 
+      {/* ── Section 4: Recruitment Status ── */}
       <div className="md:col-span-3 font-semibold text-slate-500 border-b pb-1 mt-4 flex items-center gap-2"><Target className="h-4 w-4"/> Recruitment Details</div>
+      
       <div className="space-y-1">
         <Label>Source</Label>
         <NativeSelect value={isCustomSource ? 'Other' : formData.source} onChange={v => { if(v==='Other'){setIsCustomSource(true);handleInputChange('source','')}else{setIsCustomSource(false);handleInputChange('source',v)} }}>
@@ -611,13 +622,6 @@ export default function RecruiterCandidates() {
           <option value="Other">Other</option>
         </NativeSelect>
         {isCustomSource && <Input className="mt-1" value={formData.source} onChange={e => handleInputChange('source', e.target.value)} placeholder="Enter Source"/>}
-      </div>
-      <div className="space-y-1">
-        <Label>Assigned Job</Label>
-        <NativeSelect value={typeof formData.assignedJobId === 'object' ? formData.assignedJobId._id : formData.assignedJobId || ''} onChange={val => handleInputChange('assignedJobId', val)}>
-          <option value="">Select Job</option>
-          {jobs.map(j => <option key={j._id} value={j._id}>{j.position} - {j.clientName}</option>)}
-        </NativeSelect>
       </div>
 
       <div className="space-y-1">
@@ -651,6 +655,8 @@ export default function RecruiterCandidates() {
       </div>
     </div>
   );
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <>

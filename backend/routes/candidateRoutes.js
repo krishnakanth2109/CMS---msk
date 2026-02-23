@@ -113,14 +113,14 @@ router.put('/bulk-assign', async (req, res) => {
       { 
         $set: { 
           recruiterId: recruiter._id,
-          recruiterName: recruiter.name 
+          recruiterName: `${recruiter.firstName || ''} ${recruiter.lastName || ''}`.trim() || recruiter.email 
         } 
       }
     );
 
     res.json({ 
       success: true, 
-      message: `Successfully assigned ${result.modifiedCount} candidates to ${recruiter.name}` 
+      message: `Successfully assigned ${result.modifiedCount} candidates to ${recruiter.firstName || ''} ${recruiter.lastName || ''}` 
     });
 
   } catch (error) {
@@ -173,7 +173,7 @@ router.get('/', async (req, res) => {
       query.recruiterId = req.user._id;
     }
     const candidates = await Candidate.find(query)
-      .populate('recruiterId', 'name')
+      .populate('recruiterId', 'firstName lastName name email')
       .sort({ createdAt: -1 });
     res.json(candidates);
   } catch (error) {
@@ -192,13 +192,13 @@ router.post('/', upload.single('resume'), async (req, res) => {
     }
 
     let targetRecruiterId = req.user._id;
-    let targetRecruiterName = req.user.name;
+    let targetRecruiterName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.email;
 
     if (req.user.role === 'admin' && candidateData.recruiterId) {
       const assignedRecruiter = await User.findById(candidateData.recruiterId);
       if (assignedRecruiter) {
         targetRecruiterId = assignedRecruiter._id;
-        targetRecruiterName = assignedRecruiter.name;
+        targetRecruiterName = `${assignedRecruiter.firstName || ''} ${assignedRecruiter.lastName || ''}`.trim() || assignedRecruiter.email;
       }
     }
 
@@ -227,7 +227,7 @@ router.put('/:id/inline-update', inlineUpdateCandidate);
 // Get Single Candidate
 router.get('/:id', async (req, res) => {
   try {
-    const candidate = await Candidate.findById(req.params.id).populate('recruiterId', 'name');
+    const candidate = await Candidate.findById(req.params.id).populate('recruiterId', 'firstName lastName name email');
     if (!candidate) return res.status(404).json({ message: 'Candidate not found' });
 
     if (req.user.role !== 'admin' && candidate.recruiterId._id.toString() !== req.user._id.toString()) {

@@ -32,13 +32,13 @@ export const createCandidate = async (req, res) => {
 
     // Recruiter Assignment logic
     let targetRecruiterId = req.user._id;
-    let targetRecruiterName = req.user.name;
+    let targetRecruiterName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.email;
 
     if (req.user.role === 'admin' && body.recruiterId) {
       const assignedRecruiter = await User.findById(body.recruiterId);
       if (assignedRecruiter) {
         targetRecruiterId = assignedRecruiter._id;
-        targetRecruiterName = assignedRecruiter.name;
+        targetRecruiterName = `${assignedRecruiter.firstName || ''} ${assignedRecruiter.lastName || ''}`.trim() || assignedRecruiter.email;
       }
     }
 

@@ -61,17 +61,17 @@ const VALID_STATUSES = [
 ];
 
 /**
- * Get the next available CAND-XXXX number from the real DB.
- * Always reads live from MongoDB — never gets out of sync.
+ * Get the next available VTS number from MongoDB.
+ * Matches the Candidate.js auto-ID format: VTS0000001, VTS0000002, ...
  */
 const getNextCandidateNumber = async () => {
   const last = await Candidate.findOne(
-    { candidateId: { $regex: /^CAND-\d+$/ } },
+    { candidateId: { $regex: /^VTS\d+$/i } },
     { candidateId: 1 }
-  ).sort({ candidateId: -1 });
+  ).sort({ createdAt: -1 });
 
   if (!last || !last.candidateId) return 1;
-  const num = parseInt(last.candidateId.split('-')[1], 10);
+  const num = parseInt(last.candidateId.replace(/^VTS/i, ''), 10);
   return isNaN(num) ? 1 : num + 1;
 };
 
@@ -91,7 +91,7 @@ export const bulkImportCandidates = async (req, res) => {
   const tempFilePath = req.file?.path;
 
   console.log('=== BULK IMPORT START ===');
-  console.log('User:', req.user ? `${req.user._id} / ${req.user.name}` : 'NONE');
+  console.log('User:', req.user ? `${req.user._id} / ${req.user.firstName} ${req.user.lastName}` : 'NONE');
   console.log('File:', tempFilePath);
 
   try {
@@ -218,7 +218,7 @@ export const bulkImportCandidates = async (req, res) => {
             industry          : getValue(row, cols.industry)      || '',
             dateOfBirth       : getValue(row, cols.dob)           || '',
             recruiterId       : req.user._id,
-            recruiterName     : req.user.name,
+            recruiterName     : `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.email,
             active            : true,
             dateAdded         : new Date(),
           }
@@ -262,11 +262,11 @@ export const bulkImportCandidates = async (req, res) => {
 
     if (newRows.length > 0) {
       let nextNum = await getNextCandidateNumber();
-      console.log(`Starting candidateId from: CAND-${nextNum.toString().padStart(4, '0')}`);
+      console.log(`Starting candidateId from: VTS${nextNum.toString().padStart(7, '0')}`);
 
       for (const row of newRows) {
         try {
-          row.candidateData.candidateId = `CAND-${nextNum.toString().padStart(4, '0')}`;
+          row.candidateData.candidateId = `VTS${nextNum.toString().padStart(7, '0')}`;
           nextNum++;
 
           const doc = new Candidate(row.candidateData);

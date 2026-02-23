@@ -14,7 +14,8 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { useToast } from '@/hooks/use-toast';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
+const API_URL  = `${BASE_URL}/api`;
 
 // --- Components ---
 
@@ -140,7 +141,9 @@ const CustomDateInput = React.forwardRef(({ value, onClick, placeholder, isMobil
 // --- Main Dashboard Component ---
 
 export default function RecruiterDashboard() {
-  const { user } = useAuth();
+  const { currentUser, authHeaders } = useAuth();
+  // Convenience alias — currentUser has: _id, firstName, lastName, email, role, etc.
+  const user = currentUser;
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -181,17 +184,17 @@ export default function RecruiterDashboard() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const getAuthHeader = () => ({
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${sessionStorage.getItem('authToken')}`
-  });
+  const getAuthHeader = async () => {
+    const h = await authHeaders();
+    return { 'Content-Type': 'application/json', ...h };
+  };
 
   // Fetch Data
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const headers = getAuthHeader();
+        const headers = await getAuthHeader();
 
         const [candRes, jobRes, intRes] = await Promise.all([
           fetch(`${API_URL}/candidates`, { headers }),
@@ -204,7 +207,8 @@ export default function RecruiterDashboard() {
           const rawJobs = await jobRes.json();
           const rawInterviews = await intRes.json();
 
-          const currentUserId = user?.id || user?._id;
+          const currentUserId = user?._id || user?.id;
+          const currentUserName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.email || '';
 
           const processedCandidates = rawCandidates
             .map((c) => ({
@@ -220,8 +224,8 @@ export default function RecruiterDashboard() {
 
           const myJobs = rawJobs
             .filter((j) => {
-              return j.primaryRecruiter === user?.name ||
-                    j.secondaryRecruiter === user?.name ||
+              return j.primaryRecruiter === currentUserName ||
+                    j.secondaryRecruiter === currentUserName ||
                     j.assignedRecruiter === currentUserId ||
                     j.recruiterId === currentUserId;
             })
@@ -377,7 +381,10 @@ export default function RecruiterDashboard() {
   const handleNavigateToSchedules = () => navigate('/recruiter/schedules');
   const handleNavigateToMessages = () => navigate('/recruiter/messages');
 
-  const getUserGreeting = () => user?.name ? `Welcome back, ${user.name.split(' ')[0]}!` : "Welcome back!";
+  const getUserGreeting = () => {
+    const name = user?.firstName || user?.name?.split(' ')[0] || '';
+    return name ? `Welcome back, ${name}!` : "Welcome back!";
+  };
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const PopperContainer = ({ children }) => (

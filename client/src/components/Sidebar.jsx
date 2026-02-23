@@ -65,7 +65,7 @@ export default function Sidebar() {
           </div>
           {!isCollapsed && (
             <span className="text-white font-bold text-xl tracking-tight whitespace-nowrap animate-in fade-in duration-300">
-              RecruiterHub
+              VTS Tracker
             </span>
           )}
         </div>
