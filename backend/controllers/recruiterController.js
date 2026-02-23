@@ -4,88 +4,172 @@ import { v2 as cloudinary } from 'cloudinary';
 
 cloudinary.config({
   cloud_name: process.env.CLOUD_NAME,
-  api_key: process.env.CLOUD_API_KEY,
-  api_secret: process.env.CLOUD_API_SECRET
+  api_key:    process.env.CLOUD_API_KEY,
+  api_secret: process.env.CLOUD_API_SECRET,
 });
 
-// @desc    Get Current User Profile
+// ─────────────────────────────────────────────────────────────────────────────
+// @desc    Get current logged-in user's full profile
 // @route   GET /api/recruiters/profile
 // @access  Private
+// ─────────────────────────────────────────────────────────────────────────────
 export const getUserProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('-password');
-    if (user) res.json(user);
-    else res.status(404).json({ message: 'User not found' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @desc    Update Current User Profile
-// @route   PUT /api/recruiters/profile
-// @access  Private
-export const updateUserProfile = async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    user.firstName      = req.body.firstName      || user.firstName;
-    user.lastName       = req.body.lastName       || user.lastName;
-    user.email          = req.body.email          || user.email;
-    user.phone          = req.body.phone          || user.phone;
-    user.location       = req.body.location       || user.location;
-    user.specialization = req.body.specialization || user.specialization;
-    user.experience     = req.body.experience     || user.experience;
-    user.bio            = req.body.bio            || user.bio;
-
-    if (req.body.socials) {
-      user.socials = {
-        linkedin: req.body.socials.linkedin || user.socials?.linkedin || '',
-        github:   req.body.socials.github   || user.socials?.github   || '',
-        twitter:  req.body.socials.twitter  || user.socials?.twitter  || '',
-        website:  req.body.socials.website  || user.socials?.website  || ''
-      };
-    }
-
-    if (req.body.profilePicture && req.body.profilePicture.startsWith('data:image')) {
-      try {
-        if (user.profilePicture?.includes('cloudinary')) {
-          try { await cloudinary.uploader.destroy(`recruiters/recruiter_${user._id}`); } catch {}
-        }
-        const result = await cloudinary.uploader.upload(req.body.profilePicture, {
-          folder: 'recruiters',
-          public_id: `recruiter_${user._id}`,
-          overwrite: true,
-          resource_type: 'image',
-          transformation: [{ width: 500, height: 500, crop: 'limit' }, { quality: 'auto' }, { fetch_format: 'auto' }]
-        });
-        user.profilePicture = result.secure_url;
-      } catch (uploadError) {
-        return res.status(500).json({ message: 'Failed to upload image', error: uploadError.message });
-      }
-    } else if (req.body.profilePicture && !req.body.profilePicture.startsWith('data:image')) {
-      user.profilePicture = req.body.profilePicture;
-    }
-
-    const updatedUser = await user.save();
+    // Return every profile field the frontend needs
     res.json({
-      _id: updatedUser._id, 
-      firstName: updatedUser.firstName, 
-      lastName: updatedUser.lastName, 
-      email: updatedUser.email,
-      phone: updatedUser.phone, location: updatedUser.location,
-      specialization: updatedUser.specialization, experience: updatedUser.experience,
-      bio: updatedUser.bio, profilePicture: updatedUser.profilePicture,
-      role: updatedUser.role, socials: updatedUser.socials, active: updatedUser.active
+      _id:            user._id,
+      firstName:      user.firstName,
+      lastName:       user.lastName,
+      email:          user.email,
+      username:       user.username,
+      phone:          user.phone          || '',
+      location:       user.location       || '',
+      specialization: user.specialization || '',
+      experience:     user.experience     || '',
+      bio:            user.bio            || '',
+      profilePicture: user.profilePicture || '',
+      role:           user.role,
+      active:         user.active,
+      recruiterId:    user.recruiterId    || '',
+      socials: {
+        linkedin: user.socials?.linkedin || '',
+        github:   user.socials?.github   || '',
+        twitter:  user.socials?.twitter  || '',
+        website:  user.socials?.website  || '',
+      },
+      createdAt: user.createdAt,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// @desc    Get all recruiters
+// ─────────────────────────────────────────────────────────────────────────────
+// @desc    Update current logged-in user's profile
+// @route   PUT /api/recruiters/profile
+// @access  Private
+//
+// Accepts: firstName, lastName, email, phone, location, specialization,
+//          experience, bio, profilePicture (base64 or URL), socials {}
+// Also syncs displayName to Firebase Auth so it stays consistent.
+// ─────────────────────────────────────────────────────────────────────────────
+export const updateUserProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // ── Basic fields ──────────────────────────────────────────────────────
+    if (req.body.firstName !== undefined) user.firstName      = req.body.firstName.trim()  || user.firstName;
+    if (req.body.lastName  !== undefined) user.lastName       = req.body.lastName.trim()   || user.lastName;
+    if (req.body.email     !== undefined) user.email          = req.body.email.trim()      || user.email;
+    if (req.body.phone     !== undefined) user.phone          = req.body.phone;
+    if (req.body.location  !== undefined) user.location       = req.body.location;
+    if (req.body.specialization !== undefined) user.specialization = req.body.specialization;
+    if (req.body.experience     !== undefined) user.experience     = req.body.experience;
+    if (req.body.bio            !== undefined) user.bio            = req.body.bio;
+
+    // ── Socials ───────────────────────────────────────────────────────────
+    if (req.body.socials && typeof req.body.socials === 'object') {
+      user.socials = {
+        linkedin: req.body.socials.linkedin ?? user.socials?.linkedin ?? '',
+        github:   req.body.socials.github   ?? user.socials?.github   ?? '',
+        twitter:  req.body.socials.twitter  ?? user.socials?.twitter  ?? '',
+        website:  req.body.socials.website  ?? user.socials?.website  ?? '',
+      };
+    }
+
+    // ── Profile picture — upload to Cloudinary if base64, else keep URL ──
+    if (req.body.profilePicture) {
+      if (req.body.profilePicture.startsWith('data:image')) {
+        try {
+          // Delete old Cloudinary image first
+          if (user.profilePicture?.includes('cloudinary')) {
+            try { await cloudinary.uploader.destroy(`recruiters/recruiter_${user._id}`); } catch {}
+          }
+          const result = await cloudinary.uploader.upload(req.body.profilePicture, {
+            folder:        'recruiters',
+            public_id:     `recruiter_${user._id}`,
+            overwrite:     true,
+            resource_type: 'image',
+            transformation: [
+              { width: 500, height: 500, crop: 'limit' },
+              { quality: 'auto' },
+              { fetch_format: 'auto' },
+            ],
+          });
+          user.profilePicture = result.secure_url;
+        } catch (uploadError) {
+          return res.status(500).json({ message: 'Image upload failed', error: uploadError.message });
+        }
+      } else {
+        // Already a URL — just store it
+        user.profilePicture = req.body.profilePicture;
+      }
+    }
+
+    // ── Sync displayName to Firebase Auth ─────────────────────────────────
+    // Keeps Firebase display name consistent with the DB profile
+    if (user.firebaseUid) {
+      const fbUpdates = {};
+
+      const newFirst = req.body.firstName?.trim();
+      const newLast  = req.body.lastName?.trim();
+      if (newFirst || newLast) {
+        fbUpdates.displayName = `${newFirst || user.firstName} ${newLast || user.lastName}`.trim();
+      }
+      if (req.body.email && req.body.email.trim() !== user.email) {
+        fbUpdates.email = req.body.email.trim();
+      }
+
+      if (Object.keys(fbUpdates).length > 0) {
+        try {
+          await admin.auth().updateUser(user.firebaseUid, fbUpdates);
+        } catch (fbErr) {
+          // Non-fatal — log but don't fail the whole request
+          console.error('[Profile] Firebase sync error (non-fatal):', fbErr.message);
+        }
+      }
+    }
+
+    const updatedUser = await user.save();
+
+    res.json({
+      _id:            updatedUser._id,
+      firstName:      updatedUser.firstName,
+      lastName:       updatedUser.lastName,
+      email:          updatedUser.email,
+      username:       updatedUser.username,
+      phone:          updatedUser.phone          || '',
+      location:       updatedUser.location       || '',
+      specialization: updatedUser.specialization || '',
+      experience:     updatedUser.experience     || '',
+      bio:            updatedUser.bio            || '',
+      profilePicture: updatedUser.profilePicture || '',
+      role:           updatedUser.role,
+      active:         updatedUser.active,
+      socials: {
+        linkedin: updatedUser.socials?.linkedin || '',
+        github:   updatedUser.socials?.github   || '',
+        twitter:  updatedUser.socials?.twitter  || '',
+        website:  updatedUser.socials?.website  || '',
+      },
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'Email already in use by another account.' });
+    }
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// @desc    Get all recruiters (admin view)
 // @route   GET /api/recruiters
 // @access  Private/Admin
+// ─────────────────────────────────────────────────────────────────────────────
 export const getRecruiters = async (req, res) => {
   try {
     const recruiters = await User.find({ role: { $ne: 'admin' } }).select('-password');
@@ -96,7 +180,7 @@ export const getRecruiters = async (req, res) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// @desc    Create a new recruiter
+// @desc    Create a new recruiter (admin only)
 // @route   POST /api/recruiters
 // @access  Private/Admin
 // ─────────────────────────────────────────────────────────────────────────────
@@ -110,7 +194,6 @@ export const createRecruiter = async (req, res) => {
   let firebaseUid = null;
 
   try {
-    // Guard: check MongoDB first
     const userExists = await User.findOne({ email });
     if (userExists) return res.status(400).json({ message: 'User with this email already exists.' });
 
@@ -119,17 +202,16 @@ export const createRecruiter = async (req, res) => {
       if (idExists) return res.status(400).json({ message: 'Recruiter ID already exists.' });
     }
 
-    // Step 1: Create user in Firebase (gives us the firebaseUid)
+    // Create in Firebase Auth first
     let firebaseUser;
     try {
-      firebaseUser = await admin.auth().createUser({ 
-        email, 
-        password, 
-        displayName: `${firstName} ${lastName}` 
+      firebaseUser = await admin.auth().createUser({
+        email,
+        password,
+        displayName: `${firstName} ${lastName}`,
       });
     } catch (fbError) {
       if (fbError.code === 'auth/email-already-exists') {
-        // Reuse existing Firebase account
         firebaseUser = await admin.auth().getUserByEmail(email);
       } else {
         throw fbError;
@@ -137,7 +219,6 @@ export const createRecruiter = async (req, res) => {
     }
     firebaseUid = firebaseUser.uid;
 
-    // Step 2: Save to MongoDB WITH firebaseUid — no password needed here
     const user = await User.create({
       firebaseUid,
       firstName,
@@ -152,13 +233,16 @@ export const createRecruiter = async (req, res) => {
     });
 
     res.status(201).json({
-      _id: user._id, firstName: user.firstName, lastName: user.lastName, email: user.email,
-      recruiterId: user.recruiterId, role: user.role, firebaseUid: user.firebaseUid,
+      _id:         user._id,
+      firstName:   user.firstName,
+      lastName:    user.lastName,
+      email:       user.email,
+      recruiterId: user.recruiterId,
+      role:        user.role,
+      firebaseUid: user.firebaseUid,
     });
-
   } catch (error) {
     console.error('Create Recruiter Error:', error);
-    // Rollback: delete Firebase user if MongoDB save failed
     if (firebaseUid) {
       try { await admin.auth().deleteUser(firebaseUid); } catch {}
     }
@@ -168,9 +252,11 @@ export const createRecruiter = async (req, res) => {
   }
 };
 
-// @desc    Update recruiter
+// ─────────────────────────────────────────────────────────────────────────────
+// @desc    Update a specific recruiter (admin only)
 // @route   PUT /api/recruiters/:id
 // @access  Private/Admin
+// ─────────────────────────────────────────────────────────────────────────────
 export const updateRecruiter = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
@@ -185,21 +271,17 @@ export const updateRecruiter = async (req, res) => {
       if (emailExists) return res.status(400).json({ message: 'Email already exists' });
     }
 
-    // Sync changes to Firebase too
+    // Sync to Firebase
     if (user.firebaseUid) {
       const fbUpdates = {};
-      if (req.body.password) fbUpdates.password = req.body.password;
+      if (req.body.password)                        fbUpdates.password    = req.body.password;
       if (req.body.email && req.body.email !== user.email) fbUpdates.email = req.body.email;
       if (req.body.firstName || req.body.lastName) {
-        const fName = req.body.firstName || user.firstName;
-        const lName = req.body.lastName || user.lastName;
-        fbUpdates.displayName = `${fName} ${lName}`;
+        fbUpdates.displayName = `${req.body.firstName || user.firstName} ${req.body.lastName || user.lastName}`.trim();
       }
-      
       if (Object.keys(fbUpdates).length > 0) {
-        try { await admin.auth().updateUser(user.firebaseUid, fbUpdates); } catch (e) {
-          console.error('Firebase update error (non-fatal):', e.message);
-        }
+        try { await admin.auth().updateUser(user.firebaseUid, fbUpdates); }
+        catch (e) { console.error('Firebase admin update error (non-fatal):', e.message); }
       }
     }
 
@@ -213,28 +295,34 @@ export const updateRecruiter = async (req, res) => {
     user.profilePicture = req.body.profilePicture || user.profilePicture;
 
     const updatedUser = await user.save();
-    res.json({ _id: updatedUser._id, firstName: updatedUser.firstName, lastName: updatedUser.lastName, email: updatedUser.email, role: updatedUser.role, recruiterId: updatedUser.recruiterId });
+    res.json({
+      _id:         updatedUser._id,
+      firstName:   updatedUser.firstName,
+      lastName:    updatedUser.lastName,
+      email:       updatedUser.email,
+      role:        updatedUser.role,
+      recruiterId: updatedUser.recruiterId,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// @desc    Delete recruiter
+// ─────────────────────────────────────────────────────────────────────────────
+// @desc    Delete a recruiter (admin only)
 // @route   DELETE /api/recruiters/:id
 // @access  Private/Admin
+// ─────────────────────────────────────────────────────────────────────────────
 export const deleteRecruiter = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'Recruiter not found' });
 
-    // Delete from Firebase Auth
     if (user.firebaseUid) {
-      try { await admin.auth().deleteUser(user.firebaseUid); } catch (e) {
-        console.error('Firebase delete failed (continuing):', e.message);
-      }
+      try { await admin.auth().deleteUser(user.firebaseUid); }
+      catch (e) { console.error('Firebase delete (non-fatal):', e.message); }
     }
 
-    // Delete Cloudinary image
     if (user.profilePicture?.includes('cloudinary')) {
       try { await cloudinary.uploader.destroy(`recruiters/recruiter_${user._id}`); } catch {}
     }
@@ -246,9 +334,11 @@ export const deleteRecruiter = async (req, res) => {
   }
 };
 
-// @desc    Toggle Active Status
+// ─────────────────────────────────────────────────────────────────────────────
+// @desc    Toggle active/inactive status (admin only)
 // @route   PATCH /api/recruiters/:id/status
 // @access  Private/Admin
+// ─────────────────────────────────────────────────────────────────────────────
 export const toggleRecruiterStatus = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
@@ -257,7 +347,6 @@ export const toggleRecruiterStatus = async (req, res) => {
     user.active = !user.active;
     await user.save();
 
-    // Mirror active/inactive to Firebase disabled flag
     if (user.firebaseUid) {
       try { await admin.auth().updateUser(user.firebaseUid, { disabled: !user.active }); } catch {}
     }

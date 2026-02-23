@@ -6,7 +6,6 @@ import Candidate from '../models/Candidate.js';
 export const getInterviews = async (req, res) => {
   try {
     let query = {};
-    // If user is NOT admin, filter by their ID
     if (req.user.role !== 'admin') {
       query.recruiterId = req.user._id;
     }
@@ -31,13 +30,11 @@ export const createInterview = async (req, res) => {
       duration, notes, priority, round, meetingLink 
     } = req.body;
 
-    // Combine Date & Time
     const dateTime = new Date(`${interviewDate}T${interviewTime}`);
 
-    // Create Interview
     const interview = await Interview.create({
       candidateId,
-      recruiterId: req.user._id, // Assigned to logged-in user
+      recruiterId: req.user._id,
       interviewDate: dateTime,
       duration: parseInt(duration) || 60,
       type,
@@ -48,7 +45,6 @@ export const createInterview = async (req, res) => {
       round
     });
 
-    // Update Candidate Status
     await Candidate.findByIdAndUpdate(candidateId, { status: round });
 
     res.status(201).json(interview);

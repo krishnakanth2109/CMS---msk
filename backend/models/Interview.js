@@ -16,14 +16,34 @@ const interviewSchema = mongoose.Schema({
   location: { type: String, default: 'Remote' },
   meetingLink: { type: String },
   
+  // Updated Status Enum
   status: {
     type: String,
-    enum: ['Scheduled', 'Completed', 'Cancelled', 'No Show'],
+    enum: [
+      'Scheduled', 
+      'Completed', 
+      'Cancelled', 
+      'No Show', 
+      'Shortlisted', 
+      'Rejected', 
+      'Submitted', 
+      'Hold'
+    ],
     default: 'Scheduled'
   },
+
+  // Updated Round Enum
   round: {
     type: String,
-    enum: ['L1 Interview', 'L2 Interview', 'Final Interview', 'Technical Interview', 'HR Interview'],
+    enum: [
+      'L1 Interview', 
+      'L2 Interview', 
+      'L3 Interview', 
+      'L4 Interview', 
+      'L5 Interview', 
+      'Technical Round', 
+      'HR Round'
+    ],
     default: 'L1 Interview'
   },
 
@@ -36,7 +56,7 @@ const interviewSchema = mongoose.Schema({
   timestamps: true,
 });
 
-// FIXED: Use timestamp + random string to ensure uniqueness
+// Use timestamp + random string to ensure uniqueness
 interviewSchema.pre('save', function (next) {
   if (!this.isNew) return next();
   

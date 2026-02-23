@@ -476,7 +476,7 @@ export default function RecruiterDashboard() {
           <ProfessionalStatCard title="Total Candidates" value={candidateStats.total} icon={Users} trend={0} onClick={() => handleNavigateToCandidates()} borderColor="border-blue-200 dark:border-blue-800" iconColor="text-blue-600 dark:text-blue-400" />
           <ProfessionalStatCard title="Assigned Jobs" value={jobStats.totalAssignedJobs} icon={Briefcase} trend={0} onClick={handleNavigateToAssignments} borderColor="border-green-200 dark:border-green-800" iconColor="text-green-600 dark:text-green-400" />
           <ProfessionalStatCard title="Interviews" value={interviewStats.totalInterviews} icon={Calendar} trend={0} onClick={handleNavigateToSchedules} borderColor="border-purple-200 dark:border-purple-800" iconColor="text-purple-600 dark:text-purple-400" />
-          <ProfessionalStatCard title="Performance" value={`${candidateStats.successRate}%`} icon={TrendingUp} trend={parseFloat(candidateStats.successRate) > 0 ? 1 : 0} borderColor="border-indigo-200 dark:border-indigo-800" iconColor="text-indigo-600 dark:text-indigo-400" />
+          <ProfessionalStatCard title="Average Time Period" value={`${candidateStats.successRate}%`} icon={TrendingUp} trend={parseFloat(candidateStats.successRate) > 0 ? 1 : 0} borderColor="border-indigo-200 dark:border-indigo-800" iconColor="text-indigo-600 dark:text-indigo-400" />
         </div>
 
         {/* KPI Row 2 */}
@@ -507,62 +507,8 @@ export default function RecruiterDashboard() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            
           </div>
-
-          <div className="p-4 md:p-6 shadow-lg rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700">
-            <h3 className="text-base md:text-lg font-semibold text-gray-800 dark:text-white mb-4">Status Distribution</h3>
-            <div className="h-64 md:h-72 lg:h-80">
-              {pieData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={2} dataKey="value" label>
-                      {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-400">No data available</div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Access Tables */}
-        <div className="grid gap-4 lg:gap-6 grid-cols-1 lg:grid-cols-2">
-          <div className="p-4 md:p-6 shadow-lg rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Recent Candidates</h3>
-              <button onClick={() => handleNavigateToCandidates()} className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">View All</button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-gray-50 dark:bg-gray-700 text-xs uppercase text-gray-500 font-medium">
-                  <tr><th className="p-3">Name</th><th className="p-3">Position</th><th className="p-3">Status</th></tr>
-                </thead>
-                <tbody>
-                  {filteredCandidates.slice(0, 5).map(c => (
-                    <tr key={c.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                      <td className="p-3 font-medium">{c.name}</td>
-                      <td className="p-3 text-gray-600 dark:text-gray-300">{c.position}</td>
-                      <td className="p-3">
-                        <span className={clsx("px-2 py-1 rounded-full text-xs font-medium", 
-                          (Array.isArray(c.status) ? c.status.includes('Joined') : c.status === 'Joined') ? "bg-green-100 text-green-800" : 
-                          (Array.isArray(c.status) ? c.status.includes('Rejected') : c.status === 'Rejected') ? "bg-red-100 text-red-800" : 
-                          (Array.isArray(c.status) ? c.status.includes('Offer') : c.status === 'Offer') ? "bg-purple-100 text-purple-800" : 
-                          (Array.isArray(c.status) ? c.status.some(s => s.includes('Interview')) : (c.status || '').includes('Interview')) ? "bg-amber-100 text-amber-800" : 
-                          "bg-blue-100 text-blue-800" 
-                        )}>{Array.isArray(c.status) ? c.status[0] : c.status}</span>
-                      </td>
-                    </tr>
-                  ))}
-                  {filteredCandidates.length === 0 && <tr><td colSpan={3} className="p-4 text-center">No candidates found</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
           <div className="p-4 md:p-6 shadow-lg rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold">Upcoming Interviews</h3>
@@ -588,6 +534,43 @@ export default function RecruiterDashboard() {
                 </tbody>
               </table>
             </div>
+          </div> 
+
+        
+        </div>
+
+        {/* Quick Access Tables */}
+        <div className="grid gap-4 lg:gap-6 grid-cols-1">
+          <div className="p-4 md:p-6 shadow-lg rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Recent Candidates</h3>
+              <button onClick={() => handleNavigateToCandidates()} className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">View All</button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-50 dark:bg-gray-700 text-xs uppercase text-gray-500 font-medium">
+                  <tr><th className="p-3">Name</th><th className="p-3">Position</th><th className="p-3">Status</th><th className="p-3">Clients</th></tr>
+                </thead>
+                <tbody>
+                  {filteredCandidates.slice(0, 5).map(c => (
+                    <tr key={c.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                      <td className="p-3 font-medium">{c.name}</td>
+                      <td className="p-3 text-gray-600 dark:text-gray-300">{c.position}</td>
+                      <td className="p-3">
+                        <span className={clsx("px-2 py-1 rounded-full text-xs font-medium", 
+                          (Array.isArray(c.status) ? c.status.includes('Joined') : c.status === 'Joined') ? "bg-green-100 text-green-800" : 
+                          (Array.isArray(c.status) ? c.status.includes('Rejected') : c.status === 'Rejected') ? "bg-red-100 text-red-800" : 
+                          (Array.isArray(c.status) ? c.status.includes('Offer') : c.status === 'Offer') ? "bg-purple-100 text-purple-800" : 
+                          (Array.isArray(c.status) ? c.status.some(s => s.includes('Interview')) : (c.status || '').includes('Interview')) ? "bg-amber-100 text-amber-800" : 
+                          "bg-blue-100 text-blue-800" 
+                        )}>{Array.isArray(c.status) ? c.status[0] : c.status}</span>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredCandidates.length === 0 && <tr><td colSpan={4} className="p-4 text-center">No candidates found</td></tr>}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -598,7 +581,7 @@ export default function RecruiterDashboard() {
           </button>
           <button onClick={handleNavigateToAssignments} className="h-auto py-4 px-6 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl shadow-lg flex flex-col items-center gap-3 hover:from-green-700 hover:to-green-800 transition-all">
             <Briefcase className="w-6 h-6"/>
-            <div className="text-center"><div className="font-semibold text-lg">My Assignments</div><div className="text-sm opacity-90">View jobs</div></div>
+            <div className="text-center"><div className="font-semibold text-lg">My Jobs</div><div className="text-sm opacity-90">View jobs</div></div>
           </button>
           <button onClick={handleNavigateToSchedules} className="h-auto py-4 px-6 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl shadow-lg flex flex-col items-center gap-3 hover:from-purple-700 hover:to-purple-800 transition-all">
             <Calendar className="w-6 h-6"/>
