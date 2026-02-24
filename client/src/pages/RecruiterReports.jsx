@@ -5,7 +5,7 @@ import {
   CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   PieChart, Pie, Cell,
 } from 'recharts';
-import { TrendingUp, Users, Briefcase, Award, Loader2 } from 'lucide-react';
+import { TrendingUp, Users, Briefcase, Award, Loader2, UserCheck } from 'lucide-react';
 
 // FIX: VITE_API_URL="http://localhost:5000" (no /api suffix in .env).
 // The old code used || 'http://localhost:5000/api' as fallback, but since
@@ -100,7 +100,7 @@ export default function RecruiterReports() {
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
           {[
             {
               title: 'Total Candidates',
@@ -115,15 +115,25 @@ export default function RecruiterReports() {
               Icon:  Briefcase,
             },
             {
-              title: 'Offers & Joins',
+              title: 'Offers',
               value: (
                 <>
                   {stats.offers}
-                  <span className="text-sm font-normal text-slate-400"> / {stats.joined}</span>
+                  
                 </>
               ),
-              sub:  'Offers Extended / Joined',
+              sub:  'Offers Extended',
               Icon: Award,
+            },
+            {
+              title: 'Joinings',
+              value: (
+                <>
+                  {stats.joined}
+                </>
+              ),
+              sub:  'Joined',
+              Icon: UserCheck,
             },
             {
               title: 'Performance',

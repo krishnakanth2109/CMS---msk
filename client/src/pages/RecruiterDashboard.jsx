@@ -1,17 +1,15 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Users, Briefcase, ClipboardList, Calendar, TrendingUp, 
   CheckCircle2, ArrowUpRight, ArrowDownRight, UserCheck, 
-  Bell, ChevronDown, CalendarDays, Filter, X, Mail, XCircle
+  X, Mail, XCircle
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
 import { useToast } from '@/hooks/use-toast';
 
 const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
@@ -107,42 +105,10 @@ function ProfessionalStatCard({
   );
 }
 
-const CustomDateInput = React.forwardRef(({ value, onClick, placeholder, isMobile = false }, ref) => (
-  <button
-    className={`
-      flex items-center justify-between w-full 
-      px-3 py-2 md:px-4 md:py-3 
-      text-left 
-      bg-white dark:bg-gray-800 
-      border border-gray-300 dark:border-gray-600 
-      rounded-xl hover:border-blue-500 focus:border-blue-500 
-      focus:ring-2 focus:ring-blue-500/20 transition-colors shadow-sm
-      ${isMobile ? 'text-sm' : ''}
-      relative z-10
-    `}
-    onClick={onClick}
-    ref={ref}
-    type="button"
-  >
-    <div className="flex items-center gap-2 md:gap-3">
-      <CalendarDays className="w-4 h-4 text-gray-500 flex-shrink-0" />
-      <span className={`
-        ${value ? "text-gray-900 dark:text-white font-medium" : "text-gray-500"}
-        ${isMobile ? 'text-sm' : ''}
-        truncate
-      `}>
-        {value || placeholder}
-      </span>
-    </div>
-    <ChevronDown className="w-4 h-4 text-gray-500 flex-shrink-0" />
-  </button>
-));
-
 // --- Main Dashboard Component ---
 
 export default function RecruiterDashboard() {
   const { currentUser, authHeaders } = useAuth();
-  // Convenience alias — currentUser has: _id, firstName, lastName, email, role, etc.
   const user = currentUser;
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -152,37 +118,6 @@ export default function RecruiterDashboard() {
   const [jobs, setJobs] = useState([]);
   const [interviews, setInterviews] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // UI State
-  const [startDate, setStartDate] = useState(null);
-  const [endDate, setEndDate] = useState(null);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notifications, setNotifications] = useState([]);
-  const [isMobile, setIsMobile] = useState(false);
-  const [showDateFilter, setShowDateFilter] = useState(false);
-  
-  const notificationsRef = useRef(null);
-
-  // Handle outside click for notifications
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
-        setNotificationsOpen(false);
-      }
-    };
-    if (notificationsOpen) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [notificationsOpen]);
-
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-      if (window.innerWidth >= 768) setShowDateFilter(false);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   const getAuthHeader = async () => {
     const h = await authHeaders();
@@ -219,7 +154,7 @@ export default function RecruiterDashboard() {
               status: c.status || 'Submitted',
               recruiterId: c.recruiterId?._id || c.recruiterId,
               createdAt: c.createdAt,
-              client: c.client || c.currentCompany || 'N/A'
+              client: c.client?.name || c.client?.companyName || (typeof c.client === 'string' ? c.client : c.currentCompany) || 'N/A'
             }));
 
           const myJobs = rawJobs
@@ -232,7 +167,7 @@ export default function RecruiterDashboard() {
             .map((j) => ({
               id: j._id || j.id || '',
               title: j.title || 'Untitled Job',
-              client: j.client || 'Unknown Client',
+              client: j.client?.name || j.client?.companyName || (typeof j.client === 'string' ? j.client : 'Unknown Client'),
               location: j.location || 'Remote',
               jobCode: j.jobCode || 'N/A',
               createdAt: j.createdAt || new Date().toISOString(),
@@ -268,10 +203,6 @@ export default function RecruiterDashboard() {
           setCandidates(processedCandidates);
           setJobs(myJobs);
           setInterviews(processedInterviews);
-
-          setNotifications([
-            { id: '1', title: 'Data Updated', message: `Fetched ${processedCandidates.length} candidates.`, timestamp: new Date(), read: false, type: 'success' }
-          ]);
         }
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -285,58 +216,39 @@ export default function RecruiterDashboard() {
   }, [user, toast]);
 
   // --- Filtering Logic ---
-  const filteredCandidates = useMemo(() => {
-    let filtered = candidates;
-    if (startDate || endDate) {
-      filtered = filtered.filter(c => {
-        const date = new Date(c.createdAt);
-        return (!startDate || date >= startDate) && (!endDate || date <= endDate);
-      });
-    }
-    return filtered;
-  }, [candidates, startDate, endDate]);
-
-  const filteredJobs = useMemo(() => {
-    let filtered = jobs;
-    if (startDate || endDate) {
-      filtered = filtered.filter(j => {
-        const date = new Date(j.createdAt || new Date());
-        return (!startDate || date >= startDate) && (!endDate || date <= endDate);
-      });
-    }
-    return filtered;
-  }, [jobs, startDate, endDate]);
-
+  const filteredCandidates = useMemo(() => candidates, [candidates]);
+  
+  const filteredJobs = useMemo(() => jobs, [jobs]);
+  
   const filteredInterviews = useMemo(() => {
-    let filtered = interviews;
-    if (startDate || endDate) {
-      filtered = filtered.filter(i => {
-        const date = new Date(i.interviewDate);
-        return (!startDate || date >= startDate) && (!endDate || date <= endDate);
-      });
-    }
-    return filtered.sort((a, b) => new Date(a.interviewDate).getTime() - new Date(b.interviewDate).getTime());
-  }, [interviews, startDate, endDate]);
+    return [...interviews].sort((a, b) => new Date(a.interviewDate).getTime() - new Date(b.interviewDate).getTime());
+  }, [interviews]);
 
   // --- Stats Calculation ---
   const candidateStats = useMemo(() => {
     const total = filteredCandidates.length;
 
-    const submitted = filteredCandidates.filter(c => 
-      ['Submitted', 'Pending'].includes(c.status)
-    ).length;
+    // Helper to check array/string statuses correctly
+    const hasStatus = (statusVal, targets) => {
+      const statusArr = Array.isArray(statusVal) ? statusVal : [statusVal || ''];
+      return targets.some(t => statusArr.includes(t));
+    };
 
-    const interview = filteredCandidates.filter(c => {
-      const s = Array.isArray(c.status) ? c.status.join(' ') : (c.status || '');
-      return s.includes('Interview');
-    }).length;
+    // Helper for partial matching (e.g. "L1 Interview")
+    const hasPartialStatus = (statusVal, targetStr) => {
+      const s = Array.isArray(statusVal) ? statusVal.join(' ') : (statusVal || '');
+      return s.includes(targetStr);
+    };
 
-    const offer = filteredCandidates.filter(c => c.status === 'Offer').length;
-    const joined = filteredCandidates.filter(c => c.status === 'Joined').length;
+    const submitted = filteredCandidates.filter(c => hasStatus(c.status, ['Submitted', 'Pending'])).length;
+    const interview = filteredCandidates.filter(c => hasPartialStatus(c.status, 'Interview')).length;
+    const offer = filteredCandidates.filter(c => hasStatus(c.status, ['Offer'])).length;
+    const joined = filteredCandidates.filter(c => hasStatus(c.status, ['Joined'])).length;
     
-    const rejected = filteredCandidates.filter(c => c.status === 'Rejected').length;
-    const selected = filteredCandidates.filter(c => c.status === 'Selected').length;
-    const hold = filteredCandidates.filter(c => c.status === 'Hold').length;
+    // Fixed counting logic for these metrics
+    const rejected = filteredCandidates.filter(c => hasStatus(c.status, ['Rejected'])).length;
+    const selected = filteredCandidates.filter(c => hasStatus(c.status, ['Selected'])).length;
+    const hold = filteredCandidates.filter(c => hasStatus(c.status, ['Hold'])).length;
 
     const successRate = total > 0 ? ((joined / total) * 100).toFixed(1) : '0';
 
@@ -352,14 +264,6 @@ export default function RecruiterDashboard() {
   const jobStats = useMemo(() => ({ totalAssignedJobs: filteredJobs.length }), [filteredJobs]);
 
   // --- Chart Data ---
-  const pieData = useMemo(() => [
-    { name: 'Submitted', value: candidateStats.submitted, color: '#3B82F6' }, 
-    { name: 'Interview', value: candidateStats.interview, color: '#F59E0B' }, 
-    { name: 'Offer', value: candidateStats.offer, color: '#8B5CF6' },      
-    { name: 'Joined', value: candidateStats.joined, color: '#10B981' },    
-    { name: 'Rejected', value: candidateStats.rejected, color: '#EF4444' }, 
-  ].filter(d => d.value > 0), [candidateStats]);
-
   const pipelineData = useMemo(() => [{
     name: 'Pipeline',
     Submitted: candidateStats.submitted,
@@ -385,11 +289,6 @@ export default function RecruiterDashboard() {
     const name = user?.firstName || user?.name?.split(' ')[0] || '';
     return name ? `Welcome back, ${name}!` : "Welcome back!";
   };
-  const unreadCount = notifications.filter(n => !n.read).length;
-
-  const PopperContainer = ({ children }) => (
-    <div className="z-[9999]">{children}</div>
-  );
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -429,44 +328,6 @@ export default function RecruiterDashboard() {
               <p className="text-base md:text-lg font-medium text-gray-800 dark:text-gray-200 mt-1">
                 {getUserGreeting()}
               </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="relative" ref={notificationsRef}>
-                <button onClick={() => setNotificationsOpen(!notificationsOpen)} className="relative p-2 text-gray-600 dark:text-gray-300 hover:text-blue-600 bg-white/80 dark:bg-gray-800/80 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 transition-colors">
-                  <Bell className="w-5 h-5" />
-                  {unreadCount > 0 && <span className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full">{unreadCount}</span>}
-                </button>
-                {notificationsOpen && (
-                  <div className="absolute right-0 top-12 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 z-[9998] max-h-96 overflow-y-auto">
-                    <div className="p-4 border-b border-gray-200 font-semibold text-sm">Notifications</div>
-                    {notifications.length === 0 ? <div className="p-4 text-center text-gray-500">No notifications</div> : notifications.map(n => (
-                      <div key={n.id} className={clsx("p-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50", !n.read && "bg-blue-50")}>
-                        <p className="text-sm font-medium">{n.title}</p>
-                        <p className="text-xs text-gray-500">{n.message}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Date Filter */}
-          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <CalendarDays className="w-4 h-4 text-gray-500" />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter Stats by Date</span>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                <div className="relative flex-1 md:w-48">
-                  <DatePicker selected={startDate} onChange={(d) => setStartDate(d)} selectsStart startDate={startDate} endDate={endDate} placeholderText="Start Date" customInput={<CustomDateInput isMobile={isMobile} placeholder="Start Date" />} wrapperClassName="w-full" popperContainer={PopperContainer} popperClassName="!z-[9999]" isClearable />
-                </div>
-                <div className="relative flex-1 md:w-48">
-                  <DatePicker selected={endDate} onChange={(d) => setEndDate(d)} selectsEnd startDate={startDate} endDate={endDate} minDate={startDate || undefined} placeholderText="End Date" customInput={<CustomDateInput isMobile={isMobile} placeholder="End Date" />} wrapperClassName="w-full" popperContainer={PopperContainer} popperClassName="!z-[9999]" isClearable />
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -564,6 +425,9 @@ export default function RecruiterDashboard() {
                           (Array.isArray(c.status) ? c.status.some(s => s.includes('Interview')) : (c.status || '').includes('Interview')) ? "bg-amber-100 text-amber-800" : 
                           "bg-blue-100 text-blue-800" 
                         )}>{Array.isArray(c.status) ? c.status[0] : c.status}</span>
+                      </td>
+                      <td className="p-3 text-gray-600 dark:text-gray-300 font-medium">
+                        {c.client}
                       </td>
                     </tr>
                   ))}
