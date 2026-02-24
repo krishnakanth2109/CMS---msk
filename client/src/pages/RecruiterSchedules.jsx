@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -68,6 +69,7 @@ const StatCard = ({ title, value, icon, gradient, onClick, description }) => (
 );
 
 export default function RecruiterSchedules() {
+  const { authHeaders } = useAuth();
   const [interviews, setInterviews] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [recruiters, setRecruiters] = useState([]);
@@ -93,18 +95,19 @@ export default function RecruiterSchedules() {
   });
   const [formErrors, setFormErrors] = useState({});
 
-  const getAuthHeader = () => ({
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${sessionStorage.getItem('authToken')}`
-  });
+  const getAuthHeader = async () => {
+    const h = await authHeaders();
+    return { 'Content-Type': 'application/json', ...h };
+  };
 
   const fetchData = async () => {
     setLoading(true);
     try {
+      const headers = await getAuthHeader();
       const [resInterviews, resCandidates, resRecruiters] = await Promise.all([
-        fetch(`${API_URL}/interviews`, { headers: getAuthHeader() }),
-        fetch(`${API_URL}/candidates`, { headers: getAuthHeader() }),
-        fetch(`${API_URL}/users/active-list`, { headers: getAuthHeader() })
+        fetch(`${API_URL}/interviews`, { headers }),
+        fetch(`${API_URL}/candidates`, { headers }),
+        fetch(`${API_URL}/users/active-list`, { headers })
       ]);
 
       if (resInterviews.ok) {
@@ -175,7 +178,8 @@ export default function RecruiterSchedules() {
     setSelectedCandidateFullDetails(null);
     setLoadingDetails(true);
     try {
-      const response = await fetch(`${API_URL}/candidates/${interview.candidateIdRaw}`, { headers: getAuthHeader() });
+      const headers = await getAuthHeader();
+      const response = await fetch(`${API_URL}/candidates/${interview.candidateIdRaw}`, { headers });
       if (response.ok) setSelectedCandidateFullDetails(await response.json());
       else toast({ title: "Warning", description: "Could not fetch extended candidate details." });
     } catch {
@@ -207,16 +211,32 @@ export default function RecruiterSchedules() {
 
   const handleCandidateSelect = (e) => {
     const selectedId = e.target.value;
+    
+    // Clear details if unselected
+    if (!selectedId) {
+      setNewInterviewForm(prev => ({
+        ...prev, 
+        candidateId: "", 
+        candidateName: "",
+        candidateEmail: "", 
+        candidatePhone: "",
+        position: "",
+        recruiterId: prev.recruiterId // Keep the recruiter if already set manually
+      }));
+      return;
+    }
+
+    // Find and Auto-fill details
     const candidate = candidates.find(c => c._id === selectedId || c.id === selectedId);
     if (candidate) {
       setNewInterviewForm(prev => ({
         ...prev, 
         candidateId: selectedId, 
-        candidateName: candidate.name,
-        candidateEmail: candidate.email, 
+        candidateName: candidate.name || "",
+        candidateEmail: candidate.email || "", 
         candidatePhone: candidate.contact || candidate.phone || "",
-        position: candidate.position,
-        recruiterId: typeof candidate.recruiterId === 'object' ? candidate.recruiterId._id : candidate.recruiterId || prev.recruiterId
+        position: candidate.position || "",
+        recruiterId: typeof candidate.recruiterId === 'object' ? candidate.recruiterId?._id : (candidate.recruiterId || prev.recruiterId)
       }));
       setFormErrors({});
     }
@@ -229,9 +249,10 @@ export default function RecruiterSchedules() {
     }
     
     try {
+      const headers = await getAuthHeader();
       const response = await fetch(`${API_URL}/interviews`, {
         method: 'POST', 
-        headers: getAuthHeader(), 
+        headers, 
         body: JSON.stringify(newInterviewForm)
       });
       
@@ -255,8 +276,6 @@ export default function RecruiterSchedules() {
     }
   };
 
-  const inputCls = (err) => `w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 ${err ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'}`;
-
   return (
     <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-950 min-h-screen text-gray-900 dark:text-gray-100">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -278,7 +297,7 @@ export default function RecruiterSchedules() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <StatCard title="Total" value={interviewStats.total} icon={<Calendar />} gradient="bg-purple-600" onClick={() => setActiveStatFilter('total')} />
           <StatCard title="Today" value={interviewStats.today} icon={<CalendarIcon />} gradient="bg-orange-600" onClick={() => setActiveStatFilter('today')} />
           <StatCard title="Upcoming" value={interviewStats.upcoming} icon={<Clock />} gradient="bg-green-600" onClick={() => setActiveStatFilter('upcoming')} />
@@ -547,18 +566,18 @@ function NewInterviewModal({ form, errors, onChange, onCandidateSelect, onGenera
             <label className="text-sm font-medium block mb-1 text-gray-700 dark:text-gray-200">Select Candidate *</label>
             <select className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white" onChange={onCandidateSelect} value={form.candidateId}>
               <option value="">-- Choose a Candidate --</option>
-              {candidates.map((c) => <option key={c._id || c.id} value={c._id || c.id}>{c.name} ({c.email})</option>)}
+              {candidates.map((c) => <option key={c._id || c.id} value={c._id || c.id}>{c.name || "Unknown"} ({c.email || "No Email"})</option>)}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium block mb-1 text-gray-700 dark:text-gray-200">Candidate Name</label>
-              <input name="candidateName" value={form.candidateName} onChange={onChange} disabled={!!form.candidateId} className={inputCls(errors.candidateName)} />
+              <input name="candidateName" value={form.candidateName} onChange={onChange} disabled={!!form.candidateId} className={inputCls(errors.candidateName) + (form.candidateId ? " opacity-70 cursor-not-allowed" : "")} />
               {errors.candidateName && <p className="text-xs text-red-500 mt-1">{errors.candidateName}</p>}
             </div>
             <div>
               <label className="text-sm font-medium block mb-1 text-gray-700 dark:text-gray-200">Email</label>
-              <input name="candidateEmail" value={form.candidateEmail} onChange={onChange} disabled={!!form.candidateId} className={inputCls(errors.candidateEmail)} />
+              <input name="candidateEmail" value={form.candidateEmail} onChange={onChange} disabled={!!form.candidateId} className={inputCls(errors.candidateEmail) + (form.candidateId ? " opacity-70 cursor-not-allowed" : "")} />
               {errors.candidateEmail && <p className="text-xs text-red-500 mt-1">{errors.candidateEmail}</p>}
             </div>
           </div>

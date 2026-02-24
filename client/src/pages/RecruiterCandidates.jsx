@@ -87,7 +87,6 @@ const NativeSelect = ({ value, onChange, children, className = '', disabled }) =
 
 export default function RecruiterCandidates() {
   const { currentUser, authHeaders } = useAuth();
-  // currentUser contains: { _id, name, email, role, idToken, refreshToken, ... }
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   
@@ -219,8 +218,7 @@ export default function RecruiterCandidates() {
         const allCandidates = await candRes.json();
         const allJobs = await jobRes.json();
         const allClients = await clientRes.json();
-        // Backend already filters by recruiter for non-admins — trust that
-        // and just normalise status to array
+        
         allCandidates.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         const fixedCandidates = allCandidates.map((c) => ({
           ...c,
@@ -279,10 +277,6 @@ export default function RecruiterCandidates() {
     if (!data.contact.trim()) newErrors.contact = "Phone is required";
     else if (data.contact.length !== 10) newErrors.contact = "Phone must be exactly 10 digits";
     
-    // REMOVED REQUIRED CHECKS FOR POSITION AND CLIENT
-    // if (!data.position.trim()) newErrors.position = "Position is required";
-    // if (!data.client.trim()) newErrors.client = "Client is required";
-
     if (!data.skills.toString().trim()) newErrors.skills = "Skills are required";
     if (isCustomSource && !data.source.trim()) newErrors.source = "Please specify source";
     if (data.servingNoticePeriod === 'true' && !data.lwd.trim()) newErrors.lwd = "LWD is required";
@@ -401,7 +395,6 @@ export default function RecruiterCandidates() {
       const authH = await authHeaders();
       const headers = { ...authH, 'Content-Type': 'application/json' };
 
-      // Split full name into firstName / lastName for the backend model
       const nameParts = (formData.name || '').trim().split(/\s+/);
       const firstName = nameParts[0] || formData.name || '';
       const lastName  = nameParts.slice(1).join(' ') || nameParts[0] || '';
@@ -499,8 +492,8 @@ export default function RecruiterCandidates() {
 
   if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>;
 
-  // ── Candidate Form ─────────────────────────────────────────────────────────
-  const CandidateForm = () => (
+  // ── Render Form function instead of Component to avoid cursor jump ──
+  const renderCandidateForm = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 py-4">
       {/* ── Section 1: Personal ── */}
       <div className="md:col-span-3 font-semibold border-b pb-1 text-slate-500 flex items-center gap-2"><UserCircle className="h-4 w-4"/> Personal Information</div>
@@ -724,10 +717,10 @@ export default function RecruiterCandidates() {
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b">
                     <tr>
                       <th className="p-4 w-12"><input type="checkbox" checked={getFilteredCandidates.length > 0 && selectedCandidates.length === getFilteredCandidates.length} onChange={selectAllCandidates} className="h-4 w-4 rounded border-slate-300"/></th>
-                      <th className="p-3">S.No</th><th className="p-3">ID</th><th className="p-3">Name</th>
+                      <th className="p-3">ID</th><th className="p-3">Name</th>
                       <th className="p-3">Phone</th><th className="p-3">Email</th><th className="p-3">Client</th>
                       <th className="p-3">Skills</th><th className="p-3">Date Added</th><th className="p-3">Experience</th>
-                      <th className="p-3">CTC / ECTC</th><th className="p-3">Notice</th><th className="p-3">Status</th>
+                      <th className="p-3">CTC / ECTC</th><th className="p-3">Status</th>
                       <th className="p-3">Remarks</th><th className="p-3 text-right">Actions</th>
                     </tr>
                   </thead>
@@ -735,7 +728,6 @@ export default function RecruiterCandidates() {
                     {getFilteredCandidates.map((c, index) => (
                       <tr key={c._id} className="hover:bg-slate-50">
                         <td className="p-3 pl-4"><input type="checkbox" checked={selectedCandidates.includes(c._id)} onChange={() => toggleSelectCandidate(c._id)} className="h-4 w-4 rounded"/></td>
-                        <td className="p-3 text-slate-500">{index + 1}</td>
                         <td className="p-3 font-mono text-xs text-blue-600 font-bold cursor-pointer" onClick={() => { navigator.clipboard.writeText(getCandidateId(c)); toast({title: "Copied ID"}); }}>{getCandidateId(c)}</td>
                         <td className="p-3">
                           <div className="flex items-center gap-2">
@@ -754,7 +746,6 @@ export default function RecruiterCandidates() {
                         <td className="p-3 text-sm text-slate-600">{formatDate(c.dateAdded)}</td>
                         <td className="p-3 text-sm">{c.totalExperience} Yrs</td>
                         <td className="p-3 text-xs"><div>{c.ctc || '-'}</div><div className="text-green-600">{c.ectc || '-'}</div></td>
-                        <td className="p-3 text-sm"><Badge variant="outline">{c.noticePeriod || '-'}</Badge></td>
                         <td className="p-3">
                           <div className="flex flex-wrap gap-1">
                             {Array.isArray(c.status) ? c.status.map(s => (
@@ -850,7 +841,7 @@ export default function RecruiterCandidates() {
               </div>
             </div>
           )}
-          <CandidateForm />
+          {renderCandidateForm()}
         </ModalBody>
         <ModalFooter>
           <Button variant="outline" onClick={() => { setIsAddDialogOpen(false); setIsEditDialogOpen(false); }}>Cancel</Button>
