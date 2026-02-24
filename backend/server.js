@@ -9,13 +9,7 @@ import path          from 'path';
 import { fileURLToPath } from 'url';
 import fs            from 'fs';
 
-// ── FIX 1: import protect & authorize — they were missing, causing the crash ──
-// "ReferenceError: protect is not defined" happened because these were used on
-// line 127 but never imported.
 import { protect, authorize } from './middleware/authMiddleware.js';
-
-// ── FIX 2: import models used in the server-level /api/reports routes ─────────
-// Candidate & User were referenced in the route handlers but never imported.
 import Candidate from './models/Candidate.js';
 import User      from './models/User.js';
 
@@ -38,16 +32,24 @@ if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 const app        = express();
 const httpServer = createServer(app);
 
+// ─────────────────────────────────────────────────────────────────────────────
+// FIX: Added 'vagarious-cms.netlify.app' to CORS allowed origins.
+// The old list only had 'cms-vagarious.netlify.app' (different subdomain).
+// Both are included now to support either deployment.
+// ─────────────────────────────────────────────────────────────────────────────
+const ALLOWED_ORIGINS = [
+  'https://vagarious-cms.netlify.app',   // ✅ ADDED — the actual live site
+  'https://cms-vagarious.netlify.app',   // kept for backward compat
+  'http://localhost:5173',
+  'http://localhost:5000',
+  'http://localhost:8080',
+  'http://127.0.0.1:8080',
+];
+
 // ── Socket.IO ──────────────────────────────────────────────────────────────────
 const io = new Server(httpServer, {
   cors: {
-    origin: [
-      'https://cms-vagarious.netlify.app',
-      'http://localhost:5173',
-      'http://localhost:5000',
-      'http://localhost:8080',
-      'https://vagarious-cms.netlify.app',
-    ],
+    origin:      ALLOWED_ORIGINS,
     methods:     ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true,
   },
@@ -55,13 +57,7 @@ const io = new Server(httpServer, {
 
 // ── CORS ───────────────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: [
-    'https://cms-vagarious.netlify.app',
-    'http://localhost:5173',
-    'http://localhost:5000',
-    'http://localhost:8080',
-    'http://127.0.0.1:8080',
-  ],
+  origin:         ALLOWED_ORIGINS,
   credentials:    true,
   methods:        ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
@@ -128,13 +124,6 @@ app.get('/', (_req, res) => {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // GET /api/reports  — Admin overview dashboard
-//
-// FIXED: protect, authorize, Candidate, User are all now imported above.
-// FIXED: Removed the accidentally-pasted frontend getAuthHeader() function
-//        that was at the bottom of server.js — sessionStorage does not exist
-//        in Node.js and would throw ReferenceError at runtime.
-//
-// Query: ?filter=day|week|month|all  (default: month)
 // ═══════════════════════════════════════════════════════════════════════════════
 app.get('/api/reports', protect, authorize('admin'), async (req, res) => {
   try {
@@ -210,10 +199,6 @@ app.get('/api/reports', protect, authorize('admin'), async (req, res) => {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // GET /api/reports/recruiter — Per-recruiter own stats
-//
-// Used by RecruiterReports.jsx. Returns the calling recruiter's own pipeline
-// numbers, status breakdown for the Pie chart, and 4-week activity trend.
-// Accessible to any authenticated user (not admin-only).
 // ═══════════════════════════════════════════════════════════════════════════════
 app.get('/api/reports/recruiter', protect, async (req, res) => {
   try {
@@ -237,7 +222,6 @@ app.get('/api/reports/recruiter', protect, async (req, res) => {
       ? Math.round((joined / totalSubmissions) * 100)
       : 0;
 
-    // Pipeline status distribution for Pie chart
     const statusCounts = {};
     for (const c of all) {
       const s = c.status || 'Unknown';
@@ -260,7 +244,6 @@ app.get('/api/reports/recruiter', protect, async (req, res) => {
       name, value, color: STATUS_COLORS[name] || '#94a3b8',
     }));
 
-    // Weekly activity — last 4 weeks
     const now        = new Date();
     const weeklyData = [];
     for (let i = 3; i >= 0; i--) {
