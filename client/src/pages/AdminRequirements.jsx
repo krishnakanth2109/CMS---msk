@@ -4,7 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   XMarkIcon, EyeIcon, PencilIcon, PlusIcon, CheckCircleIcon, NoSymbolIcon,
-  BriefcaseIcon, AcademicCapIcon
+  BriefcaseIcon, AcademicCapIcon, BuildingOfficeIcon, CalendarIcon, MapPinIcon
 } from "@heroicons/react/24/outline";
 
 const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
@@ -110,6 +110,10 @@ export default function AdminRequirements() {
   const [recruiters, setRecruiters] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Filters State
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedClientFilter, setSelectedClientFilter] = useState("");
+
   // Exact 14 fields requested
   const initialFormState = {
     jobCode: "", clientName: "", position: "", location: "",
@@ -124,7 +128,6 @@ export default function AdminRequirements() {
   const [selectedJob, setSelectedJob] = useState(null);
   const [editingJob, setEditingJob] = useState(null);
   const [showForm, setShowForm] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
 
   const fetchData = async () => {
     setLoading(true);
@@ -234,11 +237,16 @@ export default function AdminRequirements() {
     }
   };
 
-  const filteredJobs = jobs.filter(j => 
-    j.position.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    j.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    j.jobCode.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter Logic applying both Text Search and Client Dropdown
+  const filteredJobs = jobs.filter(j => {
+    const matchesSearch = j.position.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          j.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          j.jobCode.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesClient = selectedClientFilter === "" || j.clientName === selectedClientFilter;
+    
+    return matchesSearch && matchesClient;
+  });
 
   return (
     <div className="flex-1 p-6 space-y-8 bg-zinc-50 dark:bg-zinc-950 min-h-screen text-zinc-900 dark:text-zinc-100">
@@ -391,17 +399,31 @@ export default function AdminRequirements() {
         )}
       </AnimatePresence>
 
-      {/* Search Bar */}
-      <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-        <input
-          placeholder="Search by Job Code, Position, or Client..."
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-          className={inputCls}
-        />
+      {/* Filters & Search Bar */}
+      <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col sm:flex-row gap-4 items-center">
+        <div className="w-full sm:flex-1">
+          <input
+            placeholder="Search by Role, Job Code, or Company..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className={inputCls}
+          />
+        </div>
+        <div className="w-full sm:w-64">
+          <select 
+            value={selectedClientFilter} 
+            onChange={(e) => setSelectedClientFilter(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">All Clients</option>
+            {clients.map(c => (
+              <option key={c.id} value={c.companyName}>{c.companyName}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {/* List Section */}
+      {/* New Enhanced Table Section */}
       {loading ? (
         <div className="text-center p-12 text-zinc-500 flex flex-col items-center">
           <div className="w-8 h-8 border-4 border-zinc-300 border-t-zinc-800 rounded-full animate-spin mb-4"></div>
@@ -410,62 +432,123 @@ export default function AdminRequirements() {
       ) : (
         <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left whitespace-nowrap">
-              <thead className="bg-zinc-50 dark:bg-zinc-900/50 text-xs uppercase text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
+            <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800 text-left text-sm whitespace-nowrap">
+              <thead className="bg-zinc-50 dark:bg-zinc-900/50 text-xs uppercase text-zinc-500 font-semibold tracking-wider">
                 <tr>
-                  <th className="px-6 py-4 font-medium tracking-wider">Code</th>
-                  <th className="px-6 py-4 font-medium tracking-wider">Client & Position</th>
-                  <th className="px-6 py-4 font-medium tracking-wider">Recruiters</th>
-                  <th className="px-6 py-4 font-medium tracking-wider">Status</th>
-                  <th className="px-6 py-4 font-medium tracking-wider text-right">Actions</th>
+                  <th className="px-6 py-4">Job Code</th>
+                  <th className="px-6 py-4">Role</th>
+                  <th className="px-6 py-4">Company</th>
+                  <th className="px-6 py-4">Location</th>
+                  <th className="px-6 py-4">Primary Recruiter</th>
+                  <th className="px-6 py-4">Secondary Recruiter</th>
+                  <th className="px-6 py-4">Date Added</th>
+                  <th className="px-6 py-4 text-center">Status</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
                 {filteredJobs.length === 0 ? (
-                  <tr><td colSpan={5} className="text-center py-12 text-zinc-400">No requirements found.</td></tr>
+                  <tr><td colSpan={9} className="text-center py-12 text-zinc-400">No requirements found.</td></tr>
                 ) : filteredJobs.map(job => (
                   <tr key={job.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors">
+                    
+                    {/* Job Code */}
                     <td className="px-6 py-4">
-                      <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 px-2.5 py-1 rounded border border-zinc-200 dark:border-zinc-700 font-mono text-xs">
+                      <span className="inline-flex items-center bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-2.5 py-1 rounded text-xs border border-zinc-200 dark:border-zinc-700 font-mono font-medium">
                         {job.jobCode}
                       </span>
                     </td>
+
+                    {/* Role */}
                     <td className="px-6 py-4">
-                      <div className="font-semibold text-zinc-900 dark:text-zinc-100">{job.position}</div>
-                      <div className="text-xs text-zinc-500 mt-0.5">{job.clientName} • {job.location}</div>
+                      <div className="font-bold text-zinc-900 dark:text-zinc-100 text-base">{job.position}</div>
                     </td>
-                    <td className="px-6 py-4 text-xs">
-                      <div className="flex flex-col gap-1">
-                        {job.primaryRecruiter ? (
-                          <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded w-fit">P: {job.primaryRecruiter}</span>
-                        ) : <span className="text-zinc-400 italic">No Primary</span>}
-                        {job.secondaryRecruiter && (
-                          <span className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400 px-2 py-0.5 rounded w-fit">S: {job.secondaryRecruiter}</span>
-                        )}
+
+                    {/* Company */}
+                    <td className="px-6 py-4">
+                      <div className="font-semibold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+                         <BuildingOfficeIcon className="w-4 h-4 text-zinc-400" />
+                         {job.clientName}
                       </div>
                     </td>
+
+                    {/* Location */}
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border ${
+                      <div className="text-sm text-zinc-600 dark:text-zinc-400 flex items-center gap-1.5">
+                         <MapPinIcon className="w-4 h-4 text-zinc-400" />
+                         {job.location || 'N/A'}
+                      </div>
+                    </td>
+
+                    {/* Primary Recruiter */}
+                    <td className="px-6 py-4">
+                      {job.primaryRecruiter ? (
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 flex items-center justify-center text-xs font-bold border border-blue-200 dark:border-blue-800">
+                            {job.primaryRecruiter.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="font-medium text-zinc-700 dark:text-zinc-300">{job.primaryRecruiter}</span>
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-1 rounded bg-zinc-50 dark:bg-zinc-800/50 text-zinc-400 text-xs border border-dashed border-zinc-200 dark:border-zinc-700">
+                          Unassigned
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Secondary Recruiter */}
+                    <td className="px-6 py-4">
+                      {job.secondaryRecruiter ? (
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 flex items-center justify-center text-xs font-bold border border-purple-200 dark:border-purple-800">
+                            {job.secondaryRecruiter.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="font-medium text-zinc-700 dark:text-zinc-300">{job.secondaryRecruiter}</span>
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-1 rounded bg-zinc-50 dark:bg-zinc-800/50 text-zinc-400 text-xs border border-dashed border-zinc-200 dark:border-zinc-700">
+                          Unassigned
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Date Added */}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-500 dark:text-zinc-400">
+                      <div className="flex items-center gap-1.5">
+                        <CalendarIcon className="w-4 h-4" />
+                        {job.createdAt || job.dateAdded 
+                          ? new Date(job.createdAt || job.dateAdded).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) 
+                          : 'N/A'
+                        }
+                      </div>
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-6 py-4 text-center">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${
                         job.active !== false 
-                          ? "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700" 
-                          : "bg-red-50 text-red-600 border-red-100 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/30"
+                          ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800/50" 
+                          : "bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800/50"
                       }`}>
                         {job.active !== false ? "Active" : "Inactive"}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => setSelectedJob(job)} title="View" className="p-2 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors">
-                          <EyeIcon className="w-4 h-4" />
+
+                    {/* Actions */}
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button onClick={() => setSelectedJob(job)} title="View Details" className="p-1.5 rounded-lg text-zinc-400 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-zinc-800 dark:hover:text-blue-400 transition-colors">
+                          <EyeIcon className="w-5 h-5" />
                         </button>
-                        <button onClick={() => handleEditJob(job)} title="Edit" className="p-2 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors">
-                          <PencilIcon className="w-4 h-4" />
+                        <button onClick={() => handleEditJob(job)} title="Edit Requirement" className="p-1.5 rounded-lg text-zinc-400 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-zinc-800 dark:hover:text-amber-400 transition-colors">
+                          <PencilIcon className="w-5 h-5" />
                         </button>
-                        <button onClick={() => handleToggleActive(job)} title={job.active !== false ? "Deactivate" : "Activate"} className="p-2 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors">
-                          {job.active !== false ? <NoSymbolIcon className="w-4 h-4" /> : <CheckCircleIcon className="w-4 h-4" />}
+                        <button onClick={() => handleToggleActive(job)} title={job.active !== false ? "Mark as Inactive" : "Mark as Active"} className={`p-1.5 rounded-lg transition-colors ${job.active !== false ? 'text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-zinc-800 dark:hover:text-red-400' : 'text-zinc-400 hover:bg-green-50 hover:text-green-600 dark:hover:bg-zinc-800 dark:hover:text-green-400'}`}>
+                          {job.active !== false ? <NoSymbolIcon className="w-5 h-5" /> : <CheckCircleIcon className="w-5 h-5" />}
                         </button>
                       </div>
                     </td>
+
                   </tr>
                 ))}
               </tbody>

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Search, Plus, Eye, Loader2, MessageCircle,
-  ArrowUpDown, ArrowUp, ArrowDown, Users
+  ArrowUpDown, ArrowUp, ArrowDown, Users, Download
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -78,6 +78,7 @@ export default function AdminCandidates() {
   const [searchTerm, setSearchTerm]           = useState('');
   const [statusFilter, setStatusFilter]       = useState('all');
   const [recruiterFilter, setRecruiterFilter] = useState('all');
+  const [clientFilter, setClientFilter]       = useState('all'); 
   const [activeStatFilter, setActiveStatFilter] = useState(null);
   const [sortConfig, setSortConfig]           = useState(null);
   const [selectedIds, setSelectedIds]         = useState([]);
@@ -251,13 +252,21 @@ export default function AdminCandidates() {
 
   const filteredCandidates = useMemo(() => {
     let result = candidates.filter((c) => {
-      const matchSearch = (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (c.email || '').toLowerCase().includes(searchTerm.toLowerCase()) || (c.candidateId || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const matchSearch = (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          (c.email || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          (c.candidateId || '').toLowerCase().includes(searchTerm.toLowerCase());
+      
       const statusArr = Array.isArray(c.status) ? c.status : [c.status || ''];
       const matchStatus = statusFilter === 'all' || statusArr.includes(statusFilter);
+      
       const recId = typeof c.recruiterId === 'object' ? c.recruiterId?._id : c.recruiterId;
       const matchRec = recruiterFilter === 'all' || recId === recruiterFilter;
+      
+      const matchClient = clientFilter === 'all' || c.client === clientFilter;
+
       const statMatch = activeStatFilter ? statusArr.includes(activeStatFilter) : true;
-      return matchSearch && matchStatus && matchRec && statMatch;
+      
+      return matchSearch && matchStatus && matchRec && matchClient && statMatch;
     });
 
     if (sortConfig) {
@@ -270,7 +279,7 @@ export default function AdminCandidates() {
       });
     }
     return result;
-  }, [candidates, searchTerm, statusFilter, recruiterFilter, activeStatFilter, sortConfig]);
+  }, [candidates, searchTerm, statusFilter, recruiterFilter, clientFilter, activeStatFilter, sortConfig]);
 
   const stats = useMemo(() => {
     const count = (s) => candidates.filter((c) => (Array.isArray(c.status) ? c.status : [c.status || '']).includes(s)).length;
@@ -280,6 +289,62 @@ export default function AdminCandidates() {
       joined: count('Joined'), backout: count('Backout'), sharedProfiles: count('Shared Profiles'),
     };
   }, [candidates]);
+
+  // ── Export functionality ──────────────────────────────────────────────────
+  const handleExportExcel = () => {
+    if (filteredCandidates.length === 0) {
+      toast({ title: 'No Data', description: 'No candidates available to export.', variant: 'destructive' });
+      return;
+    }
+
+    // CSV Headers
+    const headers = [
+      'Candidate ID', 'First Name', 'Last Name', 'Full Name', 'Email', 'Contact', 'Alternate Contact',
+      'Role/Position', 'Client', 'Assigned Recruiter', 'Status', 'Current Location', 'Preferred Location',
+      'Total Experience', 'Relevant Experience', 'Current Company', 'Reason For Change',
+      'Current CTC', 'Current Take Home', 'Expected CTC', 'Expected Take Home',
+      'Notice Period', 'Serving Notice', 'LWD', 'Offers In Hand', 'Offer Package', 'Source', 'Skills'
+    ];
+
+    // Map filtered candidates into rows
+    const csvRows = [headers.join(',')];
+
+    filteredCandidates.forEach(c => {
+      const recruiterName = typeof c.recruiterId === 'object' 
+        ? c.recruiterId?.name || `${c.recruiterId?.firstName || ''} ${c.recruiterId?.lastName || ''}`.trim() 
+        : c.recruiterName || '';
+
+      const statusStr = Array.isArray(c.status) ? c.status.join(' | ') : (c.status || '');
+      const skillsStr = Array.isArray(c.skills) ? c.skills.join(' | ') : (c.skills || '');
+      
+      const rowData = [
+        getCandidateId(c), c.firstName || '', c.lastName || '', c.name || '', c.email || '', 
+        c.contact || '', c.alternateNumber || '', c.position || '', c.client || '', 
+        recruiterName, statusStr, c.currentLocation || '', c.preferredLocation || '', 
+        c.totalExperience || '', c.relevantExperience || '', c.currentCompany || '', c.reasonForChange || '', 
+        c.ctc || '', c.currentTakeHome || '', c.ectc || '', c.expectedTakeHome || '', 
+        c.noticePeriod || '', c.servingNoticePeriod ? 'Yes' : 'No', 
+        c.lwd ? new Date(c.lwd).toLocaleDateString() : '', c.offersInHand ? 'Yes' : 'No', 
+        c.offerPackage || '', c.source || '', skillsStr
+      ].map(val => {
+        const stringVal = String(val).replace(/"/g, '""');
+        return `"${stringVal}"`;
+      });
+
+      csvRows.push(rowData.join(','));
+    });
+
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Candidates_Export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // ── Bulk Selection Helpers ──────────────────────────────────────────────────
   const handleSelectAll = (e) => {
@@ -320,7 +385,7 @@ export default function AdminCandidates() {
       toast({ title: 'Success', description: data.message || `Successfully assigned ${selectedIds.length} candidates` });
       setSelectedIds([]);
       setBulkRecruiterId('');
-      fetchData(); // Refresh list to show new recruiters
+      fetchData(); 
     } catch (err) {
       toast({ title: 'Error', description: 'Failed to assign candidates', variant: 'destructive' });
     } finally {
@@ -329,7 +394,7 @@ export default function AdminCandidates() {
   };
 
   return (
-    <div className="flex-1 p-6 overflow-y-auto bg-slate-50 dark:bg-slate-950 min-h-screen">
+    <div className="flex-1 p-6 pb-48 overflow-y-auto bg-slate-50 dark:bg-slate-950 min-h-screen">
       <div className="max-w-[1800px] mx-auto space-y-6">
 
         {/* Header */}
@@ -338,14 +403,19 @@ export default function AdminCandidates() {
             <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Candidate Database</h1>
             <p className="text-slate-500 mt-1">Manage and track pipeline across all sources</p>
           </div>
-          <button onClick={openAddDialog} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">
-            <Plus className="h-4 w-4" /> Add Candidate
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={handleExportExcel} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 hover:text-slate-900 transition shadow-sm">
+              <Download className="h-4 w-4" /> Export Excel
+            </button>
+            <button onClick={openAddDialog} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition shadow-sm">
+              <Plus className="h-4 w-4" /> Add Candidate
+            </button>
+          </div>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <StatCard title="Overall Submissions" value={stats.total} colorTheme="overall" hasDot={true} active={activeStatFilter === null} onClick={() => { setActiveStatFilter(null); setStatusFilter('all'); }} />
+          <StatCard title="Overall Candidates" value={stats.total} colorTheme="overall" hasDot={true} active={activeStatFilter === null} onClick={() => { setActiveStatFilter(null); setStatusFilter('all'); }} />
           <StatCard title="Turnups" value={stats.turnups} colorTheme="turnups" active={activeStatFilter === 'Turnups'} onClick={() => { setActiveStatFilter('Turnups'); setStatusFilter('all'); }} />
           <StatCard title="No Show" value={stats.noShow} colorTheme="noshow" active={activeStatFilter === 'No Show'} onClick={() => { setActiveStatFilter('No Show'); setStatusFilter('all'); }} />
           <StatCard title="Yet to attend" value={stats.yetToAttend} colorTheme="yetToAttend" active={activeStatFilter === 'Yet to attend'} onClick={() => { setActiveStatFilter('Yet to attend'); setStatusFilter('all'); }} />
@@ -366,7 +436,11 @@ export default function AdminCandidates() {
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search name, email, ID..." className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
-          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full md:w-auto">
+            <select value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+              <option value="all">All Clients</option>
+              {clients.map((c) => <option key={c._id || c.id} value={c.companyName || c.name}>{c.companyName || c.name}</option>)}
+            </select>
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
               <option value="all">All Status</option>
               {ALL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -513,7 +587,7 @@ export default function AdminCandidates() {
               <button onClick={() => setIsDialogOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold text-xl px-2">×</button>
             </div>
 
-            <div className="p-6 overflow-y-auto flex-1 space-y-8">
+            <div className="p-6 overflow-y-auto flex-1 space-y-8 pb-48">
               
               {/* SECTION 1: Personal Info */}
               <section>

@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
-  Users, UserCheck, TrendingUp, ClipboardList, Briefcase,
+  Users, UserCheck, TrendingUp, ClipboardList, Calendar,
   Building, ArrowUpRight, ArrowDownRight,
-  PauseCircle, UserX
+  PauseCircle, UserX, X, LayoutDashboard, Search, Briefcase
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend,
+  Tooltip, ResponsiveContainer, Legend, Cell
 } from 'recharts';
 import clsx from 'clsx';
 import { useNavigate } from 'react-router-dom';
@@ -46,87 +46,59 @@ async function apiFetch(path) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Sub-components
+// UI Components
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ProfessionalStatCard({
-  title, value, icon: Icon, trend = 0, description, onClick,
-  borderColor = 'border-blue-200 dark:border-blue-800',
-  iconColor   = 'text-blue-600 dark:text-blue-400',
-}) {
-  const isPositive = trend > 0;
-  const isNegative = trend < 0;
-
-  return (
-    <div
-      onClick={onClick}
-      className={clsx(
-        'relative bg-white dark:bg-gray-800 border rounded-xl p-3 md:p-4',
-        'shadow-sm hover:shadow-md transition-all duration-300',
-        'cursor-pointer hover:scale-[1.06] group overflow-hidden',
-        'h-28 md:h-32 flex flex-col justify-between',
-        borderColor,
-        onClick && 'hover:border-2 hover:border-blue-400 dark:hover:border-blue-600',
-      )}
-    >
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-50/50 to-white/50 dark:from-gray-900/30 dark:to-gray-800/30 rounded-xl" />
-      <div className="relative z-10 h-full flex flex-col justify-between">
-        <div className="flex items-start justify-between">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider truncate">
-              {title}
-            </p>
-            <h3 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-900 dark:text-white mt-1 truncate">
-              {value}
-            </h3>
-          </div>
-          <div className={clsx(
-            'p-1.5 md:p-2 rounded-lg ml-1 md:ml-2 flex-shrink-0',
-            'bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50',
-            'group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 transition-colors',
-          )}>
-            <Icon className={`w-4 h-4 md:w-5 md:h-5 ${iconColor}`} />
-          </div>
-        </div>
-        <div className="flex items-center justify-between pt-2 md:pt-3 border-t border-gray-100 dark:border-gray-700">
-          <div className="flex items-center space-x-1 md:space-x-2">
-            {trend !== 0 && (
-              <>
-                {isPositive
-                  ? <ArrowUpRight   className="w-3 h-3 text-green-500 flex-shrink-0" />
-                  : <ArrowDownRight className="w-3 h-3 text-red-500 flex-shrink-0"   />}
-                <span className={`text-xs font-medium ${isPositive ? 'text-green-600' : isNegative ? 'text-red-600' : 'text-gray-500'}`}>
-                  {trend > 0 ? '+' : ''}{trend}%
-                </span>
-              </>
-            )}
-            {description && !trend && (
-              <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{description}</span>
-            )}
-            {/* Fallback description if no trend */}
-            {!trend && description && (
-               <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{description}</span>
-            )}
-          </div>
-          {onClick && (
-            <div className="text-xs text-blue-500 dark:text-blue-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-              →
-            </div>
-          )}
-        </div>
+const SummaryCard = ({ title, value, trend, icon: Icon, bgColor, progressColor, iconBg }) => (
+  <div className={clsx("relative overflow-hidden rounded-2xl p-6 text-white shadow-lg h-40 flex flex-col justify-between transition-transform hover:scale-[1.01]", bgColor)}>
+    <div className="flex justify-between items-start">
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest opacity-80">{title}</p>
+        <h3 className="text-3xl font-bold mt-1 tracking-tight">{value}</h3>
+      </div>
+      <div className={clsx("p-2.5 rounded-lg", iconBg)}>
+        <Icon className="w-6 h-6 text-white" />
       </div>
     </div>
-  );
-}
+    <div className="mt-2">
+      <div className="flex items-center gap-2">
+        <span className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] font-bold">+{trend}%</span> 
+        <span className="text-[10px] opacity-70 font-medium tracking-tight">vs last month</span>
+      </div>
+      <div className="mt-3 h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+        <div className={clsx("h-full rounded-full", progressColor)} style={{ width: '45%' }} />
+      </div>
+    </div>
+  </div>
+);
 
-const ChartCard = ({ children, className = '' }) => (
-  <div className={`p-4 md:p-6 shadow-lg rounded-xl border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm ${className}`}>
-    {children}
+const StatusCard = ({ title, value, trend, icon: Icon, iconBg, progressColor, trendBg }) => (
+  <div className="bg-white rounded-2xl p-6 shadow-md border border-gray-100 h-40 flex flex-col justify-between group hover:shadow-lg transition-all">
+    <div className="flex justify-between items-start">
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{title}</p>
+        <h3 className="text-3xl font-bold mt-1 text-gray-800 tracking-tight">{value}</h3>
+      </div>
+      <div className={clsx("p-2.5 rounded-lg transition-colors", iconBg)}>
+        <Icon className="w-6 h-6" />
+      </div>
+    </div>
+    <div className="mt-2">
+      <div className="flex items-center gap-2">
+        <span className={clsx("px-1.5 py-0.5 rounded text-white text-[10px] font-bold", trendBg)}>
+          +{trend}%
+        </span> 
+        <span className="text-[10px] text-gray-400 font-bold tracking-tight">vs last month</span>
+      </div>
+      <div className="mt-3 h-1.5 w-full bg-gray-50 rounded-full overflow-hidden">
+        <div className={clsx("h-full rounded-full", progressColor)} style={{ width: '60%' }} />
+      </div>
+    </div>
   </div>
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Main component
+// Main Dashboard
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
@@ -134,110 +106,55 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const { currentUser } = useAuth();
 
-  // ── Data state ──────────────────────────────────────────────────────────────
   const [candidates, setCandidates] = useState([]);
   const [recruiters, setRecruiters] = useState([]);
-  const [jobs,       setJobs      ] = useState([]);
+  const [interviews, setInterviews] = useState([]);
   const [clients,    setClients   ] = useState([]);
   const [loading,    setLoading   ] = useState(true);
-  const [errors,     setErrors    ] = useState({});
-  const [isMobile,   setIsMobile  ] = useState(false);
+  const [selectedRecruiter, setSelectedRecruiter] = useState(null);
 
-  // ── Responsive detection ────────────────────────────────────────────────────
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [candR, recR, intR, clientR] = await Promise.allSettled([
+          apiFetch('/candidates'),
+          apiFetch('/recruiters'),
+          apiFetch('/interviews'),
+          apiFetch('/clients'),
+        ]);
+
+        if (candR.status === 'fulfilled') setCandidates(candR.value);
+        if (recR.status === 'fulfilled') setRecruiters(recR.value.map(r => ({ ...r, id: r._id || r.id })));
+        if (intR.status === 'fulfilled') setInterviews(intR.value);
+        if (clientR.status === 'fulfilled') setClients(clientR.value);
+
+        setLoading(false);
+      } catch (err) {
+        toast({ title: 'Error', description: 'Failed to load dashboard data', variant: 'destructive' });
+        setLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
-  // ── Fetch dashboard data ─────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!getFirebaseToken()) {
-      const t = setTimeout(() => {
-        if (getFirebaseToken()) triggerFetch();
-        else setLoading(false);
-      }, 100);
-      return () => clearTimeout(t);
-    }
-    triggerFetch();
-
-    function triggerFetch() {
-      const fetchData = async () => {
-        try {
-          setLoading(true);
-          setErrors({});
-
-          const [candR, recR, jobR, clientR] = await Promise.allSettled([
-            apiFetch('/candidates'),
-            apiFetch('/recruiters'),
-            apiFetch('/jobs'),
-            apiFetch('/clients'),
-          ]);
-
-          if (candR.status === 'fulfilled' && Array.isArray(candR.value)) {
-            setCandidates(candR.value);
-          } else {
-            setErrors(p => ({ ...p, candidates: true }));
-          }
-
-          if (recR.status === 'fulfilled' && Array.isArray(recR.value)) {
-            setRecruiters(recR.value.map(r => ({ ...r, id: r._id || r.id })));
-          } else {
-            setErrors(p => ({ ...p, recruiters: true }));
-          }
-
-          if (jobR.status === 'fulfilled' && Array.isArray(jobR.value)) {
-            setJobs(jobR.value);
-          } else {
-            setErrors(p => ({ ...p, jobs: true }));
-          }
-
-          if (clientR.status === 'fulfilled' && Array.isArray(clientR.value)) {
-            setClients(clientR.value);
-          } else {
-            setErrors(p => ({ ...p, clients: true }));
-          }
-
-        } catch (err) {
-          console.error('Dashboard Fetch Error:', err);
-          toast({ title: 'Error', description: 'Failed to load dashboard data', variant: 'destructive' });
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchData();
-    }
-  }, []);
-
-  // ── Stats Calculation ───────────────────────────────────────────────────────
   const stats = useMemo(() => {
     const totalCandidates  = candidates.length;
     const activeRecruiters = recruiters.filter(r => r.active !== false).length;
-    const totalJobs        = jobs.length;
     
-    // Client breakdown
-    const totalClients     = clients.length;
-    const activeClients    = clients.filter(c => c.active !== false).length; // Assuming 'active' defaults to true if undefined, adjust logic if needed
-    const inactiveClients  = totalClients - activeClients;
-
-    // Status counts
-    const submitted        = candidates.filter(c => c.status === 'Submitted').length;
-    const rejected         = candidates.filter(c => c.status === 'Rejected').length; 
-    const hold             = candidates.filter(c => c.status === 'Hold').length;
-    const joined           = candidates.filter(c => c.status === 'Joined').length;
+    const submitted        = candidates.filter(c => c.status === 'Submitted' || c.status?.includes('Submitted')).length;
+    const rejected         = candidates.filter(c => c.status === 'Rejected' || c.status?.includes('Rejected')).length; 
+    const hold             = candidates.filter(c => c.status === 'Hold' || c.status?.includes('Hold')).length;
+    const joined           = candidates.filter(c => c.status === 'Joined' || c.status?.includes('Joined')).length;
     
-    // Formerly "Success Rate", now mapped to "Avg. Time to Hire" card (keeping value logic same as requested, or set to 0%)
     const successRate      = totalCandidates > 0 ? ((joined / totalCandidates) * 100).toFixed(1) : '0';
     
     return { 
-      totalCandidates, activeRecruiters, totalJobs, 
-      totalClients, activeClients, inactiveClients,
-      submitted, rejected, hold, joined, successRate 
+      totalCandidates, activeRecruiters, totalInterviews: interviews.length, 
+      totalClients: clients.length, submitted, rejected, hold, joined, successRate 
     };
-  }, [candidates, recruiters, jobs, clients]);
+  }, [candidates, recruiters, interviews, clients]);
 
-  // ── Recruiter performance ───────────────────────────────────────────────────
   const recruiterStats = useMemo(() => {
     const map = new Map();
     recruiters.forEach(r => {
@@ -252,13 +169,11 @@ export default function AdminDashboard() {
     });
 
     candidates.forEach(c => {
-      const rid = typeof c.recruiterId === 'string'
-        ? c.recruiterId
-        : c.recruiterId?._id || c.recruiterId?.id;
+      const rid = typeof c.recruiterId === 'string' ? c.recruiterId : c.recruiterId?._id || c.recruiterId?.id;
       if (rid && map.has(rid)) {
         const s = map.get(rid);
         s.submissions++;
-        const st = c.status || '';
+        const st = Array.isArray(c.status) ? (c.status[c.status.length - 1] || '') : (c.status || '');
         if      (st === 'Submitted' || st === 'Pending') s.pending++;
         else if (st === 'Hold')     s.hold++;
         else if (st === 'Joined')   s.joined++;
@@ -266,213 +181,193 @@ export default function AdminDashboard() {
       }
     });
 
-    return Array.from(map.values())
-      .map(s => ({ ...s, successRate: s.submissions > 0 ? ((s.joined / s.submissions) * 100).toFixed(1) : '0' }))
-      .sort((a, b) => b.submissions - a.submissions);
+    return Array.from(map.values()).sort((a, b) => b.submissions - a.submissions);
   }, [candidates, recruiters]);
 
-  // ── Chart data ──────────────────────────────────────────────────────────────
-  const barData = useMemo(() =>
-    recruiterStats.slice(0, 6).map(r => ({
-      name: r.name || 'Unknown', candidates: r.submissions || 0,
-      fullName: r.fullName, successRate: r.successRate, joined: r.joined,
-    })),
-  [recruiterStats]);
+  const barData = useMemo(() => recruiterStats.slice(0, 6).map(r => ({
+    name: r.name,
+    value: r.submissions,
+  })), [recruiterStats]);
 
-  const trendData = useMemo(() => ({
-    candidates: 12, recruiters: 5, jobs: 8, clients: 3,
-    submitted: 15, rejected: 4, hold: 4, joined: 7,
-    successRate: parseFloat(stats.successRate) > 0 ? Math.round(parseFloat(stats.successRate) * 0.1) : 0,
-  }), [stats.successRate]);
+  if (loading) return (
+    <div className="flex h-full w-full items-center justify-center">
+      <div className="animate-spin h-10 w-10 border-4 border-[#4d47c4] border-t-transparent rounded-full" />
+    </div>
+  );
 
-  // ── Helpers ─────────────────────────────────────────────────────────────────
-  const getUserGreeting = () => {
-    const name = currentUser?.name || currentUser?.displayName;
-    return name ? `Welcome back, ${name.split(' ')[0]}!` : 'Welcome back!';
-  };
-
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (!active || !payload?.length) return null;
-    const dp = payload[0]?.payload;
-    return (
-      <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
-        <p className="font-medium text-gray-900 dark:text-white">{dp?.fullName || label}</p>
-        <p className="text-sm text-gray-600 dark:text-gray-300">
-          Submissions: <span className="font-semibold text-blue-600">{payload[0].value}</span>
-        </p>
-        {dp && <>
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            Avg. Time to Hire: <span className="font-semibold text-green-600">{dp.successRate}%</span>
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            Joined: <span className="font-semibold text-green-600">{dp.joined}</span>
-          </p>
-        </>}
-      </div>
-    );
-  };
-
-  // ── Loading ─────────────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="flex min-h-screen bg-gray-100 dark:bg-gray-900">
-        <main className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin h-12 w-12 border-4 border-blue-500 rounded-full border-t-transparent mx-auto" />
-            <p className="mt-4 text-gray-600 dark:text-gray-400">Loading dashboard data…</p>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
+    <main className="flex-1 overflow-y-auto p-8 bg-[#f8faff] min-h-screen">
+      <div className="max-w-[1400px] mx-auto space-y-8">
 
         {/* ── Header ── */}
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
-            <div>
-              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 dark:from-blue-400 dark:via-purple-400 dark:to-blue-200">
-                Admin Dashboard
-              </h1>
-              <p className="text-base md:text-lg font-medium text-gray-800 dark:text-gray-200 mt-1">{getUserGreeting()}</p>
-              <p className="text-gray-600 dark:text-gray-400 mt-1 text-sm md:text-base">Overview of recruitment performance</p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-black text-[#4d47c4] tracking-tight">Admin Dashboard</h1>
+            <p className="text-sm text-gray-500 font-bold mt-1">Welcome back {currentUser?.firstName || 'kkanth'}, Have a nice day..!</p>
+          </div>
+          <div className="flex items-center gap-6">
+            <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest bg-white px-3 py-1.5 rounded-lg shadow-sm border border-gray-100">
+              {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
+            </span>
+          </div>
+        </div>
+
+        {/* ── Top Row Solid Cards (Summary) ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <SummaryCard title="Total Candidates" value={stats.totalCandidates.toLocaleString()} trend={12} icon={Users} bgColor="bg-[#4d47c4]" progressColor="bg-white" iconBg="bg-white/10" />
+          <SummaryCard title="Active Recruiters" value={stats.activeRecruiters} trend={5} icon={UserCheck} bgColor="bg-[#52c41a]" progressColor="bg-white" iconBg="bg-white/10" />
+          <SummaryCard title="Interviews" value={stats.totalInterviews} trend={8} icon={Calendar} bgColor="bg-[#1890ff]" progressColor="bg-white" iconBg="bg-white/10" />
+          <SummaryCard title="Total Clients" value={stats.totalClients} trend={3} icon={Building} bgColor="bg-[#722ed1]" progressColor="bg-white" iconBg="bg-white/10" />
+        </div>
+
+        {/* ── Second Row White Cards (Status) ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatusCard title="Submitted" value={stats.submitted} trend={12} icon={Users} iconBg="bg-purple-50 text-purple-600" progressColor="bg-purple-500" trendBg="bg-[#722ed1]" />
+          <StatusCard title="Joined" value={stats.joined} trend={7} icon={UserCheck} iconBg="bg-green-50 text-green-600" progressColor="bg-green-500" trendBg="bg-[#52c41a]" />
+          <StatusCard title="Hold" value={stats.hold} trend={4} icon={PauseCircle} iconBg="bg-orange-50 text-orange-600" progressColor="bg-orange-500" trendBg="bg-[#faad14]" />
+          <StatusCard title="Rejected" value={stats.rejected} trend={5} icon={UserX} iconBg="bg-red-50 text-red-600" progressColor="bg-red-500" trendBg="bg-[#f5222d]" />
+        </div>
+
+        {/* ── Middle Metrics Row ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-50 flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Avg. Time to Hire</p>
+              <h4 className="text-3xl font-black text-gray-800 mt-1 tracking-tighter">{stats.successRate}%</h4>
+              <div className="mt-4 h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full bg-[#4d47c4] rounded-full" style={{ width: `${stats.successRate}%` }} />
+              </div>
             </div>
-            {/* Notifications & Date Filter Removed */}
+            <div className="ml-8 p-4 bg-blue-50 rounded-xl">
+              <TrendingUp className="w-8 h-8 text-[#1890ff]" />
+            </div>
           </div>
-        </div>
-
-        {/* ── Partial-error banner ── */}
-        {Object.keys(errors).length > 0 && (
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-xl p-3 text-sm text-yellow-800 dark:text-yellow-300">
-            ⚠️ Some data couldn't be loaded: {Object.keys(errors).join(', ')}. Showing partial results.
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-50 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Joining Pipeline</p>
+              <h4 className="text-3xl font-black text-gray-800 mt-1 tracking-tighter">{stats.totalCandidates}</h4>
+              <p className="text-[11px] text-gray-400 mt-2 font-bold uppercase opacity-60">Active in organizational pipeline</p>
+            </div>
+            <div className="p-4 bg-blue-50 rounded-xl">
+              <Users className="w-8 h-8 text-[#1890ff]" />
+            </div>
           </div>
-        )}
-
-        {/* ── Top stats ── */}
-        <div className="grid gap-3 md:gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          <ProfessionalStatCard title="Total Candidates"  value={stats.totalCandidates}  icon={Users}     trend={trendData.candidates} onClick={() => navigate('/admin/add-candidate')} borderColor="border-blue-200 dark:border-blue-800"     iconColor="text-blue-600 dark:text-blue-400"    />
-          <ProfessionalStatCard title="Active Recruiters" value={stats.activeRecruiters} icon={UserCheck} trend={trendData.recruiters} onClick={() => navigate('/admin/recruiters')}    borderColor="border-green-200 dark:border-green-800"   iconColor="text-green-600 dark:text-green-400"  />
-          <ProfessionalStatCard title="Total Jobs"        value={stats.totalJobs}        icon={Briefcase} trend={trendData.jobs}       onClick={() => navigate('/admin/requirements')}  borderColor="border-indigo-200 dark:border-indigo-800" iconColor="text-indigo-600 dark:text-indigo-400" />
-          
-          {/* Client Card with Active/Inactive breakdown */}
-          <ProfessionalStatCard 
-            title="Total Clients" 
-            value={stats.totalClients} 
-            icon={Building} 
-            description={`Active: ${stats.activeClients} | Inactive: ${stats.inactiveClients}`}
-            trend={trendData.clients} 
-            onClick={() => navigate('/admin/clients')} 
-            borderColor="border-purple-200 dark:border-purple-800" 
-            iconColor="text-purple-600 dark:text-purple-400" 
-          />
-        </div>
-
-        {/* ── Pipeline stats ── */}
-        <div className="grid gap-3 md:gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          <ProfessionalStatCard title="Submitted" value={stats.submitted} icon={ClipboardList} trend={trendData.submitted} onClick={() => navigate('/admin/candidates')} borderColor="border-blue-200 dark:border-blue-800"      iconColor="text-blue-600 dark:text-blue-400"    />
-          <ProfessionalStatCard title="Joined"    value={stats.joined}    icon={UserCheck}     trend={trendData.joined}    onClick={() => navigate('/admin/candidates')} borderColor="border-emerald-200 dark:border-emerald-800" iconColor="text-emerald-600 dark:text-emerald-400" />
-          <ProfessionalStatCard title="Hold"      value={stats.hold}      icon={PauseCircle}   trend={trendData.hold}      onClick={() => navigate('/admin/candidates')} borderColor="border-amber-200 dark:border-amber-800"    iconColor="text-amber-600 dark:text-amber-400"  />
-          {/* New Rejected Card */}
-          <ProfessionalStatCard title="Rejected"  value={stats.rejected}  icon={UserX}         trend={trendData.rejected}  onClick={() => navigate('/admin/candidates')} borderColor="border-red-200 dark:border-red-800"        iconColor="text-red-600 dark:text-red-400"       />
-        </div>
-
-        {/* ── Bottom stats (Renamed) ── */}
-        <div className="grid gap-3 md:gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2">
-          {/* Renamed Success Rate -> Avg. Time to Hire */}
-          <ProfessionalStatCard title="Avg. Time to Hire" value={`${stats.successRate}%`} icon={TrendingUp} trend={parseFloat(stats.successRate) > 0 ? trendData.successRate : 0} borderColor="border-teal-200 dark:border-teal-800" iconColor="text-teal-600 dark:text-teal-400" />
-          {/* Renamed Total Pipeline -> Joining Pipeline */}
-          <ProfessionalStatCard title="Joining Pipeline"  value={stats.totalCandidates}   icon={Users}      description="Active candidates in pipeline" borderColor="border-cyan-200 dark:border-cyan-800" iconColor="text-cyan-600 dark:text-cyan-400" />
         </div>
 
         {/* ── Charts ── */}
-        <div className="grid gap-4 lg:gap-6 grid-cols-1">
-          {/* Bar chart - Renamed & Full Width now */}
-          <ChartCard>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base md:text-lg font-semibold text-gray-800 dark:text-white">Top Recruiters (Upload Report)</h3>
-              <div className="text-xs text-gray-500">Showing {Math.min(recruiterStats.length, 6)} of {recruiters.length}</div>
-            </div>
-            <div className="h-64 md:h-72 lg:h-80 relative">
-              {barData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={barData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                    <XAxis dataKey="name" stroke="#6B7280" tick={{ fill: '#6B7280' }}
-                      fontSize={isMobile ? 10 : 12} angle={isMobile ? -45 : 0}
-                      textAnchor={isMobile ? 'end' : 'middle'} height={isMobile ? 80 : 40} interval={0}
-                    />
-                    <YAxis stroke="#6B7280" fontSize={12} tick={{ fill: '#6B7280' }} domain={[0, 'auto']} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                    <Bar dataKey="candidates" name="Candidates Added" fill="#3B82F6" radius={[4, 4, 0, 0]} maxBarSize={60} animationDuration={1500} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center p-4">
-                    <Users className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                    <p className="text-gray-500">No recruiter data available</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </ChartCard>
-          
-          {/* Pipeline Breakdown Chart REMOVED */}
+        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-50">
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-lg font-black text-gray-800">Top Recruiters (Upload Report)</h3>
+            <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest">showing {Math.min(recruiterStats.length, 6)} of {recruiters.length}</span>
+          </div>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={barData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#4d4d4d', fontSize: 11, fontWeight: 800 }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#bfbfbf', fontSize: 11, fontWeight: 600 }} unit="%" domain={[0, 100]} />
+                <Tooltip cursor={{ fill: '#f8faff' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 16px rgba(0,0,0,0.1)' }} />
+                <Bar dataKey="value" fill="#4d47c4" radius={[6, 6, 0, 0]} barSize={45}>
+                  {barData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={index === 0 ? '#4d47c4' : index === 1 ? '#6b64f3' : index === 2 ? '#8e88f7' : '#a8a2fa'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
-        {/* ── Recruiter performance table ── */}
-        <ChartCard>
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-4">
-            <h3 className="text-base md:text-lg font-semibold text-gray-800 dark:text-white">Recruiter Performance Details</h3>
+        {/* ── Table ── */}
+        <div className="bg-[#ebf0ff] p-8 rounded-2xl shadow-sm border border-gray-100">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
+            <h3 className="text-lg font-black text-[#4d47c4]">Recruiter Performance Details</h3>
             <button onClick={() => navigate('/admin/recruiters')}
-              className="px-3 py-2 text-sm md:px-4 md:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
+              className="px-6 py-2 bg-[#4d47c4] hover:bg-[#3d38a3] text-white rounded-lg transition-all font-black text-[10px] shadow-lg uppercase tracking-wider"
             >
               View All Recruiters
             </button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-gray-50 dark:bg-gray-700 text-xs uppercase text-gray-500 font-medium">
-                <tr>
-                  <th className="p-2 md:p-3">Recruiter</th>
-                  <th className="p-2 md:p-3 text-center">Submissions</th>
-                  <th className="p-2 md:p-3 text-center">Hold</th>
-                  <th className="p-2 md:p-3 text-center">Joined</th>
-                  <th className="p-2 md:p-3 text-center">Rejected</th>
-                  <th className="p-2 md:p-3 text-center">Pending</th>
-                  <th className="p-2 md:p-3 text-right">Avg. Time to Hire</th>
+          <div className="bg-white rounded-xl overflow-hidden border border-gray-100 shadow-sm">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-white border-b border-gray-100 text-[9px] font-black uppercase text-gray-400 tracking-widest">
+                  <th className="px-8 py-4">Recruiter</th>
+                  <th className="px-6 py-4 text-center">Submissions</th>
+                  <th className="px-6 py-4 text-center">Hold</th>
+                  <th className="px-6 py-4 text-center">Joined</th>
+                  <th className="px-6 py-4 text-center">Rejected</th>
+                  <th className="px-6 py-4 text-center">Pending</th>
+                  <th className="px-8 py-4 text-right">Avg. Time to Hire</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+              <tbody className="divide-y divide-gray-50">
                 {recruiterStats.slice(0, 10).map((r, i) => (
-                  <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                    <td className="p-2 md:p-3 font-medium text-gray-900 dark:text-white truncate max-w-[100px]">{r.fullName}</td>
-                    <td className="p-2 md:p-3 text-center text-blue-600   font-medium">{r.submissions}</td>
-                    <td className="p-2 md:p-3 text-center text-amber-600  font-medium">{r.hold}</td>
-                    <td className="p-2 md:p-3 text-center text-green-600  font-bold"  >{r.joined}</td>
-                    <td className="p-2 md:p-3 text-center text-red-600    font-medium">{r.rejected}</td>
-                    <td className="p-2 md:p-3 text-center text-gray-500   font-medium">{r.pending}</td>
-                    <td className="p-2 md:p-3 text-right font-bold">
-                      <span className={parseFloat(r.successRate) > 50 ? 'text-green-600' : parseFloat(r.successRate) > 20 ? 'text-yellow-600' : 'text-red-600'}>
-                        {r.successRate}%
+                  <tr key={i} className="hover:bg-blue-50/20 transition-colors group">
+                    <td className="px-8 py-4 font-bold text-gray-700 text-sm">{r.fullName}</td>
+                    <td className="px-6 py-4 text-center">
+                      <span className="text-blue-600 font-bold text-sm hover:underline cursor-pointer" onClick={() => setSelectedRecruiter(r)}>
+                        {r.submissions}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 text-center font-bold text-sm text-orange-400">{r.hold}</td>
+                    <td className="px-6 py-4 text-center font-bold text-sm text-green-500">{r.joined}</td>
+                    <td className="px-6 py-4 text-center font-bold text-sm text-red-400">{r.rejected}</td>
+                    <td className="px-6 py-4 text-center font-bold text-sm text-gray-400">{r.pending}</td>
+                    <td className="px-8 py-4 text-right font-black text-sm text-red-500">
+                      {r.submissions > 0 ? ((r.joined / r.submissions) * 100).toFixed(1) : '0'}%
                     </td>
                   </tr>
                 ))}
-                {recruiterStats.length === 0 && (
-                  <tr><td colSpan={7} className="p-4 text-center text-gray-500">No recruiter data available</td></tr>
-                )}
               </tbody>
             </table>
           </div>
-        </ChartCard>
+        </div>
 
       </div>
+
+      {/* ── Recruiter Modal ── */}
+      {selectedRecruiter && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col overflow-hidden border border-gray-200">
+            <div className="p-6 bg-[#f8faff] border-b border-gray-100 flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-black text-gray-800">Candidates by {selectedRecruiter.fullName}</h3>
+                <p className="text-[10px] text-gray-500 font-bold uppercase mt-1 tracking-widest">Total submissions: {selectedRecruiter.submissions}</p>
+              </div>
+              <button onClick={() => setSelectedRecruiter(null)} className="p-2 hover:bg-white rounded-full transition-colors border border-gray-100 shadow-sm">
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              <table className="w-full text-xs">
+                <thead className="text-gray-400 font-black text-[9px] uppercase tracking-widest text-left border-b border-gray-100">
+                  <tr>
+                    <th className="pb-4">Candidate Name</th>
+                    <th className="pb-4">Position</th>
+                    <th className="pb-4">Status</th>
+                    <th className="pb-4 text-right">Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {candidates.filter(c => (typeof c.recruiterId === 'string' ? c.recruiterId : c.recruiterId?._id) === selectedRecruiter.id).map((c, idx) => (
+                    <tr key={idx} className="hover:bg-blue-50/20 transition-colors">
+                      <td className="py-4 font-bold text-gray-700">{c.name}</td>
+                      <td className="py-4 text-gray-500 font-medium">{c.position}</td>
+                      <td className="py-4">
+                        <span className={clsx("px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border", 
+                          c.status === 'Joined' ? "bg-green-50 text-green-600 border-green-200" : "bg-blue-50 text-blue-600 border-blue-200")}>
+                          {c.status}
+                        </span>
+                      </td>
+                      <td className="py-4 text-right text-gray-400 font-bold">{new Date(c.createdAt).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
