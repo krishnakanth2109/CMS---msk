@@ -24,24 +24,23 @@ const getAuthHeader = () => {
 };
 
 const inputCls = (err) =>
-  `w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 ${
-    err ? 'border-red-500' : 'border-slate-200 dark:border-slate-700'
+  `w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 ${err ? 'border-red-500' : 'border-slate-200 dark:border-slate-700'
   } bg-white dark:bg-slate-800`;
 
 // ── StatCard Component ────────────────────────────────────────────────────────
 const StatCard = ({ title, value, colorTheme, active, onClick, hasDot }) => {
   const themes = {
-    overall: 'bg-blue-600 text-white border-blue-700 dark:bg-blue-700', 
-    shared: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/60 dark:text-blue-200', 
+    overall: 'bg-blue-600 text-white border-blue-700 dark:bg-blue-700',
+    shared: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/60 dark:text-blue-200',
     turnups: 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/60 dark:text-purple-200',
-    noshow: 'bg-neutral-300 text-black border-neutral-400 dark:bg-neutral-700 dark:text-white', 
-    yetToAttend: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-200', 
-    selected: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/60 dark:text-green-200', 
-    joined: 'bg-emerald-200 text-emerald-900 border-emerald-300 dark:bg-emerald-900/60 dark:text-emerald-200', 
-    rejected: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/60 dark:text-red-200', 
-    backout: 'bg-rose-100 text-rose-900 border-rose-200 dark:bg-rose-900/60 dark:text-rose-200', 
-    hold: 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/60 dark:text-orange-200', 
-    pipeline: 'bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-900/60 dark:text-amber-200', 
+    noshow: 'bg-neutral-300 text-black border-neutral-400 dark:bg-neutral-700 dark:text-white',
+    yetToAttend: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-200',
+    selected: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/60 dark:text-green-200',
+    joined: 'bg-emerald-200 text-emerald-900 border-emerald-300 dark:bg-emerald-900/60 dark:text-emerald-200',
+    rejected: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/60 dark:text-red-200',
+    backout: 'bg-rose-100 text-rose-900 border-rose-200 dark:bg-rose-900/60 dark:text-rose-200',
+    hold: 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/60 dark:text-orange-200',
+    pipeline: 'bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-900/60 dark:text-amber-200',
   };
   const themeClass = themes[colorTheme] || themes.overall;
 
@@ -69,36 +68,37 @@ const SOURCES = ['LinkedIn', 'Naukri', 'Indeed', 'Portal', 'Referral', 'Other'];
 export default function AdminCandidates() {
   const { toast } = useToast();
 
-  const [candidates, setCandidates]   = useState([]);
-  const [recruiters, setRecruiters]   = useState([]);
-  const [clients, setClients]         = useState([]);
-  const [loading, setLoading]         = useState(true);
+  const [candidates, setCandidates] = useState([]);
+  const [recruiters, setRecruiters] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isParsingResume, setIsParsingResume] = useState(false);
 
-  const [searchTerm, setSearchTerm]           = useState('');
-  const [statusFilter, setStatusFilter]       = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [recruiterFilter, setRecruiterFilter] = useState('all');
-  const [clientFilter, setClientFilter]       = useState('all'); 
+  const [clientFilter, setClientFilter] = useState('all');
   const [activeStatFilter, setActiveStatFilter] = useState(null);
-  const [sortConfig, setSortConfig]           = useState(null);
-  const [selectedIds, setSelectedIds]         = useState([]);
+  const [sortConfig, setSortConfig] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   // Bulk Assign States
   const [bulkRecruiterId, setBulkRecruiterId] = useState('');
   const [isBulkAssigning, setIsBulkAssigning] = useState(false);
 
-  const [isDialogOpen, setIsDialogOpen]           = useState(false);
-  const [isViewDialogOpen, setIsViewDialogOpen]   = useState(false);
-  const [isEditMode, setIsEditMode]               = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [selectedCandidateId, setSelectedCandidateId] = useState(null);
-  const [viewCandidate, setViewCandidate]         = useState(null);
-  const [errors, setErrors]                       = useState({});
+  const [viewCandidate, setViewCandidate] = useState(null);
+  const [errors, setErrors] = useState({});
 
   const initialFormData = {
     firstName: '', lastName: '', contact: '', alternateNumber: '', email: '',
     currentLocation: '', preferredLocation: '', position: '', client: '', currentCompany: '',
-    totalExperience: '', relevantExperience: '', 
-    ctc: '', currentTakeHome: '', ectc: '', expectedTakeHome: '', 
+    totalExperience: '', relevantExperience: '',
+    ctc: '', currentTakeHome: '', ectc: '', expectedTakeHome: '',
     noticePeriod: '', servingNoticePeriod: 'false', lwd: '',
     reasonForChange: '', offersInHand: 'false', offerPackage: '', source: 'Portal',
     recruiterId: '', status: 'Submitted',
@@ -140,6 +140,78 @@ export default function AdminCandidates() {
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors((prev) => { const n = { ...prev }; delete n[field]; return n; });
+  };
+
+  const handleResumeUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: 'Error', description: 'File size must be less than 5MB', variant: 'destructive' });
+      return;
+    }
+
+    // Validate type
+    const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const validExtensions = ['.pdf', '.doc', '.docx'];
+    const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+
+    if (!validTypes.includes(file.type) && !validExtensions.includes(fileExt)) {
+      toast({ title: 'Error', description: 'Invalid file type. Only PDF, DOC, and DOCX are supported.', variant: 'destructive' });
+      return;
+    }
+
+    setIsParsingResume(true);
+
+    try {
+      const uploadFormData = new FormData();
+      uploadFormData.append('resume', file);
+
+      const headers = getAuthHeader();
+      delete headers['Content-Type']; // Let browser set multipart/form-data
+
+      const res = await fetch(`${API_URL}/candidates/parse-resume`, {
+        method: 'POST',
+        headers,
+        body: uploadFormData,
+      });
+
+      const result = await res.json();
+
+      if (!res.ok || !result.success) {
+        throw new Error(result.message || 'Failed to parse resume');
+      }
+
+      const { data } = result;
+
+      let fName = '', lName = '';
+      if (data.name) {
+        const nameParts = data.name.trim().split(' ');
+        fName = nameParts[0] || '';
+        lName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        firstName: prev.firstName || fName,
+        lastName: prev.lastName || lName,
+        email: prev.email || data.email || '',
+        contact: prev.contact || data.contact || '',
+        skills: prev.skills || data.skills || '',
+        totalExperience: prev.totalExperience || data.totalExperience || '',
+        currentCompany: prev.currentCompany || data.currentCompany || '',
+        currentLocation: prev.currentLocation || data.currentLocation || '',
+      }));
+
+      toast({ title: 'Success', description: 'Resume parsed successfully. Fields auto-filled.' });
+    } catch (error) {
+      console.error('Parsing error:', error);
+      toast({ title: 'Warning', description: 'Could not parse some details. Please fill manually.', variant: 'default' });
+    } finally {
+      setIsParsingResume(false);
+      e.target.value = ''; // Reset input
+    }
   };
 
   const validateForm = () => {
@@ -252,20 +324,20 @@ export default function AdminCandidates() {
 
   const filteredCandidates = useMemo(() => {
     let result = candidates.filter((c) => {
-      const matchSearch = (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          (c.email || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          (c.candidateId || '').toLowerCase().includes(searchTerm.toLowerCase());
-      
+      const matchSearch = (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (c.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (c.candidateId || '').toLowerCase().includes(searchTerm.toLowerCase());
+
       const statusArr = Array.isArray(c.status) ? c.status : [c.status || ''];
       const matchStatus = statusFilter === 'all' || statusArr.includes(statusFilter);
-      
+
       const recId = typeof c.recruiterId === 'object' ? c.recruiterId?._id : c.recruiterId;
       const matchRec = recruiterFilter === 'all' || recId === recruiterFilter;
-      
+
       const matchClient = clientFilter === 'all' || c.client === clientFilter;
 
       const statMatch = activeStatFilter ? statusArr.includes(activeStatFilter) : true;
-      
+
       return matchSearch && matchStatus && matchRec && matchClient && statMatch;
     });
 
@@ -310,21 +382,21 @@ export default function AdminCandidates() {
     const csvRows = [headers.join(',')];
 
     filteredCandidates.forEach(c => {
-      const recruiterName = typeof c.recruiterId === 'object' 
-        ? c.recruiterId?.name || `${c.recruiterId?.firstName || ''} ${c.recruiterId?.lastName || ''}`.trim() 
+      const recruiterName = typeof c.recruiterId === 'object'
+        ? c.recruiterId?.name || `${c.recruiterId?.firstName || ''} ${c.recruiterId?.lastName || ''}`.trim()
         : c.recruiterName || '';
 
       const statusStr = Array.isArray(c.status) ? c.status.join(' | ') : (c.status || '');
       const skillsStr = Array.isArray(c.skills) ? c.skills.join(' | ') : (c.skills || '');
-      
+
       const rowData = [
-        getCandidateId(c), c.firstName || '', c.lastName || '', c.name || '', c.email || '', 
-        c.contact || '', c.alternateNumber || '', c.position || '', c.client || '', 
-        recruiterName, statusStr, c.currentLocation || '', c.preferredLocation || '', 
-        c.totalExperience || '', c.relevantExperience || '', c.currentCompany || '', c.reasonForChange || '', 
-        c.ctc || '', c.currentTakeHome || '', c.ectc || '', c.expectedTakeHome || '', 
-        c.noticePeriod || '', c.servingNoticePeriod ? 'Yes' : 'No', 
-        c.lwd ? new Date(c.lwd).toLocaleDateString() : '', c.offersInHand ? 'Yes' : 'No', 
+        getCandidateId(c), c.firstName || '', c.lastName || '', c.name || '', c.email || '',
+        c.contact || '', c.alternateNumber || '', c.position || '', c.client || '',
+        recruiterName, statusStr, c.currentLocation || '', c.preferredLocation || '',
+        c.totalExperience || '', c.relevantExperience || '', c.currentCompany || '', c.reasonForChange || '',
+        c.ctc || '', c.currentTakeHome || '', c.ectc || '', c.expectedTakeHome || '',
+        c.noticePeriod || '', c.servingNoticePeriod ? 'Yes' : 'No',
+        c.lwd ? new Date(c.lwd).toLocaleDateString() : '', c.offersInHand ? 'Yes' : 'No',
         c.offerPackage || '', c.source || '', skillsStr
       ].map(val => {
         const stringVal = String(val).replace(/"/g, '""');
@@ -337,7 +409,7 @@ export default function AdminCandidates() {
     const csvContent = csvRows.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    
+
     const link = document.createElement('a');
     link.href = url;
     link.setAttribute('download', `Candidates_Export_${new Date().toISOString().split('T')[0]}.csv`);
@@ -381,11 +453,11 @@ export default function AdminCandidates() {
 
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      
+
       toast({ title: 'Success', description: data.message || `Successfully assigned ${selectedIds.length} candidates` });
       setSelectedIds([]);
       setBulkRecruiterId('');
-      fetchData(); 
+      fetchData();
     } catch (err) {
       toast({ title: 'Error', description: 'Failed to assign candidates', variant: 'destructive' });
     } finally {
@@ -460,8 +532,8 @@ export default function AdminCandidates() {
             </span>
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4 text-blue-600" />
-              <select 
-                value={bulkRecruiterId} 
+              <select
+                value={bulkRecruiterId}
                 onChange={(e) => setBulkRecruiterId(e.target.value)}
                 className="border border-blue-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none min-w-[200px]"
               >
@@ -472,7 +544,7 @@ export default function AdminCandidates() {
                   </option>
                 ))}
               </select>
-              <button 
+              <button
                 onClick={handleBulkAssign}
                 disabled={!bulkRecruiterId || isBulkAssigning}
                 className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition disabled:opacity-50"
@@ -481,8 +553,8 @@ export default function AdminCandidates() {
                 Assign Candidates
               </button>
             </div>
-            <button 
-              onClick={() => setSelectedIds([])} 
+            <button
+              onClick={() => setSelectedIds([])}
               className="ml-auto text-sm text-slate-500 hover:text-slate-800 font-medium px-2 py-1"
             >
               Clear Selection
@@ -500,17 +572,17 @@ export default function AdminCandidates() {
                 <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                   <tr>
                     <th className="px-4 py-3 w-12 text-center">
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={selectedIds.length === filteredCandidates.length && filteredCandidates.length > 0}
                         onChange={handleSelectAll}
                         className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
                       />
                     </th>
-                    <th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('candidateId')}>ID <SortIcon field="candidateId"/></th>
-                    <th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('name')}>Name <SortIcon field="name"/></th>
+                    <th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('candidateId')}>ID <SortIcon field="candidateId" /></th>
+                    <th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('name')}>Name <SortIcon field="name" /></th>
                     <th className="px-4 py-3">Phone</th>
-                    <th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('position')}>Role <SortIcon field="position"/></th>
+                    <th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('position')}>Role <SortIcon field="position" /></th>
                     <th className="px-4 py-3">Recruiter</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Actions</th>
@@ -523,8 +595,8 @@ export default function AdminCandidates() {
                     return (
                       <tr key={c._id} className={`transition-colors ${isSelected ? 'bg-blue-50/50 hover:bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <td className="px-4 py-3 text-center">
-                          <input 
-                            type="checkbox" 
+                          <input
+                            type="checkbox"
                             checked={isSelected}
                             onChange={(e) => handleSelectOne(e, c._id)}
                             className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
@@ -588,7 +660,45 @@ export default function AdminCandidates() {
             </div>
 
             <div className="p-6 overflow-y-auto flex-1 space-y-8 pb-48">
-              
+
+              {/* SECTION 0: Resume Upload */}
+              {!isEditMode && (
+                <section>
+                  <h3 className="text-base font-semibold text-blue-700 border-b border-blue-100 pb-2 mb-4">Upload Resume (Auto Fill)</h3>
+                  <div className="border-2 border-dashed border-blue-200 rounded-xl p-6 flex flex-col items-center justify-center bg-blue-50/50 hover:bg-blue-50 transition-colors">
+                    {isParsingResume ? (
+                      <div className="flex flex-col items-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-2" />
+                        <p className="text-sm text-blue-800 font-medium">Parsing resume details...</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="bg-white p-3 rounded-full mb-3 shadow-sm border border-blue-100">
+                          <Plus className="h-6 w-6 text-blue-600" />
+                        </div>
+                        <p className="text-sm text-slate-600 mb-4 text-center">
+                          Upload a CV to automatically fill candidate details.<br />
+                          <span className="text-xs text-slate-400">Supported: PDF, DOC, DOCX (Max 5MB)</span>
+                        </p>
+                        <input
+                          type="file"
+                          id="resume-upload"
+                          className="hidden"
+                          accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                          onChange={handleResumeUpload}
+                        />
+                        <label
+                          htmlFor="resume-upload"
+                          className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 cursor-pointer transition shadow-sm"
+                        >
+                          Browse Files
+                        </label>
+                      </>
+                    )}
+                  </div>
+                </section>
+              )}
+
               {/* SECTION 1: Personal Info */}
               <section>
                 <h3 className="text-base font-semibold text-blue-700 border-b border-blue-100 pb-2 mb-4">Personal Information</h3>
@@ -684,7 +794,7 @@ export default function AdminCandidates() {
                       <input type="text" value={formData.currentTakeHome} onChange={(e) => handleInputChange('currentTakeHome', e.target.value)} className={inputCls(false)} placeholder="e.g. 60k/mo" />
                     </div>
                   </div>
-                  
+
                   <div className="flex flex-col sm:flex-row gap-2">
                     <div className="w-full sm:w-1/2">
                       <label className="block text-sm font-medium mb-1 text-slate-700">Expected CTC</label>

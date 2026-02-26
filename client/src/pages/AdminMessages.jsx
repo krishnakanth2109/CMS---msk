@@ -49,13 +49,12 @@ export default function AdminMessages() {
 
   // --- Effects ---
   useEffect(() => {
-    // Initialize Socket Connection
     socketRef.current = io(BASE_URL);
     socketRef.current.emit('join_room', 'admin'); 
 
     socketRef.current.on('receive_message', (newMessage) => {
       setMessages((prev) => [newMessage, ...prev]);
-      toast({ title: "New Message", description: `From ${newMessage.fromName || newMessage.from}` });
+      toast({ title: "New Message", description: `From ${getRecruiterName(newMessage.from)}` });
     });
 
     const fetchData = async () => {
@@ -69,7 +68,6 @@ export default function AdminMessages() {
         if(msgRes.ok) {
           const data = await msgRes.json();
           setMessages(data);
-          // Select first message if available
           const inbox = data.filter((m) => m.to === 'admin' && m.from !== 'admin');
           if (inbox.length > 0) setSelectedMessage(inbox[0]);
         }
@@ -88,7 +86,6 @@ export default function AdminMessages() {
 
     fetchData();
 
-    // Cleanup socket on unmount
     return () => {
       if (socketRef.current) {
         socketRef.current.disconnect();
@@ -114,12 +111,9 @@ export default function AdminMessages() {
 
       if (res.ok) {
         const savedMsg = await res.json();
-        
-        // Emit via socket
         if (socketRef.current) {
           socketRef.current.emit('send_message', savedMsg);
         }
-        
         setMessages((prev) => [savedMsg, ...prev]);
         setSubject('');
         setContent('');
@@ -135,7 +129,7 @@ export default function AdminMessages() {
   };
 
   const handleDeleteMessage = async (e, id) => {
-    e.stopPropagation(); // Prevent selecting the message while deleting
+    e.stopPropagation();
     if(!confirm("Are you sure you want to delete this message?")) return;
     
     try {
@@ -162,28 +156,37 @@ export default function AdminMessages() {
     setIsComposing(true);
   };
 
+  // UPDATED: Robust name lookup helper
   const getRecruiterName = (id) => {
+    if (!id || id === 'undefined') return 'Unknown';
     if (id === 'admin') return 'Admin';
     if (id === 'all') return 'Everyone';
+    
     const r = recruiters.find(rec => rec._id === id || rec.id === id);
-    return r ? r.name : 'Unknown';
+    if (r) {
+        // Return name or username or email, whichever exists first
+        return r.name || r.username || r.email || 'Recruiter';
+    }
+    return id; // Fallback to ID if still loading recruiters
   };
 
   // --- Filtering ---
   const filteredMessages = messages.filter(m => {
     const isInbox = activeTab === 'inbox';
-    // Inbox: To Admin (from others). Sent: From Admin.
     const matchesTab = isInbox ? (m.to === 'admin' && m.from !== 'admin') : (m.from === 'admin');
     
+    const senderName = getRecruiterName(m.from).toLowerCase();
+    const recipientName = getRecruiterName(m.to).toLowerCase();
+
     const matchesSearch = 
       (m.subject || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (m.content || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (m.fromName || '').toLowerCase().includes(searchQuery.toLowerCase());
+      senderName.includes(searchQuery.toLowerCase()) ||
+      recipientName.includes(searchQuery.toLowerCase());
       
     return matchesTab && matchesSearch;
   });
 
-  // Calculate Inbox Count
   const inboxCount = messages.filter(m => m.to === 'admin' && m.from !== 'admin').length;
 
   return (
@@ -221,11 +224,7 @@ export default function AdminMessages() {
                 className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all flex items-center justify-center gap-2 ${activeTab === 'inbox' ? 'bg-white dark:bg-gray-600 shadow-sm text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}`}
               >
                 Inbox
-                {inboxCount > 0 && (
-                  <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">
-                    {inboxCount}
-                  </span>
-                )}
+                {inboxCount > 0 && <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{inboxCount}</span>}
               </button>
               <button 
                 onClick={() => { setActiveTab('sent'); setIsComposing(false); }}
@@ -251,10 +250,11 @@ export default function AdminMessages() {
                 >
                   <div className="flex justify-between items-center mb-1">
                     <span className="font-semibold text-gray-900 dark:text-white text-sm truncate pr-2">
-                      {activeTab === 'inbox' ? (msg.fromName || getRecruiterName(msg.from)) : `To: ${msg.toName || getRecruiterName(msg.to)}`}
+                      {/* FIX: Use helper function here instead of backend fromName */}
+                      {activeTab === 'inbox' ? getRecruiterName(msg.from) : `To: ${getRecruiterName(msg.to)}`}
                     </span>
                     <span className="text-xs text-gray-400 whitespace-nowrap">
-                      {format(new Date(msg.createdAt), 'MMM d')}
+                      {format(new Date(msg.createdAt), 'MMM d, h:mm a')}
                     </span>
                   </div>
                   <div className="flex justify-between items-start">
@@ -266,7 +266,6 @@ export default function AdminMessages() {
                     <button 
                       onClick={(e) => handleDeleteMessage(e, msg._id)}
                       className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-full text-red-500 transition-opacity"
-                      title="Delete"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -281,7 +280,6 @@ export default function AdminMessages() {
         <div className="flex-1 bg-gray-50 dark:bg-gray-900 flex flex-col z-0">
           
           {isComposing ? (
-            /* COMPOSE VIEW */
             <div className="h-full flex flex-col p-8 max-w-3xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-300">
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 flex-1 flex flex-col">
                 <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-gray-800 dark:text-white">
@@ -292,13 +290,19 @@ export default function AdminMessages() {
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-gray-500 uppercase">Recipient</label>
                     <Select value={recipient} onValueChange={setRecipient}>
-                      <SelectTrigger className="w-full bg-gray-50 dark:bg-gray-700 dark:border-gray-600 border-none h-10">
+                      <SelectTrigger className="w-full bg-gray-50 dark:bg-gray-700 dark:border-gray-600 border-none h-10 text-gray-900 dark:text-white">
                         <SelectValue placeholder="Select Recipient..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all"><Users className="w-4 h-4 inline mr-2"/> Broadcast to All</SelectItem>
+                        <SelectItem value="all">
+                          <span className="font-bold">Broadcast to All</span> 
+                          <span className="text-gray-400 ml-2 text-xs">(All Recruiters)</span>
+                        </SelectItem>
                         {recruiters.map(r => (
-                          <SelectItem key={r._id || r.id} value={r._id || r.id}>{r.name}</SelectItem>
+                          <SelectItem key={r._id || r.id} value={r._id || r.id}>
+                            <span className="font-medium">{r.name || r.username}</span>
+                            <span className="text-gray-500 ml-2 text-xs">(@{r.username || r.email})</span>
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -334,7 +338,6 @@ export default function AdminMessages() {
               </div>
             </div>
           ) : selectedMessage ? (
-            /* DETAIL VIEW */
             <div className="h-full flex flex-col">
               {/* Message Header */}
               <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6">
@@ -344,16 +347,18 @@ export default function AdminMessages() {
                     <div className="flex items-center gap-3 text-sm">
                       <div className="flex items-center gap-2">
                          <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center text-blue-600 font-bold text-xs">
+                            {/* FIX: Use helper function for initial */}
                             {activeTab === 'inbox' 
-                              ? (selectedMessage.fromName?.[0] || selectedMessage.from[0]).toUpperCase() 
+                              ? (getRecruiterName(selectedMessage.from)[0] || 'U').toUpperCase() 
                               : 'A'}
                          </div>
                          <div>
                            <span className="font-semibold text-gray-900 dark:text-white block">
-                             {activeTab === 'inbox' ? (selectedMessage.fromName || selectedMessage.from) : 'You (Admin)'}
+                             {/* FIX: Use helper function for detail name */}
+                             {activeTab === 'inbox' ? getRecruiterName(selectedMessage.from) : 'You (Admin)'}
                            </span>
                            <span className="text-gray-500 text-xs">
-                             To: {selectedMessage.to === 'all' ? 'Everyone' : (selectedMessage.toName || getRecruiterName(selectedMessage.to))}
+                             To: {selectedMessage.to === 'all' ? 'Everyone' : getRecruiterName(selectedMessage.to)}
                            </span>
                          </div>
                       </div>
@@ -393,7 +398,6 @@ export default function AdminMessages() {
                  </div>
               </div>
 
-              {/* Quick Reply Bar (Inbox Only) */}
               {activeTab === 'inbox' && (
                  <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
                     <Button onClick={() => handleReply(selectedMessage)} variant="outline" className="w-full justify-start text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
@@ -403,7 +407,6 @@ export default function AdminMessages() {
               )}
             </div>
           ) : (
-            /* EMPTY STATE */
             <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
               <MessageSquare className="w-16 h-16 mb-4 opacity-20"/>
               <p>Select a message to view</p>

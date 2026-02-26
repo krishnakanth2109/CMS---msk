@@ -30,7 +30,7 @@ export const parseResume = async (fileBuffer, mimetype) => {
 
     // Extract information from text
     const extractedData = extractInformation(text);
-    
+
     return {
       success: true,
       data: extractedData,
@@ -50,7 +50,7 @@ export const parseResume = async (fileBuffer, mimetype) => {
  */
 const extractInformation = (text) => {
   const lines = text.split('\n').filter(line => line.trim());
-  
+
   return {
     name: extractName(lines),
     email: extractEmail(text),
@@ -102,7 +102,7 @@ const extractPhone = (text) => {
     /\b\d{10}\b/g, // 10 digit number
     /\(\d{3}\)\s*\d{3}[-.\s]?\d{4}/g, // (123) 456-7890
   ];
-  
+
   for (let pattern of patterns) {
     const matches = text.match(pattern);
     if (matches) {
@@ -154,30 +154,115 @@ const extractSkills = (text) => {
  * Extract total years of experience
  */
 const extractExperience = (text) => {
-  const patterns = [
-    /(\d+\.?\d*)\+?\s*(?:years?|yrs?)(?:\s+of)?\s+(?:experience|exp)/gi,
-    /experience[:\s]+(\d+\.?\d*)\+?\s*(?:years?|yrs?)/gi,
-    /(\d+\.?\d*)\+?\s*(?:years?|yrs?)/gi,
+  // 1. Look for explicit total experience with strict patterns
+  const explicitPatterns = [
+    /(?:total|overall|cumulative)\s+(?:experience|exp)[\s:-]+(\d+\.?\d*)\+?\s*(?:years?|yrs?)/gi,
+    /(\d+\.?\d*)\+?\s*(?:years?|yrs?)(?:\s+of)?\s+(?:total|overall|cumulative)\s*(?:experience|exp)/gi
   ];
 
-  for (let pattern of patterns) {
-    const matches = text.match(pattern);
-    if (matches) {
-      const numbers = matches[0].match(/\d+\.?\d*/);
-      if (numbers) {
-        return numbers[0];
+  for (let pattern of explicitPatterns) {
+    const matches = [...text.matchAll(pattern)];
+    if (matches && matches.length > 0) {
+      return matches[0][1];
+    }
+  }
+
+  // 2. Safely isolate Experience section, strict boundaries to avoid Education dates
+  const lines = text.split('\n');
+  let inExp = false;
+  let expText = [];
+
+  for (let line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // Check if it's a heading (usually short)
+    if (trimmed.length < 80) {
+      const cleanStr = trimmed.toLowerCase().replace(/[^a-z]/g, '');
+
+      // Match common experience headers
+      const isExpHeading = /^(work)?experience|employment(history)?|professionalexperience|careerhistory/.test(cleanStr);
+
+      // Match other sections to know when to stop
+      const isOtherHeading = /^(education|academic|qualification|skill|project|certification|reference|personal|hobby|achievement|language|declaration|summary|objective|profile)/.test(cleanStr);
+
+      if (isExpHeading && !isOtherHeading) {
+        inExp = true;
+        continue; // start collecting after header
+      } else if (isOtherHeading && inExp) {
+        inExp = false; // hit another section, stop collecting
+      }
+    }
+
+    if (inExp) {
+      expText.push(line);
+    }
+  }
+
+  let sectionToUse = expText.length > 0 ? expText.join('\n') : '';
+
+  // Fallback: If no lines were isolated (e.g., pdf-parse removed newlines), use regex boundaries
+  if (!sectionToUse) {
+    const expMatch = text.match(/\b(?:work\s+)?experience(?:s)?\b|\bemployment(?: history)?\b|\bprofessional\s+experience\b|\bcareer\s+history\b/i);
+    if (expMatch) {
+      const stopRegex = /\b(?:education|academic|qualifications?|skills?|projects?|certifications?|references?|personal details|hobbies|achievements?|languages?|declarations?)\b/gi;
+      stopRegex.lastIndex = expMatch.index + 20;
+      const stopMatch = stopRegex.exec(text);
+
+      if (stopMatch && stopMatch.index > expMatch.index) {
+        sectionToUse = text.substring(expMatch.index, stopMatch.index);
+      } else {
+        sectionToUse = text.substring(expMatch.index);
       }
     }
   }
 
-  // Try to calculate from date ranges
-  const yearPattern = /(?:19|20)\d{2}/g;
-  const years = text.match(yearPattern);
-  if (years && years.length >= 2) {
-    const sortedYears = years.map(y => parseInt(y)).sort((a, b) => a - b);
-    const experience = new Date().getFullYear() - sortedYears[0];
-    if (experience > 0 && experience < 50) {
-      return experience.toString();
+  // 3. Calculate from explicit date ranges exclusively within the isolated experience section
+  if (sectionToUse) {
+    const dateRangePattern = /\b(19\d{2}|20\d{2})\b\s*(?:[-–]|to|till|until)\s*\b(19\d{2}|20\d{2}|present|current|now|till date|today)\b/gi;
+    const ranges = [...sectionToUse.matchAll(dateRangePattern)];
+
+    if (ranges.length > 0) {
+      let workedYears = new Set();
+      const currentYear = new Date().getFullYear();
+
+      for (let match of ranges) {
+        let startYear = parseInt(match[1]);
+        let endYearStr = match[2].toLowerCase();
+        let endYear = currentYear;
+
+        if (/\d{4}/.test(endYearStr)) {
+          endYear = parseInt(endYearStr);
+        }
+
+        // Consider realistic job bounds (exclude things that look too far back or future)
+        if (endYear >= startYear && (endYear - startYear) < 40 && startYear > 1960 && endYear <= currentYear) {
+          for (let y = startYear; y < endYear; y++) {
+            workedYears.add(y);
+          }
+          if (endYear === startYear) {
+            workedYears.add(startYear); // minimum 1 year consideration
+          }
+        }
+      }
+
+      if (workedYears.size > 0) {
+        return workedYears.size.toString();
+      }
+    }
+
+    // 4. Sum isolated durations (e.g. "3 years", "2 yrs") purely located in Experience section
+    let durationSum = 0;
+    const durationPattern = /(\d+\.?\d*)\s*(?:years?|yrs?)\b/gi;
+    const durations = [...sectionToUse.matchAll(durationPattern)];
+    for (let match of durations) {
+      let val = parseFloat(match[1]);
+      if (val > 0 && val < 40) {
+        durationSum += val;
+      }
+    }
+    if (durationSum > 0) {
+      return durationSum.toString();
     }
   }
 
@@ -240,7 +325,7 @@ const extractLocation = (text) => {
   ];
 
   const textLower = text.toLowerCase();
-  
+
   for (let city of indianCities) {
     if (textLower.includes(city.toLowerCase())) {
       return city;

@@ -30,27 +30,29 @@ export const getMessages = async (req, res) => {
 
     const messages = await Message.find(query).sort({ createdAt: -1 });
 
-    // Enhance messages with names
+    // Enhance messages with usernames
     const enhancedMessages = await Promise.all(messages.map(async (msg) => {
       let fromName = msg.from;
       let toName = msg.to;
 
-      // Resolve Sender Name
-      if (msg.from !== 'admin' && msg.from.length === 24) {
-        const user = await User.findById(msg.from).select('name');
-        if (user) fromName = user.name;
-      } else if (msg.from === 'admin') {
+      // Resolve Sender Username
+      if (msg.from === 'admin') {
         fromName = 'Admin';
+      } else if (msg.from.length === 24) {
+        // Fetch ONLY the username field
+        const user = await User.findById(msg.from).select('username');
+        if (user) fromName = user.username;
       }
 
-      // Resolve Recipient Name
-      if (msg.to !== 'admin' && msg.to !== 'all' && msg.to.length === 24) {
-        const user = await User.findById(msg.to).select('name');
-        if (user) toName = user.name;
-      } else if (msg.to === 'admin') {
+      // Resolve Recipient Username
+      if (msg.to === 'admin') {
         toName = 'Admin';
       } else if (msg.to === 'all') {
         toName = 'Everyone';
+      } else if (msg.to.length === 24) {
+        // Fetch ONLY the username field
+        const user = await User.findById(msg.to).select('username');
+        if (user) toName = user.username;
       }
 
       return {
@@ -81,27 +83,27 @@ export const sendMessage = async (req, res) => {
       content
     });
     
-    // 1. Resolve Sender Name
+    // 1. Resolve Sender Username
     let fromName = from;
     if (from === 'admin') {
       fromName = 'Admin';
     } else {
-      const user = await User.findById(from).select('name');
-      if (user) fromName = user.name;
+      const user = await User.findById(from).select('username');
+      if (user) fromName = user.username;
     }
 
-    // 2. Resolve Recipient Name (Fix: Added this logic)
+    // 2. Resolve Recipient Username
     let toName = to;
     if (to === 'admin') {
       toName = 'Admin';
     } else if (to === 'all') {
       toName = 'Everyone';
     } else if (to.length === 24) {
-      const user = await User.findById(to).select('name');
-      if (user) toName = user.name;
+      const user = await User.findById(to).select('username');
+      if (user) toName = user.username;
     }
 
-    // Return full object with names so UI updates immediately
+    // Return full object with usernames so UI updates immediately
     res.status(201).json({ 
       ...message.toObject(), 
       fromName,
@@ -148,7 +150,6 @@ export const deleteMessage = async (req, res) => {
     }
 
     // Only Admin or Sender can delete
-    // Note: Recipient cannot delete message from DB, only Sender/Admin
     if (req.user.role !== 'admin' && message.from !== req.user.id) {
       return res.status(401).json({ message: 'Not authorized' });
     }

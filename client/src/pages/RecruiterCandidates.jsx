@@ -4,14 +4,14 @@ import { useAuth } from '@/context/AuthContext';
 import {
   Plus, Search, Edit, Download, Phone, Mail,
   Building, Briefcase, Loader2, Ban, List, LayoutGrid,
-  Calendar, GraduationCap, Award, UserCircle, Target, 
+  Calendar, GraduationCap, Award, UserCircle, Target,
   MessageCircle, Eye, IndianRupee, Upload, FileUp, X,
   Trash2, AlertTriangle, FileSpreadsheet, Linkedin
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
-const API_URL  = `${BASE_URL}/api`;
+const API_URL = `${BASE_URL}/api`;
 
 // ── UI Components ─────────────────────────────────────────────────────────────
 
@@ -89,10 +89,10 @@ export default function RecruiterCandidates() {
   const { currentUser, authHeaders } = useAuth();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
-  
+
   const [candidates, setCandidates] = useState([]);
   const [jobs, setJobs] = useState([]);
-  const [clients, setClients] = useState([]); 
+  const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewingCandidate, setViewingCandidate] = useState(null);
   const [isParsingResume, setIsParsingResume] = useState(false);
@@ -100,9 +100,9 @@ export default function RecruiterCandidates() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [viewMode, setViewMode] = useState('table');
-  const [activeStatFilter, setActiveStatFilter] = useState(null); 
+  const [activeStatFilter, setActiveStatFilter] = useState(null);
   const [selectedCandidates, setSelectedCandidates] = useState([]);
-  
+
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
@@ -120,10 +120,10 @@ export default function RecruiterCandidates() {
   const [errors, setErrors] = useState({});
 
   const standardSources = ['Portal', 'LinkedIn', 'Referral', 'Direct', 'Agency', 'Naukri', 'Indeed'];
-  
+
   const allStatuses = [
-    'Shared Profiles','Yet to attend','Turnups','No Show','Selected',
-    'Joined','Rejected','Pipeline','Hold','Backout'
+    'Shared Profiles', 'Yet to attend', 'Turnups', 'No Show', 'Selected',
+    'Joined', 'Rejected', 'Pipeline', 'Hold', 'Backout'
   ];
 
   const [isCustomSource, setIsCustomSource] = useState(false);
@@ -134,7 +134,7 @@ export default function RecruiterCandidates() {
     position: '', client: '', industry: '', currentCompany: '', skills: '',
     totalExperience: '', relevantExperience: '',
     education: '',
-    ctc: '', ectc: '', 
+    ctc: '', ectc: '',
     currentTakeHome: '',
     expectedTakeHome: '',
     noticePeriod: '',
@@ -144,14 +144,14 @@ export default function RecruiterCandidates() {
     reasonForChange: '',
     offersInHand: 'false',
     offerPackage: '',
-    source: 'Portal', 
-    status: ['Submitted'], 
+    source: 'Portal',
+    status: ['Submitted'],
     rating: '0', assignedJobId: '',
     dateAdded: new Date().toISOString().split('T')[0],
     notes: '', remarks: '',
     active: true
   };
-  
+
   const [formData, setFormData] = useState(initialFormState);
 
   const handleResumeUpload = async (event) => {
@@ -218,7 +218,7 @@ export default function RecruiterCandidates() {
         const allCandidates = await candRes.json();
         const allJobs = await jobRes.json();
         const allClients = await clientRes.json();
-        
+
         allCandidates.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         const fixedCandidates = allCandidates.map((c) => ({
           ...c,
@@ -276,7 +276,7 @@ export default function RecruiterCandidates() {
     if (!data.email.trim()) newErrors.email = "Email is required";
     if (!data.contact.trim()) newErrors.contact = "Phone is required";
     else if (data.contact.length !== 10) newErrors.contact = "Phone must be exactly 10 digits";
-    
+
     if (!data.skills.toString().trim()) newErrors.skills = "Skills are required";
     if (isCustomSource && !data.source.trim()) newErrors.source = "Please specify source";
     if (data.servingNoticePeriod === 'true' && !data.lwd.trim()) newErrors.lwd = "LWD is required";
@@ -287,7 +287,7 @@ export default function RecruiterCandidates() {
   };
 
   const stats = useMemo(() => {
-    const countStatus = (s) => candidates.filter(c => 
+    const countStatus = (s) => candidates.filter(c =>
       Array.isArray(c.status) ? c.status.includes(s) : c.status === s
     ).length;
     return {
@@ -307,7 +307,7 @@ export default function RecruiterCandidates() {
 
   const getFilteredCandidates = useMemo(() => {
     return candidates.filter(c => {
-      const searchMatch = 
+      const searchMatch =
         c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.candidateId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -322,12 +322,12 @@ export default function RecruiterCandidates() {
 
   const handleExport = () => {
     if (getFilteredCandidates.length === 0) { toast({ title: "No data to export", variant: "destructive" }); return; }
-    const headers = ["Candidate ID","Name","Email","Phone","Client","Position","Status","Total Exp","Current CTC","Expected CTC","Skills","Date Added"];
+    const headers = ["Candidate ID", "Name", "Email", "Phone", "Client", "Position", "Status", "Total Exp", "Current CTC", "Expected CTC", "Skills", "Date Added"];
     const escapeCsv = (str) => str ? `"${String(str).replace(/"/g, '""')}"` : '""';
     const rows = getFilteredCandidates.map(c => [
       escapeCsv(c.candidateId), escapeCsv(c.name), escapeCsv(c.email), escapeCsv(c.contact),
       escapeCsv(c.client), escapeCsv(c.position), escapeCsv(Array.isArray(c.status) ? c.status.join(' | ') : c.status),
-      escapeCsv(c.totalExperience), escapeCsv(c.ctc), escapeCsv(c.ectc), 
+      escapeCsv(c.totalExperience), escapeCsv(c.ctc), escapeCsv(c.ectc),
       escapeCsv(Array.isArray(c.skills) ? c.skills.join(', ') : c.skills),
       escapeCsv(new Date(c.dateAdded || c.createdAt || new Date()).toLocaleDateString())
     ]);
@@ -345,14 +345,14 @@ export default function RecruiterCandidates() {
     return 'secondary';
   };
 
-  const getInitials = (n) => n.split(' ').map(i => i[0]).join('').toUpperCase().substring(0,2);
+  const getInitials = (n) => n.split(' ').map(i => i[0]).join('').toUpperCase().substring(0, 2);
   const getCandidateId = (c) => c.candidateId || c._id.substring(c._id.length - 6).toUpperCase();
   const formatSkills = (skills) => !skills ? 'N/A' : Array.isArray(skills) ? skills.slice(0, 3).join(', ') + (skills.length > 3 ? '...' : '') : skills.length > 50 ? skills.substring(0, 50) + '...' : skills;
   const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
-  
+
   const toggleSelectCandidate = (id) => setSelectedCandidates(prev => prev.includes(id) ? prev.filter(cid => cid !== id) : [...prev, id]);
   const selectAllCandidates = () => setSelectedCandidates(selectedCandidates.length === getFilteredCandidates.length ? [] : getFilteredCandidates.map(c => c._id));
-  
+
   const openViewDialog = (c) => { setViewingCandidate(c); setIsViewDialogOpen(true); };
 
   const openEditDialog = (c) => {
@@ -369,7 +369,7 @@ export default function RecruiterCandidates() {
       currentCompany: c.currentCompany || '', skills: Array.isArray(c.skills) ? c.skills.join(', ') : c.skills || '',
       totalExperience: c.totalExperience ? String(c.totalExperience) : '',
       relevantExperience: c.relevantExperience ? String(c.relevantExperience) : '',
-      education: c.education || '', 
+      education: c.education || '',
       ctc: c.ctc ? String(c.ctc) : '', ectc: c.ectc ? String(c.ectc) : '',
       currentTakeHome: c.currentTakeHome || '', expectedTakeHome: c.expectedTakeHome || '',
       noticePeriod: c.noticePeriod ? String(c.noticePeriod) : '',
@@ -397,7 +397,7 @@ export default function RecruiterCandidates() {
 
       const nameParts = (formData.name || '').trim().split(/\s+/);
       const firstName = nameParts[0] || formData.name || '';
-      const lastName  = nameParts.slice(1).join(' ') || nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || nameParts[0] || '';
 
       const payload = {
         ...formData,
@@ -427,7 +427,7 @@ export default function RecruiterCandidates() {
   };
 
   const toggleActiveStatus = async (id, currentStatus) => {
-    if(!confirm(`Are you sure you want to ${currentStatus ? 'deactivate' : 'activate'}?`)) return;
+    if (!confirm(`Are you sure you want to ${currentStatus ? 'deactivate' : 'activate'}?`)) return;
     try {
       const authH = await authHeaders();
       const headers = { ...authH, 'Content-Type': 'application/json' };
@@ -496,24 +496,24 @@ export default function RecruiterCandidates() {
   const renderCandidateForm = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 py-4">
       {/* ── Section 1: Personal ── */}
-      <div className="md:col-span-3 font-semibold border-b pb-1 text-slate-500 flex items-center gap-2"><UserCircle className="h-4 w-4"/> Personal Information</div>
-      
+      <div className="md:col-span-3 font-semibold border-b pb-1 text-slate-500 flex items-center gap-2"><UserCircle className="h-4 w-4" /> Personal Information</div>
+
       <div className="space-y-1">
         <Label className={errors.name ? "text-red-500" : ""}>Full Name *</Label>
-        <Input value={formData.name} onChange={e => handleInputChange('name', e.target.value)} className={errors.name ? "border-red-500" : ""} placeholder="Starts with Uppercase"/>
+        <Input value={formData.name} onChange={e => handleInputChange('name', e.target.value)} className={errors.name ? "border-red-500" : ""} placeholder="Starts with Uppercase" />
         {errors.name && <span className="text-xs text-red-500">{errors.name}</span>}
       </div>
       <div className="space-y-1">
         <Label className={errors.email ? "text-red-500" : ""}>Email *</Label>
-        <Input value={formData.email} onChange={e => handleInputChange('email', e.target.value)} className={errors.email ? "border-red-500" : ""} placeholder="user@domain.com"/>
+        <Input value={formData.email} onChange={e => handleInputChange('email', e.target.value)} className={errors.email ? "border-red-500" : ""} placeholder="user@domain.com" />
         {errors.email && <span className="text-xs text-red-500">{errors.email}</span>}
       </div>
       <div className="space-y-1">
         <Label className={errors.contact ? "text-red-500" : ""}>Phone *</Label>
-        <Input value={formData.contact} onChange={e => handleInputChange('contact', e.target.value)} className={errors.contact ? "border-red-500" : ""} placeholder="10 Digits Only"/>
+        <Input value={formData.contact} onChange={e => handleInputChange('contact', e.target.value)} className={errors.contact ? "border-red-500" : ""} placeholder="10 Digits Only" />
         {errors.contact && <span className="text-xs text-red-500">{errors.contact}</span>}
       </div>
-      <div className="space-y-1"><Label>Date of Birth</Label><Input type="date" value={formData.dateOfBirth} onChange={e => handleInputChange('dateOfBirth', e.target.value)}/></div>
+      <div className="space-y-1"><Label>Date of Birth</Label><Input type="date" value={formData.dateOfBirth} onChange={e => handleInputChange('dateOfBirth', e.target.value)} /></div>
       <div className="space-y-1">
         <Label>Gender</Label>
         <NativeSelect value={formData.gender} onChange={val => handleInputChange('gender', val)}>
@@ -525,17 +525,17 @@ export default function RecruiterCandidates() {
       </div>
       <div className="space-y-1">
         <Label>LinkedIn</Label>
-        <div className="relative"><Linkedin className="absolute left-2 top-2.5 h-4 w-4 text-slate-400"/><Input className="pl-8" value={formData.linkedin} onChange={e => handleInputChange('linkedin', e.target.value)} placeholder="Profile URL"/></div>
+        <div className="relative"><Linkedin className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" /><Input className="pl-8" value={formData.linkedin} onChange={e => handleInputChange('linkedin', e.target.value)} placeholder="Profile URL" /></div>
       </div>
-      <div className="space-y-1"><Label>Current Location</Label><Input value={formData.currentLocation} onChange={e => handleInputChange('currentLocation', e.target.value)}/></div>
-      <div className="space-y-1"><Label>Preferred Location</Label><Input value={formData.preferredLocation} onChange={e => handleInputChange('preferredLocation', e.target.value)}/></div>
+      <div className="space-y-1"><Label>Current Location</Label><Input value={formData.currentLocation} onChange={e => handleInputChange('currentLocation', e.target.value)} /></div>
+      <div className="space-y-1"><Label>Preferred Location</Label><Input value={formData.preferredLocation} onChange={e => handleInputChange('preferredLocation', e.target.value)} /></div>
 
       {/* ── Section 2: Professional ── */}
-      <div className="md:col-span-3 font-semibold border-b pb-1 text-slate-500 mt-4 flex items-center gap-2"><Briefcase className="h-4 w-4"/> Professional Information</div>
-      
+      <div className="md:col-span-3 font-semibold border-b pb-1 text-slate-500 mt-4 flex items-center gap-2"><Briefcase className="h-4 w-4" /> Professional Information</div>
+
       <div className="space-y-1">
         <Label>Role (Position)</Label>
-        <Input value={formData.position} onChange={e => handleInputChange('position', e.target.value)} placeholder="e.g. Frontend Developer"/>
+        <Input value={formData.position} onChange={e => handleInputChange('position', e.target.value)} placeholder="e.g. Frontend Developer" />
       </div>
       <div className="space-y-1">
         <Label>Client</Label>
@@ -544,34 +544,34 @@ export default function RecruiterCandidates() {
           {clients.map(client => <option key={client._id} value={client.companyName}>{client.companyName}</option>)}
         </NativeSelect>
       </div>
-      <div className="space-y-1"><Label>Current Company</Label><Input value={formData.currentCompany} onChange={e => handleInputChange('currentCompany', e.target.value)}/></div>
-      <div className="space-y-1"><Label>Industry</Label><Input value={formData.industry} onChange={e => handleInputChange('industry', e.target.value)}/></div>
+      <div className="space-y-1"><Label>Current Company</Label><Input value={formData.currentCompany} onChange={e => handleInputChange('currentCompany', e.target.value)} /></div>
+      <div className="space-y-1"><Label>Industry</Label><Input value={formData.industry} onChange={e => handleInputChange('industry', e.target.value)} /></div>
       <div className="md:col-span-2 space-y-1">
         <Label className={errors.skills ? "text-red-500" : ""}>Skills (comma separated) *</Label>
-        <Input value={formData.skills} onChange={e => handleInputChange('skills', e.target.value)} className={errors.skills ? "border-red-500" : ""}/>
+        <Input value={formData.skills} onChange={e => handleInputChange('skills', e.target.value)} className={errors.skills ? "border-red-500" : ""} />
         {errors.skills && <span className="text-xs text-red-500">{errors.skills}</span>}
       </div>
 
-      <div className="md:col-span-3 font-semibold text-slate-500 border-b pb-1 mt-4 flex items-center gap-2"><GraduationCap className="h-4 w-4"/> Education</div>
-      <div className="md:col-span-3 space-y-1"><Label>Qualification</Label><Input value={formData.education} onChange={e => handleInputChange('education', e.target.value)} placeholder="e.g. B.Tech from IIT Delhi"/></div>
+      <div className="md:col-span-3 font-semibold text-slate-500 border-b pb-1 mt-4 flex items-center gap-2"><GraduationCap className="h-4 w-4" /> Education</div>
+      <div className="md:col-span-3 space-y-1"><Label>Qualification</Label><Input value={formData.education} onChange={e => handleInputChange('education', e.target.value)} placeholder="e.g. B.Tech from IIT Delhi" /></div>
 
       {/* ── Section 3: Financial & Availability ── */}
-      <div className="md:col-span-3 font-semibold text-slate-500 border-b pb-1 mt-4 flex items-center gap-2"><IndianRupee className="h-4 w-4"/> Experience & Availability</div>
-      
-      <div className="space-y-1"><Label>Total Exp (Yrs)</Label><Input value={formData.totalExperience} onChange={e => handleInputChange('totalExperience', e.target.value)} placeholder="Numbers only"/></div>
-      <div className="space-y-1"><Label>Relevant Exp (Yrs)</Label><Input value={formData.relevantExperience} onChange={e => handleInputChange('relevantExperience', e.target.value)} placeholder="Numbers only"/></div>
-      
-      <div className="space-y-1"><Label>Current CTC (LPA)</Label><Input value={formData.ctc} onChange={e => handleInputChange('ctc', e.target.value)}/></div>
-      <div className="space-y-1"><Label>Expected CTC (LPA)</Label><Input value={formData.ectc} onChange={e => handleInputChange('ectc', e.target.value)}/></div>
-      
-      <div className="space-y-1"><Label>Current Take Home (Monthly)</Label><Input value={formData.currentTakeHome} onChange={e => handleInputChange('currentTakeHome', e.target.value)}/></div>
-      <div className="space-y-1"><Label>Expected Take Home (Monthly)</Label><Input value={formData.expectedTakeHome} onChange={e => handleInputChange('expectedTakeHome', e.target.value)}/></div>
+      <div className="md:col-span-3 font-semibold text-slate-500 border-b pb-1 mt-4 flex items-center gap-2"><IndianRupee className="h-4 w-4" /> Experience & Availability</div>
+
+      <div className="space-y-1"><Label>Total Exp (Yrs)</Label><Input value={formData.totalExperience} onChange={e => handleInputChange('totalExperience', e.target.value)} placeholder="Numbers only" /></div>
+      <div className="space-y-1"><Label>Relevant Exp (Yrs)</Label><Input value={formData.relevantExperience} onChange={e => handleInputChange('relevantExperience', e.target.value)} placeholder="Numbers only" /></div>
+
+      <div className="space-y-1"><Label>Current CTC (LPA)</Label><Input value={formData.ctc} onChange={e => handleInputChange('ctc', e.target.value)} /></div>
+      <div className="space-y-1"><Label>Expected CTC (LPA)</Label><Input value={formData.ectc} onChange={e => handleInputChange('ectc', e.target.value)} /></div>
+
+      <div className="space-y-1"><Label>Current Take Home (Monthly)</Label><Input value={formData.currentTakeHome} onChange={e => handleInputChange('currentTakeHome', e.target.value)} /></div>
+      <div className="space-y-1"><Label>Expected Take Home (Monthly)</Label><Input value={formData.expectedTakeHome} onChange={e => handleInputChange('expectedTakeHome', e.target.value)} /></div>
 
       <div className="space-y-1">
         <Label>Notice Period (Days/Months)</Label>
-        <Input value={formData.noticePeriod} onChange={e => handleInputChange('noticePeriod', e.target.value)} placeholder="e.g. 30 Days"/>
+        <Input value={formData.noticePeriod} onChange={e => handleInputChange('noticePeriod', e.target.value)} placeholder="e.g. 30 Days" />
       </div>
-      
+
       <div className="space-y-1">
         <Label>Serving Notice?</Label>
         <NativeSelect value={formData.servingNoticePeriod} onChange={val => handleInputChange('servingNoticePeriod', val)}>
@@ -579,16 +579,16 @@ export default function RecruiterCandidates() {
           <option value="true">Yes</option>
         </NativeSelect>
       </div>
-      
+
       {formData.servingNoticePeriod === 'true' && (
         <div className="space-y-1">
           <Label className={errors.lwd ? "text-red-500" : ""}>LWD (Last Working Day) *</Label>
-          <Input type="date" value={formData.lwd} onChange={e => handleInputChange('lwd', e.target.value)} className={errors.lwd ? "border-red-500" : ""}/>
+          <Input type="date" value={formData.lwd} onChange={e => handleInputChange('lwd', e.target.value)} className={errors.lwd ? "border-red-500" : ""} />
           {errors.lwd && <span className="text-xs text-red-500">{errors.lwd}</span>}
         </div>
       )}
 
-      <div className="space-y-1"><Label>Reason For Change</Label><textarea value={formData.reasonForChange} onChange={e => handleInputChange('reasonForChange', e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm h-10"/></div>
+      <div className="space-y-1"><Label>Reason For Change</Label><textarea value={formData.reasonForChange} onChange={e => handleInputChange('reasonForChange', e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm h-10" /></div>
 
       <div className="space-y-1">
         <Label>Offers in Hand?</Label>
@@ -600,21 +600,21 @@ export default function RecruiterCandidates() {
       {formData.offersInHand === 'true' && (
         <div className="space-y-1">
           <Label className={errors.offerPackage ? "text-red-500" : ""}>Package Amount *</Label>
-          <Input value={formData.offerPackage} onChange={e => handleInputChange('offerPackage', e.target.value)} placeholder="e.g. 15 LPA"/>
+          <Input value={formData.offerPackage} onChange={e => handleInputChange('offerPackage', e.target.value)} placeholder="e.g. 15 LPA" />
           {errors.offerPackage && <span className="text-xs text-red-500">{errors.offerPackage}</span>}
         </div>
       )}
 
       {/* ── Section 4: Recruitment Status ── */}
-      <div className="md:col-span-3 font-semibold text-slate-500 border-b pb-1 mt-4 flex items-center gap-2"><Target className="h-4 w-4"/> Recruitment Details</div>
-      
+      <div className="md:col-span-3 font-semibold text-slate-500 border-b pb-1 mt-4 flex items-center gap-2"><Target className="h-4 w-4" /> Recruitment Details</div>
+
       <div className="space-y-1">
         <Label>Source</Label>
-        <NativeSelect value={isCustomSource ? 'Other' : formData.source} onChange={v => { if(v==='Other'){setIsCustomSource(true);handleInputChange('source','')}else{setIsCustomSource(false);handleInputChange('source',v)} }}>
+        <NativeSelect value={isCustomSource ? 'Other' : formData.source} onChange={v => { if (v === 'Other') { setIsCustomSource(true); handleInputChange('source', '') } else { setIsCustomSource(false); handleInputChange('source', v) } }}>
           {standardSources.map(s => <option key={s} value={s}>{s}</option>)}
           <option value="Other">Other</option>
         </NativeSelect>
-        {isCustomSource && <Input className="mt-1" value={formData.source} onChange={e => handleInputChange('source', e.target.value)} placeholder="Enter Source"/>}
+        {isCustomSource && <Input className="mt-1" value={formData.source} onChange={e => handleInputChange('source', e.target.value)} placeholder="Enter Source" />}
       </div>
 
       <div className="space-y-1">
@@ -623,7 +623,7 @@ export default function RecruiterCandidates() {
           {formData.status.length > 0 ? formData.status.map(status => (
             <Badge key={status} variant="secondary" className="flex items-center gap-1">
               {status}
-              <X className="h-3 w-3 cursor-pointer hover:text-red-500" onClick={() => removeStatus(status)}/>
+              <X className="h-3 w-3 cursor-pointer hover:text-red-500" onClick={() => removeStatus(status)} />
             </Badge>
           )) : <span className="text-sm text-slate-400 p-1">No status selected</span>}
         </div>
@@ -634,17 +634,17 @@ export default function RecruiterCandidates() {
         </NativeSelect>
         {errors.status && <span className="text-xs text-red-500">{errors.status}</span>}
       </div>
-      
+
       <div className="space-y-1">
         <Label>Rating</Label>
         <NativeSelect value={formData.rating} onChange={v => handleInputChange('rating', v)}>
-          {[1,2,3,4,5].map(r => <option key={r} value={r.toString()}>{r} Stars</option>)}
+          {[1, 2, 3, 4, 5].map(r => <option key={r} value={r.toString()}>{r} Stars</option>)}
         </NativeSelect>
       </div>
-      <div className="space-y-1"><Label>Date Added</Label><Input type="date" value={formData.dateAdded} onChange={e => handleInputChange('dateAdded', e.target.value)}/></div>
+      <div className="space-y-1"><Label>Date Added</Label><Input type="date" value={formData.dateAdded} onChange={e => handleInputChange('dateAdded', e.target.value)} /></div>
       <div className="md:col-span-3 space-y-1 mt-2">
         <Label>Remarks</Label>
-        <textarea value={formData.remarks} onChange={e => handleInputChange('remarks', e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm min-h-[80px]"/>
+        <textarea value={formData.remarks} onChange={e => handleInputChange('remarks', e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm min-h-[80px]" />
       </div>
     </div>
   );
@@ -661,15 +661,15 @@ export default function RecruiterCandidates() {
             <div className="flex gap-3 flex-wrap">
               {selectedCandidates.length > 0 && (
                 <Button variant="destructive" onClick={() => setIsDeleteConfirmOpen(true)}>
-                  <Trash2 className="mr-2 h-4 w-4"/> Delete ({selectedCandidates.length})
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete ({selectedCandidates.length})
                 </Button>
               )}
-              <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4"/> Export</Button>
+              <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4" /> Export</Button>
               <Button variant="outline" className="border-green-500 text-green-700 hover:bg-green-50" onClick={() => { setIsImportDialogOpen(true); setImportFile(null); setImportResult(null); }}>
-                <FileSpreadsheet className="mr-2 h-4 w-4"/> Import Excel
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> Import Excel
               </Button>
               <Button onClick={() => { setFormData(initialFormState); setErrors({}); setIsAddDialogOpen(true); setIsCustomSource(false); }}>
-                <Plus className="mr-2 h-4 w-4"/> Add Candidate
+                <Plus className="mr-2 h-4 w-4" /> Add Candidate
               </Button>
             </div>
           </div>
@@ -693,7 +693,7 @@ export default function RecruiterCandidates() {
           <div className="p-4 border border-slate-200 rounded-xl bg-white shadow-sm">
             <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
               <div className="relative w-full md:max-w-md">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400"/>
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input placeholder="Search name, ID or skills..." className="pl-10" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
               </div>
               <div className="flex gap-3">
@@ -702,8 +702,8 @@ export default function RecruiterCandidates() {
                   {allStatuses.map(status => <option key={status} value={status}>{status}</option>)}
                 </NativeSelect>
                 <div className="flex bg-slate-100 rounded-lg p-1">
-                  <button className={`p-2 rounded text-sm ${viewMode === 'table' ? 'bg-white shadow' : ''}`} onClick={() => setViewMode('table')}><List className="h-4 w-4"/></button>
-                  <button className={`p-2 rounded text-sm ${viewMode === 'grid' ? 'bg-white shadow' : ''}`} onClick={() => setViewMode('grid')}><LayoutGrid className="h-4 w-4"/></button>
+                  <button className={`p-2 rounded text-sm ${viewMode === 'table' ? 'bg-white shadow' : ''}`} onClick={() => setViewMode('table')}><List className="h-4 w-4" /></button>
+                  <button className={`p-2 rounded text-sm ${viewMode === 'grid' ? 'bg-white shadow' : ''}`} onClick={() => setViewMode('grid')}><LayoutGrid className="h-4 w-4" /></button>
                 </div>
               </div>
             </div>
@@ -716,7 +716,7 @@ export default function RecruiterCandidates() {
                 <table className="w-full text-sm text-left border-collapse">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b">
                     <tr>
-                      <th className="p-4 w-12"><input type="checkbox" checked={getFilteredCandidates.length > 0 && selectedCandidates.length === getFilteredCandidates.length} onChange={selectAllCandidates} className="h-4 w-4 rounded border-slate-300"/></th>
+                      <th className="p-4 w-12"><input type="checkbox" checked={getFilteredCandidates.length > 0 && selectedCandidates.length === getFilteredCandidates.length} onChange={selectAllCandidates} className="h-4 w-4 rounded border-slate-300" /></th>
                       <th className="p-3">ID</th><th className="p-3">Name</th>
                       <th className="p-3">Phone</th><th className="p-3">Email</th><th className="p-3">Client</th>
                       <th className="p-3">Skills</th><th className="p-3">Date Added</th><th className="p-3">Experience</th>
@@ -727,8 +727,8 @@ export default function RecruiterCandidates() {
                   <tbody className="divide-y divide-slate-100">
                     {getFilteredCandidates.map((c, index) => (
                       <tr key={c._id} className="hover:bg-slate-50">
-                        <td className="p-3 pl-4"><input type="checkbox" checked={selectedCandidates.includes(c._id)} onChange={() => toggleSelectCandidate(c._id)} className="h-4 w-4 rounded"/></td>
-                        <td className="p-3 font-mono text-xs text-blue-600 font-bold cursor-pointer" onClick={() => { navigator.clipboard.writeText(getCandidateId(c)); toast({title: "Copied ID"}); }}>{getCandidateId(c)}</td>
+                        <td className="p-3 pl-4"><input type="checkbox" checked={selectedCandidates.includes(c._id)} onChange={() => toggleSelectCandidate(c._id)} className="h-4 w-4 rounded" /></td>
+                        <td className="p-3 font-mono text-xs text-blue-600 font-bold cursor-pointer" onClick={() => { navigator.clipboard.writeText(getCandidateId(c)); toast({ title: "Copied ID" }); }}>{getCandidateId(c)}</td>
                         <td className="p-3">
                           <div className="flex items-center gap-2">
                             <div className="h-8 w-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">{getInitials(c.name)}</div>
@@ -737,7 +737,7 @@ export default function RecruiterCandidates() {
                         </td>
                         <td className="p-3 text-sm text-slate-600">
                           <div className="flex items-center gap-2">{c.contact}
-                            <button className="text-green-600 hover:text-green-700" onClick={() => handleWhatsApp(c)}><MessageCircle className="h-3.5 w-3.5"/></button>
+                            <button className="text-green-600 hover:text-green-700" onClick={() => handleWhatsApp(c)}><MessageCircle className="h-3.5 w-3.5" /></button>
                           </div>
                         </td>
                         <td className="p-3 text-sm text-slate-600"><span className="truncate max-w-[150px] block" title={c.email}>{c.email}</span></td>
@@ -756,9 +756,9 @@ export default function RecruiterCandidates() {
                         <td className="p-3 text-xs text-slate-500 truncate max-w-[100px]">{c.remarks}</td>
                         <td className="p-3 text-right">
                           <div className="flex justify-end gap-1">
-                            <button className="p-1 hover:bg-slate-100 rounded" onClick={() => openViewDialog(c)}><Eye className="h-3.5 w-3.5"/></button>
-                            <button className="p-1 hover:bg-slate-100 rounded" onClick={() => openEditDialog(c)}><Edit className="h-3.5 w-3.5 text-blue-600"/></button>
-                            <button className="p-1 hover:bg-slate-100 rounded" onClick={() => toggleActiveStatus(c._id, c.active !== false)}><Ban className="h-3.5 w-3.5 text-red-600"/></button>
+                            <button className="p-1 hover:bg-slate-100 rounded" onClick={() => openViewDialog(c)}><Eye className="h-3.5 w-3.5" /></button>
+                            <button className="p-1 hover:bg-slate-100 rounded" onClick={() => openEditDialog(c)}><Edit className="h-3.5 w-3.5 text-blue-600" /></button>
+                            <button className="p-1 hover:bg-slate-100 rounded" onClick={() => toggleActiveStatus(c._id, c.active !== false)}><Ban className="h-3.5 w-3.5 text-red-600" /></button>
                           </div>
                         </td>
                       </tr>
@@ -787,15 +787,15 @@ export default function RecruiterCandidates() {
                     </div>
                   </div>
                   <div className="space-y-2 text-sm text-slate-600">
-                    <div className="flex items-center gap-2"><Building className="h-4 w-4"/> {c.client}</div>
-                    <div className="flex items-center gap-2"><Award className="h-4 w-4"/> {formatSkills(c.skills)}</div>
-                    <div className="flex items-center gap-2"><Mail className="h-4 w-4"/> {c.email}</div>
-                    <div className="flex items-center gap-2"><Phone className="h-4 w-4"/> {c.contact}</div>
+                    <div className="flex items-center gap-2"><Building className="h-4 w-4" /> {c.client}</div>
+                    <div className="flex items-center gap-2"><Award className="h-4 w-4" /> {formatSkills(c.skills)}</div>
+                    <div className="flex items-center gap-2"><Mail className="h-4 w-4" /> {c.email}</div>
+                    <div className="flex items-center gap-2"><Phone className="h-4 w-4" /> {c.contact}</div>
                   </div>
                   <div className="mt-4 flex gap-2">
                     <Button variant="outline" className="flex-1" onClick={() => openViewDialog(c)}>View</Button>
                     <Button variant="outline" className="flex-1" onClick={() => openEditDialog(c)}>Edit</Button>
-                    <Button variant="outline" className="text-green-600 hover:bg-green-50" onClick={() => handleWhatsApp(c)}><MessageCircle className="h-4 w-4"/></Button>
+                    <Button variant="outline" className="text-green-600 hover:bg-green-50" onClick={() => handleWhatsApp(c)}><MessageCircle className="h-4 w-4" /></Button>
                   </div>
                 </div>
               ))}
@@ -807,13 +807,13 @@ export default function RecruiterCandidates() {
       {/* Delete Confirm Modal */}
       <Modal open={isDeleteConfirmOpen} onClose={() => setIsDeleteConfirmOpen(false)}>
         <ModalHeader>
-          <ModalTitle className="flex items-center gap-2 text-red-600"><AlertTriangle className="h-5 w-5"/> Confirm Deletion</ModalTitle>
+          <ModalTitle className="flex items-center gap-2 text-red-600"><AlertTriangle className="h-5 w-5" /> Confirm Deletion</ModalTitle>
           <ModalDesc>Are you sure you want to delete <strong>{selectedCandidates.length}</strong> selected candidate(s)? This action cannot be undone.</ModalDesc>
         </ModalHeader>
         <ModalFooter>
           <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)} disabled={isDeleting}>Cancel</Button>
           <Button variant="destructive" onClick={handleBulkDelete} disabled={isDeleting}>
-            {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null} Delete
+            {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete
           </Button>
         </ModalFooter>
       </Modal>
@@ -827,15 +827,15 @@ export default function RecruiterCandidates() {
           {!isEditDialogOpen && (
             <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 bg-slate-50 mb-4">
               <div className="flex flex-col items-center gap-3">
-                <div className="p-3 bg-blue-100 rounded-full"><FileUp className="h-6 w-6 text-blue-600"/></div>
+                <div className="p-3 bg-blue-100 rounded-full"><FileUp className="h-6 w-6 text-blue-600" /></div>
                 <div className="text-center">
                   <h3 className="font-semibold text-slate-900 mb-1">Upload Resume to Auto-Fill</h3>
                   <p className="text-sm text-slate-500 mb-3">Upload PDF or DOC/DOCX file (max 5MB)</p>
                 </div>
                 <label htmlFor="resume-upload-recruiter">
-                  <input id="resume-upload-recruiter" type="file" accept=".pdf,.doc,.docx" onChange={handleResumeUpload} className="hidden" disabled={isParsingResume}/>
+                  <input id="resume-upload-recruiter" type="file" accept=".pdf,.doc,.docx" onChange={handleResumeUpload} className="hidden" disabled={isParsingResume} />
                   <Button type="button" variant="outline" disabled={isParsingResume} onClick={() => document.getElementById('resume-upload-recruiter')?.click()}>
-                    {isParsingResume ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Parsing...</> : <><Upload className="mr-2 h-4 w-4"/>Choose File</>}
+                    {isParsingResume ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Parsing...</> : <><Upload className="mr-2 h-4 w-4" />Choose File</>}
                   </Button>
                 </label>
               </div>
@@ -846,15 +846,15 @@ export default function RecruiterCandidates() {
         <ModalFooter>
           <Button variant="outline" onClick={() => { setIsAddDialogOpen(false); setIsEditDialogOpen(false); }}>Cancel</Button>
           <Button onClick={() => handleSave(isEditDialogOpen)} disabled={isSubmitting}>
-            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null} {isEditDialogOpen ? "Update" : "Save"}
+            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} {isEditDialogOpen ? "Update" : "Save"}
           </Button>
         </ModalFooter>
       </Modal>
-      
+
       {/* Import Modal */}
       <Modal open={isImportDialogOpen} onClose={() => { setIsImportDialogOpen(false); setImportFile(null); setImportResult(null); }}>
         <ModalHeader>
-          <ModalTitle className="flex items-center gap-2"><FileSpreadsheet className="h-5 w-5 text-green-600"/> Import Candidates from Excel</ModalTitle>
+          <ModalTitle className="flex items-center gap-2"><FileSpreadsheet className="h-5 w-5 text-green-600" /> Import Candidates from Excel</ModalTitle>
           <ModalDesc>Upload an Excel file (.xlsx / .xls) to bulk-import candidates.</ModalDesc>
         </ModalHeader>
         <ModalBody>
@@ -863,8 +863,8 @@ export default function RecruiterCandidates() {
               <p className="font-semibold mb-1">Required Excel Columns:</p>
               <p className="text-xs text-blue-700 leading-relaxed">name, email, contact, position, client, skills, totalExperience, ctc, ectc, noticePeriod, currentCompany, currentLocation, source, status</p>
               <button className="text-blue-600 text-xs underline mt-1" onClick={() => {
-                const headers = ['name','email','contact','position','client','skills','totalExperience','ctc','ectc','noticePeriod','currentCompany','currentLocation','source','status'];
-                const exampleRow = ['John Doe','john@example.com','9876543210','Software Engineer','Acme Corp','React,Node.js','3','6 LPA','8 LPA','30 days','TCS','Bangalore','Portal','Submitted'];
+                const headers = ['name', 'email', 'contact', 'position', 'client', 'skills', 'totalExperience', 'ctc', 'ectc', 'noticePeriod', 'currentCompany', 'currentLocation', 'source', 'status'];
+                const exampleRow = ['John Doe', 'john@example.com', '9876543210', 'Software Engineer', 'Acme Corp', 'React,Node.js', '3', '6 LPA', '8 LPA', '30 days', 'TCS', 'Bangalore', 'Portal', 'Submitted'];
                 const csv = [headers.join(','), exampleRow.join(',')].join('\n');
                 const blob = new Blob([csv], { type: 'text/csv' });
                 const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'candidate_import_template.csv'; a.click();
@@ -872,13 +872,13 @@ export default function RecruiterCandidates() {
             </div>
 
             <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-green-400 hover:bg-green-50 transition-colors" onClick={() => document.getElementById('excel-import-input')?.click()}>
-              <FileSpreadsheet className="h-10 w-10 text-slate-400 mx-auto mb-2"/>
+              <FileSpreadsheet className="h-10 w-10 text-slate-400 mx-auto mb-2" />
               {importFile ? (
                 <div><p className="font-semibold text-green-700">{importFile.name}</p><p className="text-xs text-slate-500">{(importFile.size / 1024).toFixed(1)} KB</p></div>
               ) : (
                 <div><p className="text-slate-600 font-medium">Click to choose Excel file</p><p className="text-xs text-slate-400 mt-1">.xlsx or .xls, max 10MB</p></div>
               )}
-              <input id="excel-import-input" type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { setImportFile(e.target.files?.[0] || null); setImportResult(null); }}/>
+              <input id="excel-import-input" type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { setImportFile(e.target.files?.[0] || null); setImportResult(null); }} />
             </div>
 
             {importResult && (
@@ -899,11 +899,11 @@ export default function RecruiterCandidates() {
         <ModalFooter>
           <Button variant="outline" onClick={() => setIsImportDialogOpen(false)}>Cancel</Button>
           <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={!importFile || isImporting} onClick={handleImportExcel}>
-            {isImporting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Importing...</> : <><FileSpreadsheet className="mr-2 h-4 w-4"/>Import Now</>}
+            {isImporting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Importing...</> : <><FileSpreadsheet className="mr-2 h-4 w-4" />Import Now</>}
           </Button>
         </ModalFooter>
       </Modal>
-      
+
       {/* View Modal */}
       {viewingCandidate && (
         <Modal open={isViewDialogOpen} onClose={() => setIsViewDialogOpen(false)} maxWidth="max-w-4xl">
@@ -922,13 +922,13 @@ export default function RecruiterCandidates() {
           <ModalBody>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-slate-50 p-4 rounded-lg space-y-3">
-                <h3 className="font-semibold text-slate-800 border-b pb-2 flex items-center gap-2"><UserCircle className="h-4 w-4"/> Personal Information</h3>
+                <h3 className="font-semibold text-slate-800 border-b pb-2 flex items-center gap-2"><UserCircle className="h-4 w-4" /> Personal Information</h3>
                 <div className="grid grid-cols-2 gap-y-3 text-sm">
                   <div><Label className="text-xs text-slate-500">Email</Label><div>{viewingCandidate.email}</div></div>
                   <div><Label className="text-xs text-slate-500">Phone</Label>
                     <div className="flex items-center gap-2">
                       <div>{viewingCandidate.contact}</div>
-                      <button className="text-green-600" onClick={() => handleWhatsApp(viewingCandidate)}><MessageCircle className="h-3.5 w-3.5"/></button>
+                      <button className="text-green-600" onClick={() => handleWhatsApp(viewingCandidate)}><MessageCircle className="h-3.5 w-3.5" /></button>
                     </div>
                   </div>
                   <div><Label className="text-xs text-slate-500">Date of Birth</Label><div>{formatDate(viewingCandidate.dateOfBirth)}</div></div>
@@ -939,7 +939,7 @@ export default function RecruiterCandidates() {
                 </div>
               </div>
               <div className="bg-slate-50 p-4 rounded-lg space-y-3">
-                <h3 className="font-semibold text-slate-800 border-b pb-2 flex items-center gap-2"><Briefcase className="h-4 w-4"/> Professional Details</h3>
+                <h3 className="font-semibold text-slate-800 border-b pb-2 flex items-center gap-2"><Briefcase className="h-4 w-4" /> Professional Details</h3>
                 <div className="grid grid-cols-2 gap-y-3 text-sm">
                   <div><Label className="text-xs text-slate-500">Position</Label><div>{viewingCandidate.position}</div></div>
                   <div><Label className="text-xs text-slate-500">Client</Label><div>{viewingCandidate.client}</div></div>
@@ -966,16 +966,16 @@ export default function RecruiterCandidates() {
 
 const StatCard = ({ title, value, color, active, onClick }) => {
   const styles = {
-    blue:   "border-l-blue-500 text-blue-600 bg-blue-50/50",
-    cyan:   "border-l-cyan-500 text-cyan-600 bg-cyan-50/50",
+    blue: "border-l-blue-500 text-blue-600 bg-blue-50/50",
+    cyan: "border-l-cyan-500 text-cyan-600 bg-cyan-50/50",
     purple: "border-l-purple-500 text-purple-600 bg-purple-50/50",
     indigo: "border-l-indigo-500 text-indigo-600 bg-indigo-50/50",
-    rose:   "border-l-rose-500 text-rose-600 bg-rose-50/50",
-    green:  "border-l-green-500 text-green-600 bg-green-50/50",
-    emerald:"border-l-emerald-500 text-emerald-600 bg-emerald-50/50",
-    red:    "border-l-red-500 text-red-600 bg-red-50/50",
+    rose: "border-l-rose-500 text-rose-600 bg-rose-50/50",
+    green: "border-l-green-500 text-green-600 bg-green-50/50",
+    emerald: "border-l-emerald-500 text-emerald-600 bg-emerald-50/50",
+    red: "border-l-red-500 text-red-600 bg-red-50/50",
     orange: "border-l-orange-500 text-orange-600 bg-orange-50/50",
-    amber:  "border-l-amber-500 text-amber-600 bg-amber-50/50",
+    amber: "border-l-amber-500 text-amber-600 bg-amber-50/50",
   };
   const currentStyle = styles[color] || styles.blue;
   return (
@@ -986,7 +986,7 @@ const StatCard = ({ title, value, color, active, onClick }) => {
           <p className="text-sm font-medium opacity-80">{title}</p>
         </div>
       </div>
-      {active && <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-blue-600 animate-pulse"/>}
+      {active && <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-blue-600 animate-pulse" />}
     </div>
   );
 };

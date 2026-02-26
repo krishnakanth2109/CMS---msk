@@ -3,12 +3,12 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import Candidate from '../models/Candidate.js';
-import User from '../models/User.js'; 
-import { parseResume } from './resumeParser.js'; 
-import { protect } from '../middleware/authMiddleware.js'; 
+import User from '../models/User.js';
+import { parseResume } from './resumeParser.js';
+import { protect } from '../middleware/authMiddleware.js';
 import { updateCandidateStatus, updateCandidateRemarks, inlineUpdateCandidate } from '../controllers/candidateStatusController.js';
 
-import { bulkImportCandidates } from '../controllers/bulkImportController.js'; 
+import { bulkImportCandidates } from '../controllers/bulkImportController.js';
 
 const router = express.Router();
 
@@ -26,7 +26,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, 
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
       'application/pdf',
@@ -65,15 +65,15 @@ router.use(protect);
 // Fix data types from FormData (Multer converts everything to strings)
 const sanitizeBody = (body) => {
   const data = { ...body };
-  
+
   if (typeof data.skills === 'string') {
     data.skills = data.skills.split(',').map(s => s.trim());
   }
-  
+
   // Convert "true"/"false" strings to Booleans
   if (data.offersInHand === 'true') data.offersInHand = true;
   if (data.offersInHand === 'false') data.offersInHand = false;
-  
+
   if (data.servingNoticePeriod === 'true') data.servingNoticePeriod = true;
   if (data.servingNoticePeriod === 'false') data.servingNoticePeriod = false;
 
@@ -110,17 +110,17 @@ router.put('/bulk-assign', async (req, res) => {
     // Update candidates
     const result = await Candidate.updateMany(
       { _id: { $in: candidateIds } },
-      { 
-        $set: { 
+      {
+        $set: {
           recruiterId: recruiter._id,
-          recruiterName: `${recruiter.firstName || ''} ${recruiter.lastName || ''}`.trim() || recruiter.email 
-        } 
+          recruiterName: `${recruiter.firstName || ''} ${recruiter.lastName || ''}`.trim() || recruiter.email
+        }
       }
     );
 
-    res.json({ 
-      success: true, 
-      message: `Successfully assigned ${result.modifiedCount} candidates to ${recruiter.firstName || ''} ${recruiter.lastName || ''}` 
+    res.json({
+      success: true,
+      message: `Successfully assigned ${result.modifiedCount} candidates to ${recruiter.firstName || ''} ${recruiter.lastName || ''}`
     });
 
   } catch (error) {
@@ -151,6 +151,8 @@ router.post('/parse-resume', upload.single('resume'), async (req, res) => {
           skills: parsedResult.data.skills || '',
           totalExperience: parsedResult.data.totalExperience || '',
           position: parsedResult.data.position || '',
+          currentCompany: parsedResult.data.currentCompany || '',
+          currentLocation: parsedResult.data.currentLocation || '',
         }
       });
     } else {
@@ -159,7 +161,7 @@ router.post('/parse-resume', upload.single('resume'), async (req, res) => {
   } catch (error) {
     console.error("Resume parsing error:", error);
     if (req.file && fs.existsSync(req.file.path)) {
-      try { fs.unlinkSync(req.file.path); } catch (err) {}
+      try { fs.unlinkSync(req.file.path); } catch (err) { }
     }
     res.status(500).json({ success: false, message: 'Error parsing resume', error: error.message });
   }
@@ -207,7 +209,7 @@ router.post('/', upload.single('resume'), async (req, res) => {
 
     const newCandidate = new Candidate(candidateData);
     await newCandidate.save();
-    
+
     res.status(201).json(newCandidate);
   } catch (error) {
     console.error("Create Error:", error);
