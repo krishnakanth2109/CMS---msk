@@ -301,7 +301,6 @@ export default function AdminMessages() {
                         {recruiters.map(r => (
                           <SelectItem key={r._id || r.id} value={r._id || r.id}>
                             <span className="font-medium">{r.name || r.username}</span>
-                            <span className="text-gray-500 ml-2 text-xs">(@{r.username || r.email})</span>
                           </SelectItem>
                         ))}
                       </SelectContent>
