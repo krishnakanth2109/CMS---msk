@@ -30,7 +30,7 @@ export const parseResume = async (fileBuffer, mimetype) => {
 
     // Extract information from text
     const extractedData = extractInformation(text);
-    
+
     return {
       success: true,
       data: extractedData,
@@ -50,7 +50,7 @@ export const parseResume = async (fileBuffer, mimetype) => {
  */
 const extractInformation = (text) => {
   const lines = text.split('\n').filter(line => line.trim());
-  
+
   return {
     name: extractName(lines),
     email: extractEmail(text),
@@ -102,7 +102,7 @@ const extractPhone = (text) => {
     /\b\d{10}\b/g, // 10 digit number
     /\(\d{3}\)\s*\d{3}[-.\s]?\d{4}/g, // (123) 456-7890
   ];
-  
+
   for (let pattern of patterns) {
     const matches = text.match(pattern);
     if (matches) {
@@ -240,7 +240,7 @@ const extractLocation = (text) => {
   ];
 
   const textLower = text.toLowerCase();
-  
+
   for (let city of indianCities) {
     if (textLower.includes(city.toLowerCase())) {
       return city;

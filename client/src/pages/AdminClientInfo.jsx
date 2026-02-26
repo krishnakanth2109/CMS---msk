@@ -14,7 +14,7 @@ import {
 } from "@heroicons/react/24/outline";
 
 const BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, '');
-const API_URL  = `${BASE_URL}/api`;
+const API_URL = `${BASE_URL}/api`;
 
 // Sleek Grey Input Styling
 const inputCls = "w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-zinc-500 bg-white dark:bg-zinc-900 dark:text-zinc-100 transition-shadow placeholder-zinc-400";
@@ -49,7 +49,7 @@ const ClientDetailCard = ({ client, onClose }) => {
                   {client.industry && <span>• {client.industry}</span>}
                 </div>
               </div>
-              <button 
+              <button
                 onClick={onClose}
                 className="p-1.5 hover:bg-zinc-700 rounded-lg transition-colors text-zinc-400 hover:text-white"
               >
@@ -84,7 +84,7 @@ const ClientDetailCard = ({ client, onClose }) => {
                   <p className="flex justify-between"><span className="text-zinc-500">Candidate Period:</span> <span className="font-medium">{client.candidatePeriod ? `${client.candidatePeriod} months` : "-"}</span></p>
                   <p className="flex justify-between"><span className="text-zinc-500">Replacement:</span> <span className="font-medium">{client.replacementPeriod ? `${client.replacementPeriod} days` : "-"}</span></p>
                   <p className="flex justify-between"><span className="text-zinc-500">GST Number:</span> <span className="font-medium font-mono text-xs">{client.gstNumber || "-"}</span></p>
-                  <p className="flex justify-between"><span className="text-zinc-500">Status:</span> 
+                  <p className="flex justify-between"><span className="text-zinc-500">Status:</span>
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${client.active ? 'bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
                       {client.active ? "Active" : "Inactive"}
                     </span>
@@ -112,9 +112,9 @@ export default function AdminClientInfo() {
   const { authHeaders } = useAuth();
 
   // ── Auth helper — reads Firebase idToken from AuthContext (stored in sessionStorage as 'currentUser')
-  const getAuthHeader = () => ({
+  const getAuthHeader = async () => ({
     "Content-Type": "application/json",
-    ...authHeaders(),
+    ...(await authHeaders()),
   });
 
   const [clients, setClients] = useState([]);
@@ -139,7 +139,8 @@ export default function AdminClientInfo() {
   const fetchClients = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/clients`, { headers: getAuthHeader() });
+      const headers = await getAuthHeader();
+      const res = await fetch(`${API_URL}/clients`, { headers });
       if (!res.ok) throw new Error();
       const data = await res.json();
       setClients(data.map((c) => ({ ...c, id: c._id })));
@@ -178,9 +179,10 @@ export default function AdminClientInfo() {
     if (!validateForm()) return;
     try {
       const url = editingClient ? `${API_URL}/clients/${editingClient.id}` : `${API_URL}/clients`;
+      const headers = await getAuthHeader();
       const res = await fetch(url, {
         method: editingClient ? "PUT" : "POST",
-        headers: getAuthHeader(),
+        headers,
         body: JSON.stringify(form),
       });
       if (!res.ok) throw new Error();
@@ -208,13 +210,14 @@ export default function AdminClientInfo() {
 
   const handleToggleActive = async (client) => {
     try {
+      const headers = await getAuthHeader();
       await fetch(`${API_URL}/clients/${client.id}`, {
         method: "PUT",
-        headers: getAuthHeader(),
+        headers,
         body: JSON.stringify({ active: !client.active }),
       });
       fetchClients();
-    } catch {}
+    } catch { }
   };
 
   const uniqueIndustries = useMemo(() => Array.from(new Set(clients.map((c) => c.industry).filter(Boolean))), [clients]);
@@ -229,7 +232,7 @@ export default function AdminClientInfo() {
 
   return (
     <div className="flex-1 p-6 space-y-8 bg-zinc-50 dark:bg-zinc-950 min-h-screen text-zinc-900 dark:text-zinc-100">
-      
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -251,7 +254,7 @@ export default function AdminClientInfo() {
 
       {/* Form Panel */}
       {showForm && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
           className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-6"
         >
@@ -350,11 +353,10 @@ export default function AdminClientInfo() {
                       {client.percentage ? `${client.percentage}% Comm.` : "-"}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border ${
-                        client.active !== false 
-                          ? "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700" 
+                      <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border ${client.active !== false
+                          ? "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700"
                           : "bg-red-50 text-red-600 border-red-100 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/30"
-                      }`}>
+                        }`}>
                         {client.active !== false ? "Active" : "Inactive"}
                       </span>
                     </td>
