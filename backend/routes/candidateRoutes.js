@@ -151,6 +151,8 @@ router.post('/parse-resume', upload.single('resume'), async (req, res) => {
           skills: parsedResult.data.skills || '',
           totalExperience: parsedResult.data.totalExperience || '',
           position: parsedResult.data.position || '',
+          currentCompany: parsedResult.data.currentCompany || '',
+          currentLocation: parsedResult.data.currentLocation || '',
         }
       });
     } else {
