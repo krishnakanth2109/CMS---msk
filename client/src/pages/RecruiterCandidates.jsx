@@ -158,46 +158,63 @@ export default function RecruiterCandidates() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword'];
-    if (!allowedTypes.includes(file.type)) {
-      toast({ title: 'Invalid File Type', description: 'Please upload a PDF or DOC/DOCX file', variant: 'destructive' });
+    // Validate size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: 'Error', description: 'File size must be less than 5MB', variant: 'destructive' });
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ title: 'File Too Large', description: 'Resume must be less than 5MB', variant: 'destructive' });
+
+    // Validate type using extension fallback
+    const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const validExtensions = ['.pdf', '.doc', '.docx'];
+    const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+
+    if (!validTypes.includes(file.type) && !validExtensions.includes(fileExt)) {
+      toast({ title: 'Error', description: 'Invalid file type. Only PDF, DOC, and DOCX are supported.', variant: 'destructive' });
       return;
     }
 
     setIsParsingResume(true);
+
     try {
       const uploadFormData = new FormData();
       uploadFormData.append('resume', file);
+
       const authH = await authHeaders();
       const response = await fetch(`${API_URL}/candidates/parse-resume`, {
         method: 'POST',
         headers: { ...authH },
         body: uploadFormData
       });
+
       const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Failed to parse resume');
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Failed to parse resume');
+      }
+
       if (result.success && result.data) {
         const cleanContact = result.data.contact ? result.data.contact.replace(/\D/g, '').slice(0, 10) : '';
         const cleanTotalExp = result.data.totalExperience ? String(result.data.totalExperience).replace(/[^0-9.]/g, '') : '';
+
         setFormData(prev => ({
           ...prev,
-          name: result.data.name || prev.name,
-          email: result.data.email || prev.email,
-          contact: cleanContact || prev.contact,
-          skills: result.data.skills || prev.skills,
-          totalExperience: cleanTotalExp || prev.totalExperience,
-          education: result.data.education || prev.education,
-          currentLocation: result.data.currentLocation || prev.currentLocation,
-          currentCompany: result.data.currentCompany || prev.currentCompany,
+          name: prev.name || result.data.name || '',
+          email: prev.email || result.data.email || '',
+          contact: prev.contact || cleanContact || '',
+          linkedin: prev.linkedin || result.data.linkedin || '',
+          gender: prev.gender || result.data.gender || 'Not Specified',
+          skills: prev.skills || result.data.skills || '',
+          totalExperience: prev.totalExperience || cleanTotalExp || '',
+          education: prev.education || result.data.education || '',
+          currentLocation: prev.currentLocation || result.data.currentLocation || '',
+          currentCompany: prev.currentCompany || result.data.currentCompany || '',
         }));
-        toast({ title: 'Resume Parsed Successfully', description: 'Form fields have been auto-filled.', duration: 5000 });
+        toast({ title: 'Success', description: 'Resume parsed successfully. Fields auto-filled.' });
       }
     } catch (error) {
-      toast({ title: 'Parsing Failed', description: error.message || 'Could not extract data', variant: 'destructive' });
+      console.error('Parsing error:', error);
+      toast({ title: 'Warning', description: 'Could not parse some details. Please fill manually.', variant: 'default' });
     } finally {
       setIsParsingResume(false);
       event.target.value = '';
@@ -521,6 +538,7 @@ export default function RecruiterCandidates() {
           <option value="Male">Male</option>
           <option value="Female">Female</option>
           <option value="Other">Other</option>
+          <option value="Not Specified">Not Specified</option>
         </NativeSelect>
       </div>
       <div className="space-y-1">
