@@ -17,7 +17,7 @@ import AdminRecruiters from '@/pages/AdminRecruiters';
 import AdminClientInfo from '@/pages/AdminClientInfo';
 import AdminClientInvoice from '@/pages/AdminClientInvoice';
 import AdminRequirements from '@/pages/AdminRequirements';
-import AdminSchedules from '@/pages/AdminSchedules'; // <-- ADDED THIS IMPORT
+import AdminSchedules from '@/pages/AdminSchedules';
 import AdminMessages from '@/pages/AdminMessages';
 import AdminReports from '@/pages/AdminReports';
 import AdminSettings from '@/pages/AdminSettings';
@@ -40,7 +40,9 @@ function ProtectedRoute({ children, allowedRoles }) {
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   if (allowedRoles && !allowedRoles.includes(userRole)) {
-    return <Navigate to={userRole === 'admin' ? '/admin' : '/recruiter'} replace />;
+    // 🔴 FIXED: Admin OR Manager go to /admin. Everyone else goes to /recruiter.
+    const destination = (userRole === 'admin' || userRole === 'manager') ? '/admin' : '/recruiter';
+    return <Navigate to={destination} replace />;
   }
 
   return children;
@@ -49,7 +51,13 @@ function ProtectedRoute({ children, allowedRoles }) {
 function PublicRoute({ children }) {
   const { isAuthenticated, userRole, loading } = useAuth();
   if (loading) return null;
-  if (isAuthenticated) return <Navigate to={userRole === 'admin' ? '/admin' : '/recruiter'} replace />;
+  
+  if (isAuthenticated) {
+    // 🔴 FIXED: Same logic here
+    const destination = (userRole === 'admin' || userRole === 'manager') ? '/admin' : '/recruiter';
+    return <Navigate to={destination} replace />;
+  }
+  
   return children;
 }
 
@@ -61,9 +69,10 @@ function AppRoutes() {
       <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
       <Route path="/reset-password" element={<ResetPassword />} />
 
-      {/* ===================== ADMIN ROUTES ===================== */}
+      {/* ===================== ADMIN / MANAGER ROUTES ===================== */}
+      {/* 🔴 FIXED: Added 'manager' to allowedRoles */}
       <Route path="/admin" element={
-        <ProtectedRoute allowedRoles={['admin']}>
+        <ProtectedRoute allowedRoles={['admin', 'manager']}>
           <DashboardLayout />
         </ProtectedRoute>
       }>
@@ -74,7 +83,7 @@ function AppRoutes() {
         <Route path="clients" element={<AdminClientInfo />} />
         <Route path="invoices" element={<AdminClientInvoice />} />
         <Route path="requirements" element={<AdminRequirements />} />
-        <Route path="schedules" element={<AdminSchedules />} /> {/* <-- SCHEDULES ROUTE */}
+        <Route path="schedules" element={<AdminSchedules />} />
         <Route path="messages" element={<AdminMessages />} />
         <Route path="reports" element={<AdminReports />} />
         <Route path="settings" element={<AdminSettings />} />

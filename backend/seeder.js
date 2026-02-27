@@ -1,43 +1,51 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
-import User from './models/User.js'; // Ensure this path matches your structure
+import User from './models/User.js'; // Make sure this path is correct
 
 dotenv.config();
 
 const seedData = async () => {
   try {
-    // 1. Connect to Database
+    // 1️⃣ Connect to MongoDB
     const conn = await mongoose.connect(process.env.MONGO_URL);
     console.log(`MongoDB Connected: ${conn.connection.host}`);
 
-    // 2. Clear existing users to avoid duplicates
-    await User.deleteMany();
-    console.log('Existing users removed');
+    // 2️⃣ Define Users (No deleteMany — existing users will remain)
 
-    // 3. Define Users
     const users = [
+      // 🔹 Recruiter User
+      // {
+      //   username: 'urstruelykrishnkanth@gmail.com',
+      //   password: '987654321', // Will be hashed by pre-save middleware
+      //   name: 'Mahesh',
+      //   role: 'recruiter',
+      //   email: 'urstruelykrishnkanth@gmail.com',
+      // },
+
+      // 🔹 Admin User
+      // {
+      //   username: 'kkanth355@gmail.com',
+      //   password: '123456789', // Will be hashed by pre-save middleware
+      //   name: 'Navya',
+      //   role: 'admin',
+      //   email: 'kkanth355@gmail.com',
+      // },
+
+      // 🔹 Manager User (New Role Added)
       {
-        username: 'urstruelykrishnkanth@gmail.com',
-        password: '987654321', // Middleware in User.js will hash this
-        name: 'mahesh',
-        role: 'recruiter',
-        email:"urstruelykrishnkanth@gmail.com"
-      },
-      {
-        username: 'kkanth355@gmail.com',
-        password: '123456789', // Middleware in User.js will hash this
-        name: 'Navya ',
-        role: 'admin',
-        email:"kkanth355@gmail.com"
+        username: 'nainika@gmail.com',
+        password: '123456789', // Will be hashed by pre-save middleware
+        name: 'Nainika Shantholla',
+        role: 'manager',
+        email: 'Shanthollanainika@gmail.com',
       },
     ];
 
-    // 4. Create Users
-    // We use create() instead of insertMany() to ensure the pre-save hook 
-    // in your User model runs to hash the passwords.
+    // 3️⃣ Create Users
+    // Using create() so that pre-save middleware runs (password hashing)
     await User.create(users);
 
-    console.log('Data Imported Successfully!');
+    console.log('Users Seeded Successfully!');
     process.exit();
   } catch (error) {
     console.error(`Error: ${error.message}`);

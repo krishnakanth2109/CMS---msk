@@ -18,6 +18,7 @@ const adminLinks = [
   { to: '/admin/messages', label: 'Messages', icon: MessageSquare },
   { to: '/admin/reports', label: 'Reports', icon: BarChart2 },
   { to: '/admin/settings', label: 'Settings', icon: Settings },
+
 ];
 
 const recruiterLinks = [

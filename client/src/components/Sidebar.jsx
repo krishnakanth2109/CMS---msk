@@ -17,11 +17,13 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
     { name: 'Add Candidate', path: '/admin/add-candidate', icon: UserPlus },
     { name: 'Recruiters', path: '/admin/recruiters', icon: Briefcase },
     { name: 'Client Info', path: '/admin/clients', icon: Building2 },
+    { name: 'Recruiter Schedules', path: '/admin/schedules', icon: Calendar },
     { name: 'Invoices', path: '/admin/invoices', icon: Receipt },
     { name: 'Requirements', path: '/admin/requirements', icon: ClipboardList },
     { name: 'Messages', path: '/admin/messages', icon: MessageSquare },
     { name: 'Reports', path: '/admin/reports', icon: BarChart },
     { name: 'Settings', path: '/admin/settings', icon: Settings },
+
   ];
 
   const recruiterLinks = [

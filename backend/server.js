@@ -123,9 +123,10 @@ app.get('/', (_req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// GET /api/reports  — Admin overview dashboard
+// GET /api/reports  — Admin & Manager overview dashboard
 // ═══════════════════════════════════════════════════════════════════════════════
-app.get('/api/reports', protect, authorize('admin'), async (req, res) => {
+// 🔴 FIXED: Added 'manager' so they can load the dashboard stats
+app.get('/api/reports', protect, authorize('admin', 'manager'), async (req, res) => {
   try {
     const { filter = 'month' } = req.query;
 

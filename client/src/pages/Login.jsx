@@ -32,7 +32,14 @@ export default function Login() {
 
     try {
       const user = await login(email, password);
-      navigate(user?.role === 'admin' ? '/admin' : '/recruiter');
+      
+      // 🔴 FIXED: Both Admin and Manager now route to the same dashboard
+      if (user?.role === 'admin' || user?.role === 'manager') {
+        navigate('/admin');
+      } else {
+        navigate('/recruiter');
+      }
+      
     } catch (err) {
       setError(getFriendlyError(err));
     } finally {
