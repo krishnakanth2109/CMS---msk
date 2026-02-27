@@ -211,20 +211,62 @@ const AdminClientInvoice = () => {
 
       // -- Client details (Below 'To,') --
       drawText(selectedClient?.companyName || "", 68, 155, 11, true);
-      // Display Contact Person neatly below company name if exists, adjusting coordinates automatically
-      if (selectedClient?.contactPerson) {
-        drawText(selectedClient.contactPerson, 68, 170, 10);
-        drawText(selectedClient?.address || "", 68, 185, 10);
-        if (selectedClient?.gstNumber) drawText(`GST : ${selectedClient.gstNumber}`, 68, 200, 10);
+
+      // Smart address formatting:
+      // - Parts with digits or building keywords → joined on Line 1 (house/office/building)
+      // - Pure area/street names (no digits, no keywords) → each on its own line
+      // - Second-to-last → City
+      // - Last → State + Pincode
+      const rawParts = (selectedClient?.address || "").split(",").map(p => p.trim()).filter(Boolean);
+      let addressLines = [];
+      if (rawParts.length <= 2) {
+        addressLines = rawParts;
       } else {
-        drawText(selectedClient?.address || "", 68, 170, 10);
-        if (selectedClient?.gstNumber) drawText(`GST : ${selectedClient.gstNumber}`, 68, 185, 10);
+        const city = rawParts[rawParts.length - 2];
+        const state = rawParts[rawParts.length - 1];
+        const middleParts = rawParts.slice(0, rawParts.length - 2);
+
+        // Detect building parts: contain digits OR building-related keywords
+        const buildingPattern = /\d|floor|f\.no|no\.|h\.no|plot|flat|door|d\.no|beside|above|below|near|opp|block|wing|phase|sector|tower|unit|suite|rd\s|street|building|complex|nagar/i;
+        const buildingParts = middleParts.filter(p => buildingPattern.test(p));
+        const areaParts = middleParts.filter(p => !buildingPattern.test(p));
+
+        const lines = [];
+        if (buildingParts.length > 0) lines.push(buildingParts.join(", "));
+        areaParts.forEach(a => lines.push(a)); // each area on its own line
+        lines.push(city, state);
+        addressLines = lines;
       }
 
-      // -- Date & Invoice Number --
-      // 'Date:' baseline ends exact Y: 291.36, Set to 288 for exact strict typographic baseline match
-      drawText(getOrdinalDate(form.invoiceDate), 412, 288, 10);
-      drawText(`No: ${form.invoiceNumber}`, 485, 288, 10);
+      if (selectedClient?.contactPerson) {
+        drawText(selectedClient.contactPerson, 68, 170, 10);
+        addressLines.forEach((line, i) => drawText(line, 68, 185 + i * 13, 10));
+        const gstY = 185 + addressLines.length * 13;
+        if (selectedClient?.gstNumber) drawText(`GST : ${selectedClient.gstNumber}`, 68, gstY, 10);
+      } else {
+        addressLines.forEach((line, i) => drawText(line, 68, 170 + i * 13, 10));
+        const gstY = 170 + addressLines.length * 13;
+        if (selectedClient?.gstNumber) drawText(`GST : ${selectedClient.gstNumber}`, 68, gstY, 10);
+      }
+
+      // -- Erase background "Date:" from template: RIGHT SIDE ONLY (X=370+) --
+      // TAX INVOICE is centered (~X 220-365), Date: label is on right (~X 370-415)
+      // Y band: top 278-315 covers where Date: sits, above where TAX INVOICE header is
+      firstPage.drawRectangle({
+        x: 370,
+        y: height - 315,
+        width: 230,
+        height: 40,
+        color: rgb(1, 1, 1),
+        opacity: 1,
+      });
+
+      // -- Date: label + value together at top right --
+      drawText('Date:', 430, 120, 10, true);
+      drawText(getOrdinalDate(form.invoiceDate), 463, 120, 10);
+
+      // -- No: INV-xxxx: LEFT side, just above "SUB: Final Invoice" --
+      drawText(`No: ${form.invoiceNumber}`, 68, 288, 10);
 
       // -- Table Row Start --
       const rowY = 384; // Exact vertical center baseline for Row 1
