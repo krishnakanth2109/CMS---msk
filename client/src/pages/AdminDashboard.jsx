@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
-  Users, UserCheck, TrendingUp, Calendar, Building, 
-  Send, PauseCircle, UserMinus, X
+  Users, UserCheck, TrendingUp, PauseCircle, UserX, User, 
+  ClipboardList, Briefcase, FileText
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -37,62 +37,85 @@ async function apiFetch(path) {
 
 // ─── REUSABLE CARD COMPONENTS ────────────────────────────────────────────────
 
-const SummaryCard = ({ title, value, trend, icon: Icon, bgColor, progressColor, iconBg, onClick }) => (
+// 1. Primary Blue Card (Total Candidates - Dark Style)
+const PrimaryStatCard = ({ title, value, trend, icon: Icon, onClick }) => (
   <div 
     onClick={onClick}
-    className={clsx(
-      "relative z-10 overflow-hidden rounded-[2rem] p-6 text-white shadow-xl h-44 flex flex-col justify-between transition-all hover:scale-[1.02] cursor-pointer active:scale-95 hover:ring-4 hover:ring-white/20", 
-      bgColor
-    )}
+    className="relative overflow-hidden bg-[#3530a0] rounded-[1.5rem] p-6 text-white shadow-lg h-44 flex flex-col justify-between cursor-pointer hover:shadow-2xl transition-all hover:scale-[1.02]"
   >
-    <div className="flex justify-between items-start pointer-events-none">
+    <div className="relative z-10 flex justify-between items-start">
       <div>
-        <p className="text-[10px] font-black uppercase tracking-[0.15em] opacity-80">{title}</p>
-        <h3 className="text-2xl font-black mt-2 tracking-tighter">{value}</h3> {/* Reduced size to 2xl */}
+        <p className="text-[10px] font-bold uppercase tracking-wider opacity-90">{title}</p>
+        <h3 className="text-4xl font-bold mt-2">{value}</h3>
       </div>
-      <div className={clsx("p-3 rounded-2xl shadow-inner", iconBg)}>
+      <div className="p-2 bg-white/10 rounded-lg">
         <Icon className="w-7 h-7 text-white" />
       </div>
     </div>
-    <div className="mt-auto pointer-events-none">
-      <div className="flex items-center gap-2">
-        <span className="bg-white/25 px-2 py-0.5 rounded-full text-[10px] font-black">+{trend}%</span> 
-        <span className="text-[9px] opacity-70 font-black uppercase tracking-tight">vs last month</span>
+    
+    <div className="relative z-10 mt-auto">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="bg-green-500 text-white px-2 py-0.5 rounded text-[10px] font-bold">+{trend}%</span>
+        <span className="text-[10px] opacity-70">vs last month</span>
       </div>
-      <div className="mt-4 h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-        <div className={clsx("h-full rounded-full", progressColor)} style={{ width: '65%' }} />
+      {/* Progress Bar */}
+      <div className="h-1.5 w-full bg-black/20 rounded-full overflow-hidden">
+        <div className="h-full bg-blue-400 rounded-full w-2/5"></div>
       </div>
     </div>
+    {/* Decorative background shape */}
+    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10 pointer-events-none" />
   </div>
 );
 
-const StatusCard = ({ title, value, trend, icon: Icon, iconBg, trendColor, barColor, onClick }) => (
-  <div 
-    onClick={onClick}
-    className="relative z-10 bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 h-44 flex flex-col justify-between group hover:shadow-xl transition-all cursor-pointer active:scale-95 hover:border-blue-200"
-  >
-    <div className="flex justify-between items-start pointer-events-none">
-      <div>
-        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-400">{title}</p>
-        <h3 className="text-2xl font-black mt-2 text-gray-900 tracking-tighter">{value}</h3> {/* Reduced size to 2xl */}
+// 2. Bubble Stat Card (Bubble Background + Progress Bar)
+const BubbleStatCard = ({ title, value, trend, icon: Icon, theme = 'blue', onClick }) => {
+  
+  // Theme Configuration
+  const themes = {
+    green: { bubble: 'bg-[#e8f5e9]', iconBg: 'bg-[#e8f5e9]', iconText: 'text-green-600', badge: 'bg-green-500', bar: 'bg-green-500' },
+    blue:  { bubble: 'bg-[#e3f2fd]',  iconBg: 'bg-[#e3f2fd]',  iconText: 'text-blue-600',  badge: 'bg-blue-500', bar: 'bg-blue-500' },
+    purple:{ bubble: 'bg-[#f3e5f5]', iconBg: 'bg-[#f3e5f5]', iconText: 'text-purple-600', badge: 'bg-purple-500', bar: 'bg-purple-500' },
+    orange:{ bubble: 'bg-[#fff3e0]', iconBg: 'bg-[#fff3e0]', iconText: 'text-orange-500', badge: 'bg-orange-400', bar: 'bg-orange-400' },
+    red:   { bubble: 'bg-[#ffebee]', iconBg: 'bg-[#ffebee]', iconText: 'text-red-500',    badge: 'bg-red-500',    bar: 'bg-red-500' },
+  };
+
+  const t = themes[theme] || themes.blue;
+
+  return (
+    <div 
+      onClick={onClick}
+      className="relative bg-white rounded-[1.5rem] p-6 shadow-sm border border-gray-100 h-44 flex flex-col justify-between cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02] overflow-hidden"
+    >
+      {/* THE BUBBLE EFFECT */}
+      <div className={clsx("absolute -top-6 -left-6 w-36 h-36 rounded-full opacity-100 pointer-events-none", t.bubble)}></div>
+
+      {/* Content */}
+      <div className="relative z-10 flex justify-between items-start">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">{title}</p>
+          <h3 className="text-4xl font-bold mt-2 text-slate-800">{value}</h3>
+        </div>
+        <div className={clsx("p-2 rounded-lg", t.iconBg)}>
+          <Icon className={clsx("w-6 h-6", t.iconText)} />
+        </div>
       </div>
-      <div className={clsx("p-3 rounded-2xl transition-all group-hover:scale-110 shadow-sm", iconBg)}>
-        <Icon className="w-7 h-7" />
+
+      <div className="relative z-10 mt-auto">
+        <div className="flex items-center gap-2 mb-2">
+          <span className={clsx("px-2 py-0.5 rounded text-[10px] font-bold text-white", t.badge)}>+{trend}%</span>
+          <span className="text-[10px] text-gray-400">vs last month</span>
+        </div>
+        {/* Progress Bar */}
+        <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+          <div className={clsx("h-full rounded-full w-2/5", t.bar)}></div>
+        </div>
       </div>
     </div>
-    <div className="mt-auto pointer-events-none">
-      <div className="flex items-center gap-2">
-        <span className={clsx("px-2 py-0.5 rounded-full text-[10px] font-black", trendColor)}>
-          +{trend}%
-        </span> 
-        <span className="text-[9px] text-gray-400 font-black uppercase tracking-tight">vs last month</span>
-      </div>
-      <div className="mt-4 h-1.5 w-full bg-gray-50 rounded-full overflow-hidden">
-        <div className={clsx("h-full rounded-full transition-all duration-1000", barColor)} style={{ width: '45%' }} />
-      </div>
-    </div>
-  </div>
-);
+  );
+};
+
+// ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -103,18 +126,20 @@ export default function AdminDashboard() {
   const [recruiters, setRecruiters] = useState([]);
   const [interviews, setInterviews] = useState([]);
   const [clients,    setClients   ] = useState([]);
+  const [jobs,       setJobs      ] = useState([]);
   const [loading,    setLoading   ] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [candR, recR, intR, clientR] = await Promise.allSettled([
-          apiFetch('/candidates'), apiFetch('/recruiters'), apiFetch('/interviews'), apiFetch('/clients'),
+        const [candR, recR, intR, clientR, jobsR] = await Promise.allSettled([
+          apiFetch('/candidates'), apiFetch('/recruiters'), apiFetch('/interviews'), apiFetch('/clients'), apiFetch('/jobs')
         ]);
         if (candR.status === 'fulfilled') setCandidates(candR.value);
         if (recR.status === 'fulfilled') setRecruiters(recR.value);
         if (intR.status === 'fulfilled') setInterviews(intR.value);
         if (clientR.status === 'fulfilled') setClients(clientR.value);
+        if (jobsR.status === 'fulfilled') setJobs(jobsR.value);
       } catch (err) {
         toast({ title: 'Sync Error', description: 'Check server connection', variant: 'destructive' });
       } finally { setLoading(false); }
@@ -122,7 +147,7 @@ export default function AdminDashboard() {
     fetchData();
   }, []);
 
-  // Safe Status Helper to handle Array or String status formats
+  // Safe Status Helper
   const getSafeStatus = (s) => {
     if (Array.isArray(s)) return String(s[0] || '').toLowerCase();
     return String(s || '').toLowerCase();
@@ -143,168 +168,236 @@ export default function AdminDashboard() {
   }, [candidates]);
 
   const recruiterStats = useMemo(() => {
-    return recruiters.map(r => {
-      const cands = candidates.filter(c => (c.recruiterId?._id || c.recruiterId) === (r._id || r.id));
-      return {
-        fullName: r.name || `${r.firstName || ''} ${r.lastName || ''}`.trim(),
-        shortName: r.firstName || r.name?.split(' ')[0] || 'User',
-        submissions: cands.length,
-        joined: cands.filter(c => getSafeStatus(c.status) === 'joined').length,
-      };
-    }).sort((a,b) => b.submissions - a.submissions);
+    return recruiters
+      .filter(r => r._id || r.id) // Filter out null/undefined IDs
+      .map(r => {
+        const cands = candidates.filter(c => (c.recruiterId?._id || c.recruiterId) === (r._id || r.id));
+        const name = r.name || `${r.firstName || ''} ${r.lastName || ''}`.trim();
+        
+        return {
+          fullName: name, // This might be empty string if names are missing
+          submissions: cands.length,
+          joined: cands.filter(c => getSafeStatus(c.status) === 'joined').length,
+          pending: cands.filter(c => ['submitted', 'pending'].includes(getSafeStatus(c.status))).length,
+          hold: cands.filter(c => getSafeStatus(c.status) === 'hold').length,
+          rejected: cands.filter(c => getSafeStatus(c.status) === 'rejected').length,
+        };
+      })
+      .filter(r => r.fullName !== "") // Filter out recruiters with empty names
+      .sort((a,b) => b.submissions - a.submissions);
   }, [candidates, recruiters]);
 
-  const barData = recruiterStats.slice(0, 6).map(r => ({ name: r.shortName, value: r.submissions }));
+  const barData = recruiterStats.slice(0, 6).map(r => ({ 
+    name: r.fullName.split(' ')[0], // Use first name for chart
+    value: r.submissions 
+  }));
 
   if (loading) return (
-    <div className="flex h-screen w-full items-center justify-center bg-[#f8faff]">
-      <div className="animate-spin h-12 w-12 border-4 border-[#4d47c4] border-t-transparent rounded-full" />
+    <div className="flex h-screen w-full items-center justify-center bg-[#f3f6fd]">
+      <div className="animate-spin h-12 w-12 border-4 border-[#283086] border-t-transparent rounded-full" />
     </div>
   );
 
+  const formattedDate = format(new Date(), 'dd MMM, yyyy').toUpperCase();
+
   return (
-    <div className="flex-1 p-10 bg-[#f8faff] min-h-screen">
-      <div className="max-w-[1600px] mx-auto space-y-10">
+    <div className="max-w-[1600px] mx-auto space-y-8">
+      
+      {/* ── Header ── */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-[#283086]">Admin Dashboard</h1>
+          <p className="text-gray-500 text-sm font-medium mt-1">
+            Welcome back {currentUser?.firstName || 'kkanth'}, Have a nice day..!
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-xs font-bold text-gray-500 bg-white px-4 py-2 rounded-lg shadow-sm">
+          <span>{formattedDate}</span>
+          <span className="relative flex h-3 w-3">
+             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+             <span className="relative inline-flex rounded-full h-3 w-3 bg-purple-500"></span>
+          </span>
+        </div>
+      </div>
 
-        {/* ── Header ── */}
-        <div className="flex justify-between items-end">
+      {/* ── Row 1: Summary Cards ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <PrimaryStatCard 
+          title="Total Candidates" 
+          value={stats.total} 
+          trend={12} 
+          icon={Users} 
+          onClick={() => navigate('/admin/add-candidate', { state: { filter: 'All' } })}
+        />
+        <BubbleStatCard 
+          title="Active Recruiters" 
+          value={recruiters.length} 
+          trend={5} 
+          icon={UserCheck} 
+          theme="green"
+          onClick={() => navigate('/admin/recruiters')}
+        />
+        <BubbleStatCard 
+          title="Total Jobs" 
+          value={jobs.length} 
+          trend={8} 
+          icon={Briefcase} 
+          theme="blue"
+          onClick={() => navigate('/admin/requirements')}
+        />
+        <BubbleStatCard 
+          title="Total Clients" 
+          value={clients.length} 
+          trend={3} 
+          icon={FileText} 
+          theme="purple"
+          onClick={() => navigate('/admin/clients')}
+        />
+      </div>
+
+      {/* ── Row 2: Status Cards ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <BubbleStatCard 
+          title="Submitted" 
+          value={stats.submitted} 
+          trend={12} 
+          icon={User} 
+          theme="purple"
+          onClick={() => navigate('/admin/add-candidate', { state: { filter: 'Submitted' } })}
+        />
+        <BubbleStatCard 
+          title="Joined" 
+          value={stats.joined} 
+          trend={7} 
+          icon={UserCheck} 
+          theme="green"
+          onClick={() => navigate('/admin/add-candidate', { state: { filter: 'Joined' } })}
+        />
+        <BubbleStatCard 
+          title="Hold" 
+          value={stats.hold} 
+          trend={4} 
+          icon={PauseCircle} 
+          theme="orange"
+          onClick={() => navigate('/admin/add-candidate', { state: { filter: 'Hold' } })}
+        />
+        <BubbleStatCard 
+          title="Rejected" 
+          value={stats.rejected} 
+          trend={5} 
+          icon={UserX} 
+          theme="red"
+          onClick={() => navigate('/admin/add-candidate', { state: { filter: 'Rejected' } })}
+        />
+      </div>
+
+      {/* ── Row 3: Middle Large Cards ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Average Time of Hire */}
+        <div className="bg-white p-8 rounded-[1.5rem] shadow-sm border border-gray-100 flex items-center justify-between">
+          <div className="flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Average Time of Hire</p>
+            <h3 className="text-4xl font-bold text-slate-800 mt-2">0.0%</h3>
+            <div className="w-full h-2 bg-gray-100 rounded-full mt-6">
+              <div className="h-full bg-[#283086] rounded-full w-[30%]"></div>
+            </div>
+          </div>
+          <div className="bg-blue-50 p-4 rounded-xl">
+            <TrendingUp size={32} className="text-blue-600" />
+          </div>
+        </div>
+
+        {/* Joining Pipeline */}
+        <div className="bg-white p-8 rounded-[1.5rem] shadow-sm border border-gray-100 flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-black text-[#4d47c4] tracking-tight">Admin Dashboard</h1>
-            <p className="text-gray-500 font-bold mt-1 uppercase text-xs tracking-wider">Welcome back {currentUser?.firstName || 'kkanth'}, Have a nice day..!</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Joining Pipeline</p>
+            <h3 className="text-4xl font-bold text-slate-800 mt-2">{stats.total}</h3>
+            <p className="text-xs text-gray-400 mt-2">Active candidates in pipeline</p>
           </div>
-          <div className="bg-white px-6 py-3 rounded-2xl shadow-sm border border-gray-100 font-black text-[#4d47c4] text-xs uppercase tracking-[0.2em]">
-            {format(new Date(), 'dd MMM, yyyy')}
+          <div className="bg-indigo-50 p-4 rounded-xl">
+            <User size={32} className="text-indigo-600" />
           </div>
         </div>
+      </div>
 
-        {/* ── Row 1: Summary Cards ── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          <SummaryCard 
-            title="Total Candidates" 
-            value={stats.total} trend={12} icon={Users} bgColor="bg-[#4d47c4]" progressColor="bg-white" iconBg="bg-white/20" 
-            onClick={() => navigate('/admin/add-candidate', { state: { filter: 'All' } })}
-          />
-          <SummaryCard 
-            title="Active Recruiters" 
-            value={recruiters.length} trend={5} icon={UserCheck} bgColor="bg-[#22c55e]" progressColor="bg-white" iconBg="bg-white/20" 
-            onClick={() => navigate('/admin/recruiters')}
-          />
-          <SummaryCard 
-            title="INTERVIEWS" 
-            value={interviews.length} trend={8} icon={Calendar} bgColor="bg-[#3b82f6]" progressColor="bg-white" iconBg="bg-white/20" 
-            onClick={() => navigate('/admin/add-candidate', { state: { filter: 'Interviews' } })}
-          />
-          <SummaryCard 
-            title="Total Clients" 
-            value={clients.length} trend={3} icon={Building} bgColor="bg-[#722ed1]" progressColor="bg-white" iconBg="bg-white/20" 
-            onClick={() => navigate('/admin/clients')}
-          />
+      {/* ── Row 4: Chart Section ── */}
+      <div className="bg-white p-8 rounded-[1.5rem] shadow-sm border border-gray-100">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-base font-bold text-slate-800">Top Recruiters (Upload Report)</h3>
+          <span className="text-xs text-gray-400">showing 6 of {recruiters.length}</span>
         </div>
-
-        {/* ── Row 2: Status Cards ── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          <StatusCard 
-            title="Submitted" 
-            value={stats.submitted} trend={12} icon={Send} iconBg="bg-purple-50 text-purple-600 border border-purple-100" barColor="bg-purple-600" trendColor="bg-purple-100 text-purple-700" 
-            onClick={() => navigate('/admin/add-candidate', { state: { filter: 'Submitted' } })}
-          />
-          <StatusCard 
-            title="Joined" 
-            value={stats.joined} trend={7} icon={UserCheck} iconBg="bg-green-50 text-green-600 border border-green-100" barColor="bg-green-600" trendColor="bg-green-100 text-green-700" 
-            onClick={() => navigate('/admin/add-candidate', { state: { filter: 'Joined' } })}
-          />
-          <StatusCard 
-            title="Hold" 
-            value={stats.hold} trend={4} icon={PauseCircle} iconBg="bg-orange-50 text-orange-600 border border-orange-100" barColor="bg-orange-600" trendColor="bg-orange-100 text-orange-700" 
-            onClick={() => navigate('/admin/add-candidate', { state: { filter: 'Hold' } })}
-          />
-          <StatusCard 
-            title="Rejected" 
-            value={stats.rejected} trend={5} icon={UserMinus} iconBg="bg-red-50 text-red-600 border border-red-100" barColor="bg-red-600" trendColor="bg-red-100 text-red-700" 
-            onClick={() => navigate('/admin/add-candidate', { state: { filter: 'Rejected' } })}
-          />
+        <div className="h-72">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={barData} barSize={40}>
+              <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis 
+                dataKey="name" 
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fill: '#64748b', fontSize: 12, fontWeight: 500 }} 
+                dy={10} 
+              />
+              <YAxis 
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fill: '#94a3b8', fontSize: 12 }} 
+                tickFormatter={(value) => `${value}%`}
+              />
+              <Tooltip cursor={{ fill: 'transparent' }} />
+              <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                {barData.map((_, index) => (
+                  <Cell key={`cell-${index}`} fill="#5664d2" />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
+      </div>
 
-        {/* ── Middle Metrics Row ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-gray-100 flex items-center justify-between group">
-            <div className="flex-1">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Avg. Time to Hire</p>
-              <h3 className="text-4xl font-black text-gray-900 mt-3">0.0%</h3>
-              <div className="w-full h-2 bg-gray-100 rounded-full mt-8 overflow-hidden">
-                <div className="h-full bg-[#4d47c4] rounded-full group-hover:w-[45%] transition-all duration-1000 w-0" />
-              </div>
-            </div>
-            <div className="ml-10 bg-blue-50 p-6 rounded-[2rem]">
-              <TrendingUp size={48} className="text-[#3b82f6]" />
-            </div>
-          </div>
-
-          <div 
-            onClick={() => navigate('/admin/add-candidate', { state: { filter: 'All' } })}
-            className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-gray-100 flex items-center justify-between group hover:shadow-md transition-all cursor-pointer z-10"
+      {/* ── Row 5: Table Section ── */}
+      <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-8 py-6 flex justify-between items-center bg-[#f8faff] border-b border-gray-100">
+          <h3 className="text-base font-bold text-slate-800">Recruiter Performance Details</h3>
+          <button 
+            onClick={() => navigate('/admin/recruiters')} 
+            className="bg-[#283086] text-white px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wide hover:bg-blue-900 transition-colors shadow-lg"
           >
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Joining Pipeline</p>
-              <h3 className="text-4xl font-black text-gray-900 mt-3">{stats.total}</h3>
-              <p className="text-[10px] font-bold text-gray-400 mt-6 uppercase tracking-widest">Active in organizational pipeline</p>
-            </div>
-            <div className="bg-indigo-50 p-6 rounded-[2rem]">
-              <Users size={48} className="text-[#4d47c4]" />
-            </div>
-          </div>
+            View All Recruiters
+          </button>
         </div>
-
-        {/* ── Chart Section ── */}
-        <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-gray-100">
-           <h3 className="text-xl font-black text-gray-800 mb-10">Top Recruiters (Upload Report)</h3>
-          <div className="h-96">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 700 }} dy={15} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 12, fontWeight: 600 }} />
-                <Tooltip cursor={{ fill: '#f8faff' }} />
-                <Bar dataKey="value" radius={[10, 10, 0, 0]} barSize={50}>
-                  {barData.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={['#4d47c4', '#6366f1', '#818cf8', '#a5b4fc'][index % 4]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* ── Table Section ── */}
-        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-10 flex justify-between items-center bg-[#fbfcfe]">
-            <h3 className="text-xl font-black text-[#4d47c4]">Recruiter Performance Details</h3>
-            <button onClick={() => navigate('/admin/recruiters')} className="bg-[#4d47c4] hover:bg-[#3d38a3] text-white px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg">
-              View All Recruiters
-            </button>
-          </div>
-          <table className="w-full">
-            <thead>
-              <tr className="bg-[#f8faff] text-[10px] font-black uppercase text-gray-400 tracking-widest border-b border-gray-100">
-                <th className="px-10 py-6 text-left">Recruiter</th>
-                <th className="px-6 py-6 text-center">Submissions</th>
-                <th className="px-6 py-6 text-center">Joined</th>
-                <th className="px-10 py-6 text-right">Avg. Time to Hire</th>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-[#f8faff] text-gray-500 font-bold uppercase text-[10px] tracking-widest border-b border-gray-100">
+              <tr>
+                <th className="px-8 py-5 text-left">Recruiter</th>
+                <th className="px-4 py-5 text-center">Submissions</th>
+                <th className="px-4 py-5 text-center">Hold</th>
+                <th className="px-4 py-5 text-center">Joined</th>
+                <th className="px-4 py-5 text-center">Rejected</th>
+                <th className="px-4 py-5 text-center">Pending</th>
+                <th className="px-8 py-5 text-right">Avg. Time to Hire</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-gray-50 bg-white">
               {recruiterStats.map((r, i) => (
                 <tr key={i} className="hover:bg-blue-50/30 transition-colors">
-                  <td className="px-10 py-6 font-bold text-gray-700 text-sm">{r.fullName}</td>
-                  <td className="px-6 py-6 text-center text-blue-600 font-black text-lg">{r.submissions}</td>
-                  <td className="px-6 py-6 text-center text-green-500 font-bold">{r.joined}</td>
-                  <td className="px-10 py-6 text-right font-black text-red-500 text-sm">0.0%</td>
+                  <td className="px-8 py-5 font-bold text-slate-700">{r.fullName}</td>
+                  <td className="px-4 py-5 text-center text-blue-600 font-black">{r.submissions}</td>
+                  <td className="px-4 py-5 text-center text-orange-400 font-bold">{r.hold}</td>
+                  <td className="px-4 py-5 text-center text-green-600 font-black">{r.joined}</td>
+                  <td className="px-4 py-5 text-center text-red-500 font-medium">{r.rejected}</td>
+                  <td className="px-4 py-5 text-center text-gray-400 font-medium">{r.pending}</td>
+                  <td className="px-8 py-5 text-right font-black text-red-500">0.0%</td>
                 </tr>
               ))}
+              {recruiterStats.length === 0 && (
+                <tr><td colSpan="7" className="p-8 text-center text-gray-400">No active recruiter data available</td></tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
+
     </div>
   );
 }

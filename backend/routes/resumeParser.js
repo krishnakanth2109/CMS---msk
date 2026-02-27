@@ -55,6 +55,8 @@ const extractInformation = (text) => {
     name: extractName(lines),
     email: extractEmail(text),
     contact: extractPhone(text),
+    linkedin: extractLinkedIn(text),
+    gender: extractGender(text),
     skills: extractSkills(text),
     totalExperience: extractExperience(text),
     education: extractEducation(text),
@@ -93,6 +95,15 @@ const extractEmail = (text) => {
 };
 
 /**
+ * Extract LinkedIn profile format
+ */
+const extractLinkedIn = (text) => {
+  const linkedinRegex = /(?:https?:\/\/)?(?:[a-z]{2,3}\.)?linkedin\.com\/(?:in\/|pub\/|profile\/)?([a-zA-Z0-9_-]+)\/?/i;
+  const match = text.match(linkedinRegex);
+  return match ? match[0] : '';
+};
+
+/**
  * Extract phone number
  */
 const extractPhone = (text) => {
@@ -117,6 +128,19 @@ const extractPhone = (text) => {
     }
   }
   return '';
+};
+
+/**
+ * Extract Gender
+ */
+const extractGender = (text) => {
+  // Look for explicit indicators like "Gender: Male" or just the words near personal details
+  const match = text.match(/(?:gender|sex)[\s:-]+(male|female|other)\b/i) || text.match(/\b(male|female)\b/i);
+  if (match) {
+    const gender = match[1].toLowerCase();
+    return gender.charAt(0).toUpperCase() + gender.slice(1);
+  }
+  return 'Not Specified';
 };
 
 /**
@@ -270,20 +294,53 @@ const extractExperience = (text) => {
 };
 
 /**
- * Extract education
+ * Extract education - finds the highest qualification based on hierarchy
  */
 const extractEducation = (text) => {
-  const degrees = [
-    'B.Tech', 'B.E', 'M.Tech', 'M.E', 'MBA', 'MCA', 'BCA',
-    'Bachelor', 'Master', 'PhD', 'Doctorate',
-    'B.Sc', 'M.Sc', 'B.Com', 'M.Com', 'BBA',
+  // Ordered by highest priority first
+  const degreeHierarchy = [
+    { regex: /\b(Ph\.?D\.|Doctorate)\b/i, label: 'PhD' },
+    { regex: /\b(M\.?Tech|Masters? of Technology)\b/i, label: 'M.Tech' },
+    { regex: /\b(M\.?E|Masters? of Engineering)\b/i, label: 'M.E' },
+    { regex: /\b(MBA|Masters? of Business Administration)\b/i, label: 'MBA' },
+    { regex: /\b(MCA|Masters? of Computer Applications?)\b/i, label: 'MCA' },
+    { regex: /\b(M\.?Sc|Masters? of Science)\b/i, label: 'M.Sc' },
+    { regex: /\b(M\.?Com|Masters? of Commerce)\b/i, label: 'M.Com' },
+    { regex: /\b(Masters?.*?)\b/i, label: 'Master\'s Degree' },
+
+    { regex: /\b(B\.?Tech|Bachelors? of Technology)\b/i, label: 'B.Tech' },
+    { regex: /\b(B\.?E|Bachelors? of Engineering)\b/i, label: 'B.E' },
+    { regex: /\b(BCA|Bachelors? of Computer Applications?)\b/i, label: 'BCA' },
+    { regex: /\b(BBA|Bachelors? of Business Administration)\b/i, label: 'BBA' },
+    { regex: /\b(B\.?Sc|Bachelors? of Science)\b/i, label: 'B.Sc' },
+    { regex: /\b(B\.?Com|Bachelors? of Commerce)\b/i, label: 'B.Com' },
+    { regex: /\b(Bachelors?.*?)\b/i, label: 'Bachelor\'s Degree' },
   ];
 
-  for (let degree of degrees) {
-    const regex = new RegExp(`${degree}[^\\n]{0,100}`, 'i');
-    const match = text.match(regex);
-    if (match) {
-      return match[0].trim();
+  // Try to find the exact line context for the highest degree
+  for (let degree of degreeHierarchy) {
+    if (degree.regex.test(text)) {
+      // Find the specific line containing this highest qualification to give contextual info
+      const lines = text.split('\n');
+      for (let line of lines) {
+        if (degree.regex.test(line)) {
+          let clean = line.trim();
+
+          // Cut aggressively at common delimiters
+          clean = clean.split(/[,|\-\(\);]/)[0].trim();
+
+          // Stop at common separator words that indicate the end of the degree name
+          const stopPattern = /\b(postgraduate|graduate|with|from|at|cgpa|percentage|\d+%|score|marks|board|university|college|school|passed)\b/i;
+          const stopMatch = clean.match(stopPattern);
+          if (stopMatch) {
+            clean = clean.substring(0, stopMatch.index).trim();
+          }
+
+          // If the remaining string is clean and short enough, return it. Otherwise fallback to base label.
+          return clean && clean.length <= 40 ? clean : degree.label;
+        }
+      }
+      return degree.label; // Fallback to basic label if line logic misses
     }
   }
 

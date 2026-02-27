@@ -23,7 +23,6 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
     { name: 'Messages', path: '/admin/messages', icon: MessageSquare },
     { name: 'Reports', path: '/admin/reports', icon: BarChart },
     { name: 'Settings', path: '/admin/settings', icon: Settings },
-
   ];
 
   const recruiterLinks = [
@@ -37,7 +36,8 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
     { name: 'Settings', path: '/recruiter/settings', icon: Settings },
   ];
 
-  const links = userRole === 'admin' ? adminLinks : recruiterLinks;
+  // 🔴 FIXED: Show adminLinks to both 'admin' and 'manager' roles
+  const links = (userRole === 'admin' || userRole === 'manager') ? adminLinks : recruiterLinks;
 
   return (
     <div 
@@ -74,7 +74,6 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
         )}>
           {!isCollapsed ? (
             <div className="flex items-center gap-3">
-              {/* UPDATED: Removed img (US initials) and added User icon */}
               <div className="w-12 h-12 rounded-full border-2 border-white/50 flex items-center justify-center bg-white/20 shadow-inner">
                  <User className="h-6 w-6 text-white" />
               </div>
