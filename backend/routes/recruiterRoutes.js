@@ -1,71 +1,45 @@
-import express   from 'express';
-import User      from '../models/User.js';
-// FIX: Candidate was used in /profile/stats but never imported
-import Candidate from '../models/Candidate.js';
-import {
-  getRecruiters,
-  createRecruiter,
-  updateRecruiter,
+import express from 'express';
+import User from '../models/User.js';
+import { 
+  getRecruiters, 
+  createRecruiter, 
+  updateRecruiter, 
   deleteRecruiter,
   toggleRecruiterStatus,
   getUserProfile,
-  updateUserProfile,
+  updateUserProfile
 } from '../controllers/recruiterController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// 1. Protected Routes — all logged-in users
-// ═══════════════════════════════════════════════════════════════════════════════
+// ==========================================
+// 1. Public/Protected Routes (All Logged In Users)
+// ==========================================
 
-// Apply token verification to every route below this line
+// Protect all routes
 router.use(protect);
 
-// @route   GET /api/recruiters/profile
-// @route   PUT /api/recruiters/profile
+// @desc    Get current user profile
+// @route   GET /api/users/profile
+// @route   PUT /api/users/profile
 // @access  Private
 router.route('/profile')
   .get(getUserProfile)
   .put(updateUserProfile);
 
-// @route   GET /api/recruiters/profile/stats
+// @desc    Get all recruiters/active users (for assignment dropdowns)
+// @route   GET /api/users/active-list
 // @access  Private
-//
-// FIX: This route was defined BEFORE router.use(protect) in the old file,
-// so req.user was always undefined and Candidate wasn't imported → crashes.
-// Moved to AFTER protect so req.user is guaranteed to be set.
-router.get('/profile/stats', async (req, res) => {
-  try {
-    const INTERVIEW_STAGES = new Set([
-      'L1 Interview', 'L2 Interview', 'Final Interview',
-      'Technical Interview', 'HR Interview', 'Interview',
-    ]);
-
-    const all = await Candidate.find({ recruiterId: req.user._id })
-      .select('status')
-      .lean();
-
-    res.json({
-      totalSubmissions: all.length,
-      interviews:       all.filter(c => INTERVIEW_STAGES.has(c.status)).length,
-      offers:           all.filter(c => c.status === 'Offer').length,
-      joined:           all.filter(c => c.status === 'Joined').length,
-      rejected:         all.filter(c => c.status === 'Rejected').length,
-    });
-  } catch (error) {
-    console.error('[Stats] /profile/stats error:', error.message);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// @route   GET /api/recruiters/active-list
-// @access  Private (all roles — used to populate assignment dropdowns)
+// Note: Kept separate from Admin "Get All" to allow non-admins to populate dropdowns
 router.get('/active-list', async (req, res) => {
   try {
-    const recruiters = await User.find({ active: true })
-      .select('_id firstName lastName email role')
-      .sort({ firstName: 1, lastName: 1 });
+    const recruiters = await User.find({ 
+      active: true 
+    })
+    .select('_id name email role')
+    .sort({ name: 1 });
+    
     res.json(recruiters);
   } catch (error) {
     console.error('Get Active Users Error:', error);
@@ -73,23 +47,27 @@ router.get('/active-list', async (req, res) => {
   }
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// 2. Admin-only Routes
-// ═══════════════════════════════════════════════════════════════════════════════
+// ==========================================
+// 2. Admin / Manager Routes
+// ==========================================
 
-router.use(authorize('admin'));
+// 🔴 FIXED: Apply Admin AND Manager authorization to all routes below
+router.use(authorize('admin', 'manager'));
 
-// @route   GET  /api/recruiters   — list all
-// @route   POST /api/recruiters   — create new
+// @desc    Get all recruiters (Admin Dashboard) & Create Recruiter
+// @route   GET /api/users
+// @route   POST /api/users
 router.route('/')
   .get(getRecruiters)
   .post(createRecruiter);
 
-// @route   PATCH /api/recruiters/:id/status
+// @desc    Manage specific recruiter status
+// @route   PATCH /api/users/:id/status
 router.patch('/:id/status', toggleRecruiterStatus);
 
-// @route   PUT    /api/recruiters/:id
-// @route   DELETE /api/recruiters/:id
+// @desc    Update & Delete specific recruiter
+// @route   PUT /api/users/:id
+// @route   DELETE /api/users/:id
 router.route('/:id')
   .put(updateRecruiter)
   .delete(deleteRecruiter);

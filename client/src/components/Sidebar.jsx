@@ -42,7 +42,22 @@ export default function Sidebar() {
     { name: 'Settings', path: '/recruiter/settings', icon: Settings },
   ];
 
+<<<<<<< HEAD
   const links = userRole === 'admin' ? adminLinks : recruiterLinks;
+=======
+  // 🔴 FIXED: Determine which links to show based on exact role
+  let links = [];
+  if (userRole === 'admin') {
+    links = adminLinks;
+  } else if (userRole === 'manager') {
+    // Show admin links but hide Client Info and Invoices
+    links = adminLinks.filter(
+      (link) => link.name !== 'Client Info' && link.name !== 'Invoices'
+    );
+  } else {
+    links = recruiterLinks;
+  }
+>>>>>>> 8e390de68b83837061f8ab7411eb74814c96ebab
 
   return (
     <div className={clsx("flex flex-col h-screen fixed left-0 top-0 z-50 shadow-2xl w-80", sidebarBg)}>
@@ -62,8 +77,14 @@ export default function Sidebar() {
       {/* --- User Profile Card --- */}
       <div className="mb-8 px-6">
         <div className="bg-[#3d4692] rounded-2xl p-4 flex items-center gap-4 overflow-hidden shadow-inner border border-white/5">
+<<<<<<< HEAD
           <div className="w-12 h-12 rounded-full border-2 border-white/20 flex-shrink-0 overflow-hidden bg-gray-200">
              <img src="https://github.com/shadcn.png" alt="User" className="w-full h-full object-cover" />
+=======
+          <div className="w-12 h-12 rounded-full border-2 border-white/20 flex-shrink-0 overflow-hidden bg-gray-200 flex items-center justify-center">
+             {/* Fallback to User icon if no image available */}
+             <User className="h-6 w-6 text-gray-500" />
+>>>>>>> 8e390de68b83837061f8ab7411eb74814c96ebab
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-white truncate">{currentUser?.email || 'admin@vts.com'}</p>

@@ -3,12 +3,10 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import Candidate from '../models/Candidate.js';
-import User from '../models/User.js';
-import { parseResume } from './resumeParser.js';
-import { protect } from '../middleware/authMiddleware.js';
+import User from '../models/User.js'; 
+import { parseResume } from './resumeParser.js'; 
+import { protect } from '../middleware/authMiddleware.js'; 
 import { updateCandidateStatus, updateCandidateRemarks, inlineUpdateCandidate } from '../controllers/candidateStatusController.js';
-
-import { bulkImportCandidates } from '../controllers/bulkImportController.js';
 
 const router = express.Router();
 
@@ -26,7 +24,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 }, 
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
       'application/pdf',
@@ -41,95 +39,12 @@ const upload = multer({
   }
 });
 
-// Multer config for Excel uploads
-const excelUpload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    const allowedExcelTypes = [
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    ];
-    if (allowedExcelTypes.includes(file.mimetype) || file.originalname.endsWith('.xlsx') || file.originalname.endsWith('.xls')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Invalid file type. Only Excel (.xlsx, .xls) allowed.'));
-    }
-  }
-});
-
 // Apply Authentication
 router.use(protect);
 
-// --- HELPER FUNCTION ---
-// Fix data types from FormData (Multer converts everything to strings)
-const sanitizeBody = (body) => {
-  const data = { ...body };
+// --- ROUTES ---
 
-  if (typeof data.skills === 'string') {
-    data.skills = data.skills.split(',').map(s => s.trim());
-  }
-
-  // Convert "true"/"false" strings to Booleans
-  if (data.offersInHand === 'true') data.offersInHand = true;
-  if (data.offersInHand === 'false') data.offersInHand = false;
-
-  if (data.servingNoticePeriod === 'true') data.servingNoticePeriod = true;
-  if (data.servingNoticePeriod === 'false') data.servingNoticePeriod = false;
-
-  return data;
-};
-
-// ==========================================
-// STATIC ROUTES (MUST BE BEFORE /:id ROUTES)
-// ==========================================
-
-// 1. Bulk Import Candidates from Excel
-router.post('/bulk-import', excelUpload.single('file'), bulkImportCandidates);
-
-// 2. Bulk Assign Recruiter
-// MOVED UP: This must be before router.put('/:id')
-router.put('/bulk-assign', async (req, res) => {
-  try {
-    const { candidateIds, recruiterId } = req.body;
-
-    if (!candidateIds || !Array.isArray(candidateIds) || candidateIds.length === 0) {
-      return res.status(400).json({ message: 'No candidates selected' });
-    }
-
-    if (!recruiterId) {
-      return res.status(400).json({ message: 'Target recruiter is required' });
-    }
-
-    // Verify Recruiter exists
-    const recruiter = await User.findById(recruiterId);
-    if (!recruiter) {
-      return res.status(404).json({ message: 'Recruiter not found' });
-    }
-
-    // Update candidates
-    const result = await Candidate.updateMany(
-      { _id: { $in: candidateIds } },
-      {
-        $set: {
-          recruiterId: recruiter._id,
-          recruiterName: `${recruiter.firstName || ''} ${recruiter.lastName || ''}`.trim() || recruiter.email
-        }
-      }
-    );
-
-    res.json({
-      success: true,
-      message: `Successfully assigned ${result.modifiedCount} candidates to ${recruiter.firstName || ''} ${recruiter.lastName || ''}`
-    });
-
-  } catch (error) {
-    console.error("Bulk Assign Error:", error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// 3. Parse Resume
+// Parse Resume
 router.post('/parse-resume', upload.single('resume'), async (req, res) => {
   try {
     if (!req.file) {
@@ -149,13 +64,8 @@ router.post('/parse-resume', upload.single('resume'), async (req, res) => {
           email: parsedResult.data.email || '',
           contact: parsedResult.data.contact || '',
           skills: parsedResult.data.skills || '',
-          linkedin: parsedResult.data.linkedin || '',
-          gender: parsedResult.data.gender || 'Not Specified',
-          education: parsedResult.data.education || '',
           totalExperience: parsedResult.data.totalExperience || '',
           position: parsedResult.data.position || '',
-          currentCompany: parsedResult.data.currentCompany || '',
-          currentLocation: parsedResult.data.currentLocation || '',
         }
       });
     } else {
@@ -164,21 +74,22 @@ router.post('/parse-resume', upload.single('resume'), async (req, res) => {
   } catch (error) {
     console.error("Resume parsing error:", error);
     if (req.file && fs.existsSync(req.file.path)) {
-      try { fs.unlinkSync(req.file.path); } catch (err) { }
+      try { fs.unlinkSync(req.file.path); } catch (err) {}
     }
     res.status(500).json({ success: false, message: 'Error parsing resume', error: error.message });
   }
 });
 
-// 4. Get All Candidates
+// GET ALL
 router.get('/', async (req, res) => {
   try {
     let query = {};
-    if (req.user && req.user.role !== 'admin') {
+    // 🔴 FIXED: Allow Managers to see all candidates (bypass recruiter lock)
+    if (req.user && req.user.role !== 'admin' && req.user.role !== 'manager') {
       query.recruiterId = req.user._id;
     }
     const candidates = await Candidate.find(query)
-      .populate('recruiterId', 'firstName lastName name email')
+      .populate('recruiterId', 'name')
       .sort({ createdAt: -1 });
     res.json(candidates);
   } catch (error) {
@@ -186,24 +97,46 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 5. Create Candidate
+// Helper to fix data types from FormData (Multer converts everything to strings)
+const sanitizeBody = (body) => {
+  const data = { ...body };
+  
+  if (typeof data.skills === 'string') {
+    data.skills = data.skills.split(',').map(s => s.trim());
+  }
+  
+  // Convert "true"/"false" strings to Booleans
+  if (data.offersInHand === 'true') data.offersInHand = true;
+  if (data.offersInHand === 'false') data.offersInHand = false;
+  
+  if (data.servingNoticePeriod === 'true') data.servingNoticePeriod = true;
+  if (data.servingNoticePeriod === 'false') data.servingNoticePeriod = false;
+
+  return data;
+};
+
+// CREATE CANDIDATE
 router.post('/', upload.single('resume'), async (req, res) => {
   try {
+    // Sanitize the body (fix booleans and skills array)
     let candidateData = sanitizeBody(req.body);
 
+    // Handle File
     if (req.file) {
       candidateData.resumeUrl = `/uploads/${req.file.filename}`;
       candidateData.resumeOriginalName = req.file.originalname;
     }
 
+    // Handle Recruiter Assignment
     let targetRecruiterId = req.user._id;
-    let targetRecruiterName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.email;
+    let targetRecruiterName = req.user.name;
 
-    if (req.user.role === 'admin' && candidateData.recruiterId) {
+    // 🔴 FIXED: Allow Managers to assign candidates to specific recruiters
+    if ((req.user.role === 'admin' || req.user.role === 'manager') && candidateData.recruiterId) {
       const assignedRecruiter = await User.findById(candidateData.recruiterId);
       if (assignedRecruiter) {
         targetRecruiterId = assignedRecruiter._id;
-        targetRecruiterName = `${assignedRecruiter.firstName || ''} ${assignedRecruiter.lastName || ''}`.trim() || assignedRecruiter.email;
+        targetRecruiterName = assignedRecruiter.name;
       }
     }
 
@@ -212,7 +145,7 @@ router.post('/', upload.single('resume'), async (req, res) => {
 
     const newCandidate = new Candidate(candidateData);
     await newCandidate.save();
-
+    
     res.status(201).json(newCandidate);
   } catch (error) {
     console.error("Create Error:", error);
@@ -220,22 +153,14 @@ router.post('/', upload.single('resume'), async (req, res) => {
   }
 });
 
-// ==========================================
-// DYNAMIC ROUTES (/:id) - MUST BE LAST
-// ==========================================
-
-// Specialized status/remarks/inline update routes
-router.put('/:id/status', updateCandidateStatus);
-router.put('/:id/remarks', updateCandidateRemarks);
-router.put('/:id/inline-update', inlineUpdateCandidate);
-
-// Get Single Candidate
+// GET SINGLE
 router.get('/:id', async (req, res) => {
   try {
-    const candidate = await Candidate.findById(req.params.id).populate('recruiterId', 'firstName lastName name email');
+    const candidate = await Candidate.findById(req.params.id).populate('recruiterId', 'name');
     if (!candidate) return res.status(404).json({ message: 'Candidate not found' });
 
-    if (req.user.role !== 'admin' && candidate.recruiterId._id.toString() !== req.user._id.toString()) {
+    // 🔴 FIXED: Managers bypass ownership check
+    if (req.user.role !== 'admin' && req.user.role !== 'manager' && candidate.recruiterId._id.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized to view this candidate' });
     }
 
@@ -245,15 +170,22 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Update Candidate
+// Specialized status/remarks/inline update routes
+router.put('/:id/status', updateCandidateStatus);
+router.put('/:id/remarks', updateCandidateRemarks);
+router.put('/:id/inline-update', inlineUpdateCandidate);
+
+// UPDATE CANDIDATE
 router.put('/:id', upload.single('resume'), async (req, res) => {
   try {
+    // Sanitize the body
     let updateData = sanitizeBody(req.body);
 
     const existingCandidate = await Candidate.findById(req.params.id);
     if (!existingCandidate) return res.status(404).json({ message: 'Candidate not found' });
 
-    if (req.user.role !== 'admin' && existingCandidate.recruiterId.toString() !== req.user._id.toString()) {
+    // 🔴 FIXED: Managers bypass ownership check
+    if (req.user.role !== 'admin' && req.user.role !== 'manager' && existingCandidate.recruiterId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
@@ -269,13 +201,14 @@ router.put('/:id', upload.single('resume'), async (req, res) => {
   }
 });
 
-// Delete Candidate
+// DELETE CANDIDATE
 router.delete('/:id', async (req, res) => {
   try {
     const candidate = await Candidate.findById(req.params.id);
     if (!candidate) return res.status(404).json({ message: 'Candidate not found' });
 
-    if (req.user.role !== 'admin' && candidate.recruiterId.toString() !== req.user._id.toString()) {
+    // 🔴 FIXED: Managers bypass ownership check
+    if (req.user.role !== 'admin' && req.user.role !== 'manager' && candidate.recruiterId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
