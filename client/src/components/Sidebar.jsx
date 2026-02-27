@@ -2,16 +2,23 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { 
-  LayoutDashboard, Users, UserPlus, Briefcase, 
+  LayoutDashboard, UserPlus, Briefcase, 
   Building2, Receipt, ClipboardList, MessageSquare, 
-  BarChart, Settings, Calendar, User, ClipboardCheck, 
-  Power, ChevronLeft, ChevronRight
+  BarChart3, Settings, Power, User
 } from 'lucide-react';
 import clsx from 'clsx';
 
-export default function Sidebar({ isCollapsed, setIsCollapsed }) {
+export default function Sidebar() {
   const { userRole, logout, currentUser } = useAuth();
   
+  // -- Colors --
+  const sidebarBg = "bg-[#283086]"; // Deep Royal Blue
+  const activeBgClass = "bg-[#f3f6fd]"; // Matches Dashboard Background
+  // Thick Blue Text for Active
+  const activeTextClass = "text-[#283086] font-extrabold"; 
+  // Thick White Text for Inactive
+  const inactiveTextClass = "text-white font-bold hover:bg-white/10";
+
   const adminLinks = [
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
     { name: 'Add Candidate', path: '/admin/add-candidate', icon: UserPlus },
@@ -20,17 +27,17 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
     { name: 'Invoices', path: '/admin/invoices', icon: Receipt },
     { name: 'Requirements', path: '/admin/requirements', icon: ClipboardList },
     { name: 'Messages', path: '/admin/messages', icon: MessageSquare },
-    { name: 'Reports', path: '/admin/reports', icon: BarChart },
-    { name: 'Settings', path: '/admin/settings', icon: Settings },
+    { name: 'Reports', path: '/admin/reports', icon: BarChart3 },
+    { name: 'Settings', path: '/admin/settings', icon: Settings }, 
   ];
 
   const recruiterLinks = [
     { name: 'Dashboard', path: '/recruiter', icon: LayoutDashboard },
-    { name: 'My Candidates', path: '/recruiter/candidates', icon: Users },
-    { name: 'Assignments', path: '/recruiter/assignments', icon: ClipboardCheck },
-    { name: 'Schedules', path: '/recruiter/schedules', icon: Calendar },
+    { name: 'My Candidates', path: '/recruiter/candidates', icon: UserPlus },
+    { name: 'Assignments', path: '/recruiter/assignments', icon: Briefcase },
+    { name: 'Schedules', path: '/recruiter/schedules', icon: ClipboardList },
     { name: 'Messages', path: '/recruiter/messages', icon: MessageSquare },
-    { name: 'Reports', path: '/recruiter/reports', icon: BarChart },
+    { name: 'Reports', path: '/recruiter/reports', icon: BarChart3 },
     { name: 'My Profile', path: '/recruiter/profile', icon: User },
     { name: 'Settings', path: '/recruiter/settings', icon: Settings },
   ];
@@ -38,61 +45,36 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
   const links = userRole === 'admin' ? adminLinks : recruiterLinks;
 
   return (
-    <div 
-      className={clsx(
-        "flex flex-col h-screen bg-[#4d47c4] text-white shadow-2xl fixed left-0 top-0 transition-all duration-500 ease-in-out z-40",
-        isCollapsed ? "w-20 rounded-r-[2rem]" : "w-72 rounded-r-[3.5rem]"
-      )}
-    >
-      {/* Header / Logo */}
-      <div className={clsx(
-        "h-24 flex items-center transition-all duration-300",
-        isCollapsed ? "justify-center px-0" : "px-8"
-      )}>
-        <div className="flex items-center gap-4 overflow-hidden">
-          <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center flex-shrink-0 border border-white/30 shadow-lg">
-            <span className="text-white font-black text-2xl">A</span>
+    <div className={clsx("flex flex-col h-screen fixed left-0 top-0 z-50 shadow-2xl w-80", sidebarBg)}>
+      
+      {/* --- Header / Logo --- */}
+      <div className="h-28 flex items-center px-8">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm border border-white/10">
+            <span className="text-white font-extrabold text-2xl">V</span>
           </div>
-          {!isCollapsed && (
-            <span className="text-white font-bold text-2xl tracking-tight whitespace-nowrap">
-              VTS Tracker
-            </span>
-          )}
+          <span className="text-white font-bold text-2xl tracking-tight whitespace-nowrap">
+            VTS Tracker
+          </span>
         </div>
       </div>
 
-      {/* User Profile Section */}
-      <div className={clsx(
-        "transition-all duration-300 mb-6",
-        isCollapsed ? "px-4 flex justify-center" : "px-6"
-      )}>
-        <div className={clsx(
-          "bg-white/10 backdrop-blur-lg border border-white/20 rounded-3xl p-4 transition-all",
-          isCollapsed ? "w-12 h-12 p-0 flex items-center justify-center" : "w-full"
-        )}>
-          {!isCollapsed ? (
-            <div className="flex items-center gap-3">
-              {/* UPDATED: Removed img (US initials) and added User icon */}
-              <div className="w-12 h-12 rounded-full border-2 border-white/50 flex items-center justify-center bg-white/20 shadow-inner">
-                 <User className="h-6 w-6 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-white/90 truncate">{currentUser?.email || 'Admin Account'}</p>
-                <div className="mt-1">
-                  <span className="text-[9px] font-black uppercase tracking-widest bg-white/20 text-white px-2 py-0.5 rounded-full">
-                    {userRole} Account
-                  </span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <User className="h-5 w-5 text-white/80" />
-          )}
+      {/* --- User Profile Card --- */}
+      <div className="mb-8 px-6">
+        <div className="bg-[#3d4692] rounded-2xl p-4 flex items-center gap-4 overflow-hidden shadow-inner border border-white/5">
+          <div className="w-12 h-12 rounded-full border-2 border-white/20 flex-shrink-0 overflow-hidden bg-gray-200">
+             <img src="https://github.com/shadcn.png" alt="User" className="w-full h-full object-cover" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-white truncate">{currentUser?.email || 'admin@vts.com'}</p>
+            <p className="text-[11px] text-blue-200 uppercase font-bold mt-0.5 tracking-wide">{userRole} Account</p>
+          </div>
         </div>
       </div>
 
-      {/* Navigation */}
-      <div className="flex-1 overflow-y-auto px-4 space-y-2 scrollbar-none">
+      {/* --- Navigation Links --- */}
+      {/* [&::-webkit-scrollbar]:hidden hides the scrollbar explicitly */}
+      <div className="flex-1 overflow-y-auto space-y-2 py-2 pl-6 pr-0 [&::-webkit-scrollbar]:hidden">
         {links.map((link) => (
           <NavLink
             key={link.path}
@@ -100,49 +82,60 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }) {
             end={link.path === '/admin' || link.path === '/recruiter'}
             className={({ isActive }) =>
               clsx(
-                "flex items-center rounded-2xl transition-all duration-300 font-bold text-sm h-12",
-                isCollapsed ? "justify-center" : "px-4 gap-4",
-                isActive
-                  ? "bg-white text-[#4d47c4] shadow-xl translate-x-1" 
-                  : "text-white/70 hover:bg-white/10 hover:text-white"
+                "group flex items-center relative transition-all duration-200 py-5 pl-8",
+                isActive 
+                  ? `${activeBgClass} ${activeTextClass} rounded-l-[50px] rounded-r-none`
+                  : `${inactiveTextClass} rounded-l-[50px]`
               )
             }
           >
-            <link.icon className="h-5 w-5 flex-shrink-0" />
-            {!isCollapsed && <span className="whitespace-nowrap tracking-wide">{link.name}</span>}
+            {({ isActive }) => (
+              <>
+                {/* --- The "Cutout" Curves --- */}
+                {isActive && (
+                  <>
+                    <div 
+                      className="absolute right-0 -top-[30px] w-[30px] h-[30px] bg-transparent pointer-events-none z-10"
+                      style={{
+                        borderBottomRightRadius: '30px',
+                        boxShadow: `6px 6px 0 6px #f3f6fd`
+                      }}
+                    />
+                    <div 
+                      className="absolute right-0 -bottom-[30px] w-[30px] h-[30px] bg-transparent pointer-events-none z-10"
+                      style={{
+                        borderTopRightRadius: '30px',
+                        boxShadow: `6px -6px 0 6px #f3f6fd`
+                      }}
+                    />
+                  </>
+                )}
+
+                <div className="flex items-center gap-5 z-20 relative w-full">
+                  <link.icon 
+                    className={clsx(
+                      "h-6 w-6 flex-shrink-0 transition-transform duration-300", 
+                      isActive ? "scale-110 stroke-[3px]" : "group-hover:scale-110 stroke-[2.5px]"
+                    )} 
+                  />
+                  <span className="text-[17px] tracking-wide">{link.name}</span>
+                </div>
+              </>
+            )}
           </NavLink>
         ))}
       </div>
 
-      {/* Footer / Power Button */}
-      <div className="p-8 flex justify-center border-t border-white/10">
-        <button
-          onClick={logout}
-          className={clsx(
-            "flex items-center justify-center transition-all duration-300 group",
-            isCollapsed 
-              ? "w-12 h-12 bg-white/10 hover:bg-red-500 rounded-full" 
-              : "w-full h-14 bg-white/10 hover:bg-red-500 border border-white/20 rounded-2xl shadow-lg"
-          )}
+      {/* --- Sign Out Button --- */}
+      <div className="p-8 mt-auto">
+        <button 
+          onClick={logout} 
+          className="flex items-center gap-4 w-full px-6 py-4 bg-red-600 text-white hover:bg-red-700 transition-all rounded-2xl shadow-lg group"
         >
-          <Power className={clsx(
-            "h-6 w-6 text-red-500 group-hover:text-white transition-colors duration-300"
-          )} />
-          {!isCollapsed && (
-            <span className="ml-3 font-black uppercase text-xs tracking-widest text-red-500 group-hover:text-white">
-              Sign Out
-            </span>
-          )}
+          <Power className="h-6 w-6 group-hover:scale-110 transition-transform stroke-[3px]" />
+          <span className="font-extrabold tracking-wide text-base">Sign Out</span>
         </button>
       </div>
-
-      {/* Toggle Button */}
-      <button
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-4 top-1/2 -translate-y-1/2 bg-white text-[#4d47c4] border-4 border-[#f8faff] rounded-full p-1.5 hover:scale-110 transition-all z-50 shadow-xl"
-      >
-        {isCollapsed ? <ChevronRight size={20} strokeWidth={3} /> : <ChevronLeft size={20} strokeWidth={3} />}
-      </button>
     </div>
   );
 }

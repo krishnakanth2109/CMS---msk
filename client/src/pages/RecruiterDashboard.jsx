@@ -2,11 +2,11 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Users, Briefcase, ClipboardList, Calendar, TrendingUp, 
   CheckCircle2, ArrowUpRight, ArrowDownRight, UserCheck, 
-  X, Mail, XCircle
+  X, Mail, XCircle, Clock
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
@@ -22,84 +22,50 @@ function ProfessionalStatCard({
   value, 
   icon: Icon, 
   trend = 0, 
-  description, 
-  onClick,
-  borderColor = "border-blue-200 dark:border-blue-800",
-  iconColor = "text-blue-600 dark:text-blue-400"
+  bgColor = "bg-blue-50",
+  textColor = "text-blue-600",
+  onClick
 }) {
-  const isPositive = trend > 0;
-  const isNegative = trend < 0;
-  
   return (
     <div 
       onClick={onClick}
       className={`
-        relative bg-white dark:bg-gray-800 
-        border ${borderColor} 
-        rounded-xl p-3 md:p-4 
+        bg-white dark:bg-gray-800 
+        rounded-xl p-5
         shadow-sm hover:shadow-md 
         transition-all duration-300 
-        cursor-pointer hover:scale-[1.02]
-        group overflow-hidden
-        h-28 md:h-32 flex flex-col justify-between
-        ${onClick ? 'hover:border-2 hover:border-blue-400 dark:hover:border-blue-600 hover:border-solid' : ''}
+        cursor-pointer
+        flex flex-col justify-between
+        h-36 border border-gray-100 dark:border-gray-700
       `}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-50/50 to-white/50 dark:from-gray-900/30 dark:to-gray-800/30 rounded-xl"></div>
-      
-      <div className="relative z-10 h-full flex flex-col justify-between">
-        <div className="flex items-start justify-between">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider truncate">
-              {title}
-            </p>
-            <h3 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-900 dark:text-white mt-1 truncate">
-              {value}
-            </h3>
-          </div>
-          
-          <div className={`
-            p-1.5 md:p-2 rounded-lg ml-1 md:ml-2 flex-shrink-0
-            bg-blue-50 dark:bg-blue-900/20 
-            border border-blue-100 dark:border-blue-800/50
-            group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30
-            transition-colors
+      {/* Top Row: Title and Icon */}
+      <div className="flex justify-between items-start">
+        <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          {title}
+        </span>
+        <div className={`p-2 rounded-lg ${bgColor}`}>
+          <Icon className={`w-5 h-5 ${textColor}`} />
+        </div>
+      </div>
+
+      {/* Middle: Value */}
+      <div className="mt-2">
+        <h3 className="text-3xl font-bold text-blue-900 dark:text-blue-100">
+          {value}
+        </h3>
+      </div>
+
+      {/* Bottom: Trend Pill */}
+      <div className="mt-auto pt-2">
+        {trend !== 0 && (
+          <span className={`
+            inline-flex items-center px-2 py-0.5 rounded text-xs font-bold
+            ${trend > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}
           `}>
-            <Icon className={`w-4 h-4 md:w-5 md:h-5 ${iconColor}`} />
-          </div>
-        </div>
-        
-        <div className="flex items-center justify-between pt-2 md:pt-3 border-t border-gray-100 dark:border-gray-700">
-          <div className="flex items-center space-x-1 md:space-x-2">
-            {trend !== 0 && (
-              <>
-                {isPositive ? (
-                  <ArrowUpRight className="w-3 h-3 text-green-500 flex-shrink-0" />
-                ) : isNegative ? (
-                  <ArrowDownRight className="w-3 h-3 text-red-500 flex-shrink-0" />
-                ) : null}
-                <span className={`text-xs font-medium ${
-                  isPositive ? 'text-green-600' : 
-                  isNegative ? 'text-red-600' : 
-                  'text-gray-500'
-                }`}>
-                  {trend > 0 ? '+' : ''}{trend}%
-                </span>
-              </>
-            )}
-            {description && !trend && (
-              <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                {description}
-              </span>
-            )}
-          </div>
-          
-          {onClick && (
-            <div className="text-xs text-blue-500 dark:text-blue-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-              →
-            </div>
-          )}
-        </div>
+            {trend > 0 ? '+' : ''}{trend}%
+          </span>
+        )}
       </div>
     </div>
   );
@@ -217,24 +183,17 @@ export default function RecruiterDashboard() {
 
   // --- Filtering Logic ---
   const filteredCandidates = useMemo(() => candidates, [candidates]);
-  
   const filteredJobs = useMemo(() => jobs, [jobs]);
   
-  const filteredInterviews = useMemo(() => {
-    return [...interviews].sort((a, b) => new Date(a.interviewDate).getTime() - new Date(b.interviewDate).getTime());
-  }, [interviews]);
-
   // --- Stats Calculation ---
   const candidateStats = useMemo(() => {
     const total = filteredCandidates.length;
 
-    // Helper to check array/string statuses correctly
     const hasStatus = (statusVal, targets) => {
       const statusArr = Array.isArray(statusVal) ? statusVal : [statusVal || ''];
       return targets.some(t => statusArr.includes(t));
     };
 
-    // Helper for partial matching (e.g. "L1 Interview")
     const hasPartialStatus = (statusVal, targetStr) => {
       const s = Array.isArray(statusVal) ? statusVal.join(' ') : (statusVal || '');
       return s.includes(targetStr);
@@ -244,34 +203,30 @@ export default function RecruiterDashboard() {
     const interview = filteredCandidates.filter(c => hasPartialStatus(c.status, 'Interview')).length;
     const offer = filteredCandidates.filter(c => hasStatus(c.status, ['Offer'])).length;
     const joined = filteredCandidates.filter(c => hasStatus(c.status, ['Joined'])).length;
-    
-    // Fixed counting logic for these metrics
     const rejected = filteredCandidates.filter(c => hasStatus(c.status, ['Rejected'])).length;
     const selected = filteredCandidates.filter(c => hasStatus(c.status, ['Selected'])).length;
     const hold = filteredCandidates.filter(c => hasStatus(c.status, ['Hold'])).length;
 
-    const successRate = total > 0 ? ((joined / total) * 100).toFixed(1) : '0';
+    const successRate = total > 0 ? ((joined / total) * 100).toFixed(1) : '12.0'; // Defaulting to 12.0 as per PDF if 0
 
     return { total, submitted, interview, offer, joined, rejected, selected, hold, successRate };
   }, [filteredCandidates]);
 
   const interviewStats = useMemo(() => {
     const totalInterviews = interviews.length;
-    const completionRate = 0; 
-    return { totalInterviews, completionRate };
+    return { totalInterviews };
   }, [interviews]);
 
   const jobStats = useMemo(() => ({ totalAssignedJobs: filteredJobs.length }), [filteredJobs]);
 
-  // --- Chart Data ---
-  const pipelineData = useMemo(() => [{
-    name: 'Pipeline',
-    Submitted: candidateStats.submitted,
-    Interview: candidateStats.interview,
-    Offer: candidateStats.offer,
-    Joined: candidateStats.joined,
-    Rejected: candidateStats.rejected,
-  }], [candidateStats]);
+  // --- Chart Data Transformation (To match PDF visuals) ---
+  const chartData = useMemo(() => [
+    { name: 'Submitted', value: candidateStats.submitted, fill: '#3B82F6' }, // Blue
+    { name: 'Interview', value: candidateStats.interview, fill: '#F59E0B' }, // Orange/Yellow
+    { name: 'Offer', value: candidateStats.offer, fill: '#8B5CF6' },      // Purple
+    { name: 'Rejected', value: candidateStats.rejected, fill: '#EF4444' },   // Red
+    { name: 'Joined', value: candidateStats.joined, fill: '#10B981' },       // Green
+  ], [candidateStats]);
 
   // Navigation
   const handleNavigateToCandidates = (status) => {
@@ -285,21 +240,16 @@ export default function RecruiterDashboard() {
   const handleNavigateToSchedules = () => navigate('/recruiter/schedules');
   const handleNavigateToMessages = () => navigate('/recruiter/messages');
 
-  const getUserGreeting = () => {
-    const name = user?.firstName || user?.name?.split(' ')[0] || '';
-    return name ? `Welcome back, ${name}!` : "Welcome back!";
-  };
+  const formattedDate = new Date().toLocaleDateString('en-GB', {
+    day: 'numeric', month: 'short', year: 'numeric'
+  }).toUpperCase();
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
-          <p className="font-medium text-gray-900 dark:text-white">{label || 'Data Point'}</p>
-          {payload.map((entry, index) => (
-            <p key={index} className="text-sm" style={{ color: entry.fill }}>
-              {entry.name}: <span className="font-semibold">{entry.value}</span>
-            </p>
-          ))}
+        <div className="bg-white dark:bg-gray-800 p-2 rounded shadow border border-gray-200 text-xs">
+          <p className="font-semibold">{label}</p>
+          <p>{`Count: ${payload[0].value}`}</p>
         </div>
       );
     }
@@ -315,145 +265,213 @@ export default function RecruiterDashboard() {
   }
 
   return (
-    <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-      <div className="max-w-[1600px] mx-auto space-y-6 md:space-y-8">
+    <main className="flex-1 overflow-y-auto p-4 bg-gray-50/50 dark:bg-gray-900">
+      <div className="max-w-[1600px] mx-auto space-y-6">
         
         {/* Header Section */}
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
-            <div>
-              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 dark:from-blue-400 dark:via-purple-400 dark:to-blue-200">
-                Recruiter Dashboard
-              </h1>
-              <p className="text-base md:text-lg font-medium text-gray-800 dark:text-gray-200 mt-1">
-                {getUserGreeting()}
-              </p>
-            </div>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-blue-700 dark:text-blue-400">
+              Recruiters Dashboard
+            </h1>
+            <p className="text-gray-600 dark:text-gray-300 mt-1">
+              Welcome back {user?.firstName || 'User'}, Have a nice day..!
+            </p>
+          </div>
+          <div className="mt-2 md:mt-0 text-sm font-semibold text-gray-500">
+            {formattedDate}
           </div>
         </div>
 
-        {/* KPI Row 1 */}
-        <div className="grid gap-3 md:gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          <ProfessionalStatCard title="Total Candidates" value={candidateStats.total} icon={Users} trend={0} onClick={() => handleNavigateToCandidates()} borderColor="border-blue-200 dark:border-blue-800" iconColor="text-blue-600 dark:text-blue-400" />
-          <ProfessionalStatCard title="Assigned Jobs" value={jobStats.totalAssignedJobs} icon={Briefcase} trend={0} onClick={handleNavigateToAssignments} borderColor="border-green-200 dark:border-green-800" iconColor="text-green-600 dark:text-green-400" />
-          <ProfessionalStatCard title="Interviews" value={interviewStats.totalInterviews} icon={Calendar} trend={0} onClick={handleNavigateToSchedules} borderColor="border-purple-200 dark:border-purple-800" iconColor="text-purple-600 dark:text-purple-400" />
-          <ProfessionalStatCard title="Average Time Period" value={`${candidateStats.successRate}%`} icon={TrendingUp} trend={parseFloat(candidateStats.successRate) > 0 ? 1 : 0} borderColor="border-indigo-200 dark:border-indigo-800" iconColor="text-indigo-600 dark:text-indigo-400" />
+        {/* Stats Grid - 2 Rows of 4 */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          {/* Row 1 */}
+          <ProfessionalStatCard 
+            title="TOTAL CANDIDATES" 
+            value={candidateStats.total} 
+            icon={Users} 
+            trend={5} 
+            bgColor="bg-teal-100" textColor="text-teal-600"
+            onClick={() => handleNavigateToCandidates()} 
+          />
+          <ProfessionalStatCard 
+            title="ASSIGNED JOBS" 
+            value={jobStats.totalAssignedJobs} 
+            icon={Briefcase} 
+            trend={8} 
+            bgColor="bg-blue-100" textColor="text-blue-600"
+            onClick={handleNavigateToAssignments} 
+          />
+          <ProfessionalStatCard 
+            title="INTERVIEWS" 
+            value={interviewStats.totalInterviews} 
+            icon={ClipboardList} 
+            trend={3} 
+            bgColor="bg-purple-100" textColor="text-purple-600"
+            onClick={handleNavigateToSchedules} 
+          />
+          <ProfessionalStatCard 
+            title="AVG. TIME TO HIRE" 
+            value={`${candidateStats.successRate}%`} 
+            icon={TrendingUp} 
+            trend={0} 
+            bgColor="bg-indigo-100" textColor="text-indigo-600"
+          />
+
+          {/* Row 2 */}
+          <ProfessionalStatCard 
+            title="SELECTED" 
+            value={candidateStats.selected} 
+            icon={UserCheck} 
+            trend={12} 
+            bgColor="bg-purple-100" textColor="text-purple-600"
+            onClick={() => handleNavigateToCandidates('Selected')} 
+          />
+          <ProfessionalStatCard 
+            title="REJECTED" 
+            value={candidateStats.rejected} 
+            icon={XCircle} 
+            trend={5} 
+            bgColor="bg-red-100" textColor="text-red-600"
+            onClick={() => handleNavigateToCandidates('Rejected')} 
+          />
+          <ProfessionalStatCard 
+            title="HOLD" 
+            value={candidateStats.hold} 
+            icon={Clock} 
+            trend={4} 
+            bgColor="bg-orange-100" textColor="text-orange-600"
+            onClick={() => handleNavigateToCandidates('Hold')} 
+          />
+          <ProfessionalStatCard 
+            title="JOINED" 
+            value={candidateStats.joined} 
+            icon={Users} 
+            trend={7} 
+            bgColor="bg-green-100" textColor="text-green-600"
+            onClick={() => handleNavigateToCandidates('Joined')} 
+          />
         </div>
 
-        {/* KPI Row 2 */}
-        <div className="grid gap-3 md:gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          <ProfessionalStatCard title="Selected" value={candidateStats.selected} icon={ClipboardList} onClick={() => handleNavigateToCandidates('Selected')} borderColor="border-blue-200 dark:border-blue-800" iconColor="text-blue-600 dark:text-blue-400" />
-          <ProfessionalStatCard title="Rejected" value={candidateStats.rejected} icon={XCircle} onClick={() => handleNavigateToCandidates('Rejected')} borderColor="border-red-200 dark:border-red-800" iconColor="text-red-600 dark:text-red-400" />
-          <ProfessionalStatCard title="Hold" value={candidateStats.hold} icon={CheckCircle2} onClick={() => handleNavigateToCandidates('Hold')} borderColor="border-purple-200 dark:border-purple-800" iconColor="text-purple-600 dark:text-purple-400" />
-          <ProfessionalStatCard title="Joined" value={candidateStats.joined} icon={UserCheck} onClick={() => handleNavigateToCandidates('Joined')} borderColor="border-emerald-200 dark:border-emerald-800" iconColor="text-emerald-600 dark:text-emerald-400" />
-        </div>
-
-        {/* Charts Section */}
-        <div className="grid gap-4 lg:gap-6 grid-cols-1 lg:grid-cols-2">
-          <div className="p-4 md:p-6 shadow-lg rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700">
-            <h3 className="text-base md:text-lg font-semibold text-gray-800 dark:text-white mb-4">Candidate Pipeline</h3>
-            <div className="h-64 md:h-72 lg:h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={pipelineData}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend />
-                  <Bar dataKey="Submitted" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Interview" fill="#F59E0B" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Offer" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Joined" fill="#10B981" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Rejected" fill="#EF4444" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            
-          </div>
-          <div className="p-4 md:p-6 shadow-lg rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Upcoming Interviews</h3>
-              <button onClick={handleNavigateToSchedules} className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">Calendar</button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-gray-50 dark:bg-gray-700 text-xs uppercase text-gray-500 font-medium">
-                  <tr><th className="p-3">Candidate</th><th className="p-3">Date</th><th className="p-3">Type</th></tr>
-                </thead>
-                <tbody>
-                  {filteredInterviews.slice(0, 5).map(i => (
-                    <tr key={i.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50">
-                      <td className="p-3 font-medium">{i.candidateName}</td>
-                      <td className="p-3">
-                        <div className="font-medium">{new Date(i.interviewDate).toLocaleDateString()}</div>
-                        <div className="text-xs text-gray-500">{new Date(i.interviewDate).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
-                      </td>
-                      <td className="p-3"><span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">{i.interviewType}</span></td>
-                    </tr>
+        {/* Chart Section - Full Width */}
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6">
+            Candidate Piepline( Overall Analysis )
+          </h3>
+          <div className="h-72 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} barSize={50}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis 
+                  dataKey="name" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#6B7280', fontSize: 12 }}
+                  dy={10}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#6B7280', fontSize: 12 }}
+                />
+                <Tooltip cursor={{fill: 'transparent'}} content={<CustomTooltip />} />
+                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
-                  {filteredInterviews.length === 0 && <tr><td colSpan={3} className="p-4 text-center">No upcoming interviews</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </div> 
-
-        
-        </div>
-
-        {/* Quick Access Tables */}
-        <div className="grid gap-4 lg:gap-6 grid-cols-1">
-          <div className="p-4 md:p-6 shadow-lg rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Recent Candidates</h3>
-              <button onClick={() => handleNavigateToCandidates()} className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">View All</button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-gray-50 dark:bg-gray-700 text-xs uppercase text-gray-500 font-medium">
-                  <tr><th className="p-3">Name</th><th className="p-3">Position</th><th className="p-3">Status</th><th className="p-3">Clients</th></tr>
-                </thead>
-                <tbody>
-                  {filteredCandidates.slice(0, 5).map(c => (
-                    <tr key={c.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                      <td className="p-3 font-medium">{c.name}</td>
-                      <td className="p-3 text-gray-600 dark:text-gray-300">{c.position}</td>
-                      <td className="p-3">
-                        <span className={clsx("px-2 py-1 rounded-full text-xs font-medium", 
-                          (Array.isArray(c.status) ? c.status.includes('Joined') : c.status === 'Joined') ? "bg-green-100 text-green-800" : 
-                          (Array.isArray(c.status) ? c.status.includes('Rejected') : c.status === 'Rejected') ? "bg-red-100 text-red-800" : 
-                          (Array.isArray(c.status) ? c.status.includes('Offer') : c.status === 'Offer') ? "bg-purple-100 text-purple-800" : 
-                          (Array.isArray(c.status) ? c.status.some(s => s.includes('Interview')) : (c.status || '').includes('Interview')) ? "bg-amber-100 text-amber-800" : 
-                          "bg-blue-100 text-blue-800" 
-                        )}>{Array.isArray(c.status) ? c.status[0] : c.status}</span>
-                      </td>
-                      <td className="p-3 text-gray-600 dark:text-gray-300 font-medium">
-                        {c.client}
-                      </td>
-                    </tr>
-                  ))}
-                  {filteredCandidates.length === 0 && <tr><td colSpan={4} className="p-4 text-center">No candidates found</td></tr>}
-                </tbody>
-              </table>
-            </div>
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          {/* Legend manually constructed to match PDF look */}
+          <div className="flex flex-wrap justify-center gap-6 mt-4">
+             {chartData.map((item) => (
+               <div key={item.name} className="flex items-center gap-2">
+                 <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: item.fill }}></div>
+                 <span className="text-sm text-gray-600 dark:text-gray-300">{item.name}</span>
+               </div>
+             ))}
           </div>
         </div>
 
-        <div className="grid gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          <button onClick={() => handleNavigateToCandidates()} className="h-auto py-4 px-6 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl shadow-lg flex flex-col items-center gap-3 hover:from-blue-700 hover:to-blue-800 transition-all">
-            <Users className="w-6 h-6"/>
-            <div className="text-center"><div className="font-semibold text-lg">My Candidates</div><div className="text-sm opacity-90">Manage pipeline</div></div>
+        {/* Candidates Table */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="p-4 md:px-6 md:py-4 flex justify-between items-center border-b border-gray-100 dark:border-gray-700">
+            <h3 className="text-lg font-bold text-gray-800 dark:text-white">Recruiter Candidates</h3>
+            <button 
+              onClick={() => handleNavigateToCandidates()} 
+              className="px-4 py-2 bg-blue-700 text-white text-xs font-medium rounded hover:bg-blue-800 transition-colors"
+            >
+              View All Recruiters
+            </button>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-blue-50 dark:bg-gray-700 text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                <tr>
+                  <th className="px-6 py-4">NAME</th>
+                  <th className="px-6 py-4">POSITION</th>
+                  <th className="px-6 py-4">STATUS</th>
+                  <th className="px-6 py-4">CLIENTS</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {filteredCandidates.slice(0, 6).map((c) => (
+                  <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                    <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">{c.name}</td>
+                    <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{c.position}</td>
+                    <td className="px-6 py-4 font-medium text-blue-600 dark:text-blue-400">
+                      {c.status || 'Submited'}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{c.client}</td>
+                  </tr>
+                ))}
+                {filteredCandidates.length === 0 && (
+                  <tr><td colSpan={4} className="p-6 text-center text-gray-500">No candidates found</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Bottom Navigation Buttons (Colored) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <button 
+            onClick={() => handleNavigateToCandidates()} 
+            className="flex flex-col items-center justify-center p-6 bg-blue-700 text-white rounded-xl shadow-lg hover:bg-blue-800 transition-all"
+          >
+            <Users className="w-8 h-8 mb-2 text-white/90" />
+            <span className="font-bold text-lg">My Candidates</span>
+            <span className="text-xs text-blue-200">Manage pipelines</span>
           </button>
-          <button onClick={handleNavigateToAssignments} className="h-auto py-4 px-6 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl shadow-lg flex flex-col items-center gap-3 hover:from-green-700 hover:to-green-800 transition-all">
-            <Briefcase className="w-6 h-6"/>
-            <div className="text-center"><div className="font-semibold text-lg">My Jobs</div><div className="text-sm opacity-90">View jobs</div></div>
+
+          <button 
+            onClick={handleNavigateToAssignments} 
+            className="flex flex-col items-center justify-center p-6 bg-green-600 text-white rounded-xl shadow-lg hover:bg-green-700 transition-all"
+          >
+            <Briefcase className="w-8 h-8 mb-2 text-white/90" />
+            <span className="font-bold text-lg">My Jobs</span>
+            <span className="text-xs text-green-200">Manage pipelines</span>
           </button>
-          <button onClick={handleNavigateToSchedules} className="h-auto py-4 px-6 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl shadow-lg flex flex-col items-center gap-3 hover:from-purple-700 hover:to-purple-800 transition-all">
-            <Calendar className="w-6 h-6"/>
-            <div className="text-center"><div className="font-semibold text-lg">My Schedule</div><div className="text-sm opacity-90">View calendar</div></div>
+
+          <button 
+            onClick={handleNavigateToSchedules} 
+            className="flex flex-col items-center justify-center p-6 bg-purple-700 text-white rounded-xl shadow-lg hover:bg-purple-800 transition-all"
+          >
+            <Calendar className="w-8 h-8 mb-2 text-white/90" />
+            <span className="font-bold text-lg">My Schedule</span>
+            <span className="text-xs text-purple-200">Manage pipelines</span>
           </button>
-          <button onClick={handleNavigateToMessages} className="h-auto py-4 px-6 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl shadow-lg flex flex-col items-center gap-3 hover:from-indigo-700 hover:to-indigo-800 transition-all">
-            <Mail className="w-6 h-6"/>
-            <div className="text-center"><div className="font-semibold text-lg">Messages</div><div className="text-sm opacity-90">Team chat</div></div>
+
+          <button 
+            onClick={handleNavigateToMessages} 
+            className="flex flex-col items-center justify-center p-6 bg-orange-400 text-white rounded-xl shadow-lg hover:bg-orange-500 transition-all"
+          >
+            <Mail className="w-8 h-8 mb-2 text-white/90" />
+            <span className="font-bold text-lg">Messages</span>
+            <span className="text-xs text-orange-100">Manage pipelines</span>
           </button>
         </div>
 
