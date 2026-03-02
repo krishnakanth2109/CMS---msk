@@ -40,7 +40,7 @@ function ProtectedRoute({ children, allowedRoles }) {
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   if (allowedRoles && !allowedRoles.includes(userRole)) {
-    // 🔴 FIXED: Admin OR Manager go to /admin. Everyone else goes to /recruiter.
+    // Redirect unauthorized users to their home base
     const destination = (userRole === 'admin' || userRole === 'manager') ? '/admin' : '/recruiter';
     return <Navigate to={destination} replace />;
   }
@@ -53,7 +53,6 @@ function PublicRoute({ children }) {
   if (loading) return null;
   
   if (isAuthenticated) {
-    // 🔴 FIXED: Same logic here
     const destination = (userRole === 'admin' || userRole === 'manager') ? '/admin' : '/recruiter';
     return <Navigate to={destination} replace />;
   }
@@ -70,7 +69,6 @@ function AppRoutes() {
       <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* ===================== ADMIN / MANAGER ROUTES ===================== */}
-      {/* 🔴 FIXED: Added 'manager' to allowedRoles */}
       <Route path="/admin" element={
         <ProtectedRoute allowedRoles={['admin', 'manager']}>
           <DashboardLayout />
@@ -90,8 +88,9 @@ function AppRoutes() {
       </Route>
 
       {/* ===================== RECRUITER ROUTES ===================== */}
+      {/* 🔴 FIX: Added 'manager' here so they can access /recruiter/candidates */}
       <Route path="/recruiter" element={
-        <ProtectedRoute allowedRoles={['recruiter']}>
+        <ProtectedRoute allowedRoles={['recruiter', 'manager']}>
           <DashboardLayout />
         </ProtectedRoute>
       }>

@@ -86,7 +86,7 @@ const NativeSelect = ({ value, onChange, children, className = '', disabled }) =
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function RecruiterCandidates() {
-  const { currentUser, authHeaders } = useAuth();
+  const { currentUser, userRole, authHeaders } = useAuth(); // Added userRole here
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
 
@@ -226,11 +226,19 @@ export default function RecruiterCandidates() {
       setLoading(true);
       const authH = await authHeaders();
       const headers = { ...authH };
+
+      // 🔴 CHECK ROLE: If Manager or Recruiter, fetch "My Candidates". Otherwise fetch All.
+      // (Assuming your backend has a /candidates/my endpoint that filters by logged-in user ID)
+      const candidateEndpoint = (userRole === 'recruiter' || userRole === 'manager') 
+        ? `${API_URL}/candidates/my` 
+        : `${API_URL}/candidates`;
+
       const [candRes, jobRes, clientRes] = await Promise.all([
-        fetch(`${API_URL}/candidates`, { headers }),
+        fetch(candidateEndpoint, { headers }),
         fetch(`${API_URL}/jobs`, { headers }),
         fetch(`${API_URL}/clients`, { headers })
       ]);
+
       if (candRes.ok && jobRes.ok && clientRes.ok) {
         const allCandidates = await candRes.json();
         const allJobs = await jobRes.json();
@@ -675,7 +683,12 @@ export default function RecruiterCandidates() {
         <div className="max-w-[1800px] mx-auto space-y-6">
           {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div><h1 className="text-3xl font-bold">My Candidates</h1><p className="text-slate-500">Manage pipeline</p></div>
+            <div>
+              <h1 className="text-3xl font-bold">
+                {userRole === 'admin' ? 'My Candidates (Admin View)' : 'My Candidates'}
+              </h1>
+              <p className="text-slate-500">Manage pipeline</p>
+            </div>
             <div className="flex gap-3 flex-wrap">
               {selectedCandidates.length > 0 && (
                 <Button variant="destructive" onClick={() => setIsDeleteConfirmOpen(true)}>
