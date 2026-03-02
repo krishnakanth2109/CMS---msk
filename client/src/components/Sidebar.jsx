@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { 
   LayoutDashboard, UserPlus, Briefcase, 
   Building2, Receipt, ClipboardList, MessageSquare, 
-  BarChart3, Settings, Power, User
+  BarChart3, Settings, Power, User, Users
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -12,16 +12,14 @@ export default function Sidebar() {
   const { userRole, logout, currentUser } = useAuth();
   
   // -- Colors --
-  const sidebarBg = "bg-[#283086]"; // Deep Royal Blue
-  const activeBgClass = "bg-[#f3f6fd]"; // Matches Dashboard Background
-  // Thick Blue Text for Active
+  const sidebarBg = "bg-[#283086]"; 
+  const activeBgClass = "bg-[#f3f6fd]"; 
   const activeTextClass = "text-[#283086] font-extrabold"; 
-  // Thick White Text for Inactive
   const inactiveTextClass = "text-white font-bold hover:bg-white/10";
 
   const adminLinks = [
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
-    { name: 'Add Candidate', path: '/admin/add-candidate', icon: UserPlus },
+    { name: 'OverAll Candidate', path: '/admin/add-candidate', icon: Users }, // Changed Icon to distinguish
     { name: 'Recruiters', path: '/admin/recruiters', icon: Briefcase },
     { name: 'Client Info', path: '/admin/clients', icon: Building2 },
     { name: 'Invoices', path: '/admin/invoices', icon: Receipt },
@@ -42,15 +40,30 @@ export default function Sidebar() {
     { name: 'Settings', path: '/recruiter/settings', icon: Settings },
   ];
 
-  // 🔴 FIXED: Determine which links to show based on exact role
+  // 🔴 Determine links based on role
   let links = [];
   if (userRole === 'admin') {
     links = adminLinks;
   } else if (userRole === 'manager') {
-    // Show admin links but hide Client Info and Invoices
-    links = adminLinks.filter(
+    // 1. Filter out restricted Admin links
+    const filteredAdminLinks = adminLinks.filter(
       (link) => link.name !== 'Client Info' && link.name !== 'Invoices'
     );
+
+    // 2. Define the "My Candidates" link
+    const myCandidatesLink = { 
+      name: 'My Candidates', 
+      path: '/recruiter/candidates', 
+      icon: UserPlus 
+    };
+
+    // 3. Reconstruct: Dashboard -> OverAll -> My Candidates -> Rest
+    links = [
+      filteredAdminLinks[0], // Dashboard
+      filteredAdminLinks[1], // OverAll Candidate (Admin route)
+      myCandidatesLink,      // My Candidates (Recruiter route)
+      ...filteredAdminLinks.slice(2) // Everything else
+    ];
   } else {
     links = recruiterLinks;
   }
@@ -74,18 +87,16 @@ export default function Sidebar() {
       <div className="mb-8 px-6">
         <div className="bg-[#3d4692] rounded-2xl p-4 flex items-center gap-4 overflow-hidden shadow-inner border border-white/5">
           <div className="w-12 h-12 rounded-full border-2 border-white/20 flex-shrink-0 overflow-hidden bg-gray-200 flex items-center justify-center">
-             {/* Fallback to User icon if no image available */}
              <User className="h-6 w-6 text-gray-500" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-white truncate">{currentUser?.email || 'admin@vts.com'}</p>
+            <p className="text-sm font-bold text-white truncate">{currentUser?.email || 'User'}</p>
             <p className="text-[11px] text-blue-200 uppercase font-bold mt-0.5 tracking-wide">{userRole} Account</p>
           </div>
         </div>
       </div>
 
       {/* --- Navigation Links --- */}
-      {/* [&::-webkit-scrollbar]:hidden hides the scrollbar explicitly */}
       <div className="flex-1 overflow-y-auto space-y-2 py-2 pl-6 pr-0 [&::-webkit-scrollbar]:hidden">
         {links.map((link) => (
           <NavLink
@@ -103,7 +114,7 @@ export default function Sidebar() {
           >
             {({ isActive }) => (
               <>
-                {/* --- The "Cutout" Curves --- */}
+                {/* --- Cutout Curves --- */}
                 {isActive && (
                   <>
                     <div 
