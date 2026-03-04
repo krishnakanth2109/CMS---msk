@@ -18,7 +18,6 @@ export const getUserProfile = async (req, res) => {
     const user = await User.findById(req.user._id).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Return every profile field the frontend needs
     res.json({
       _id:            user._id,
       firstName:      user.firstName,
@@ -51,10 +50,6 @@ export const getUserProfile = async (req, res) => {
 // @desc    Update current logged-in user's profile
 // @route   PUT /api/recruiters/profile
 // @access  Private
-//
-// Accepts: firstName, lastName, email, phone, location, specialization,
-//          experience, bio, profilePicture (base64 or URL), socials {}
-// Also syncs displayName to Firebase Auth so it stays consistent.
 // ─────────────────────────────────────────────────────────────────────────────
 export const updateUserProfile = async (req, res) => {
   try {
@@ -81,11 +76,18 @@ export const updateUserProfile = async (req, res) => {
       };
     }
 
-    // ── Profile picture — upload to Cloudinary if base64, else keep URL ──
-    if (req.body.profilePicture) {
-      if (req.body.profilePicture.startsWith('data:image')) {
+    // ── Profile picture (HANDLES DELETION, UPLOAD, AND KEEPING) ───────────
+    if (req.body.profilePicture !== undefined) {
+      if (req.body.profilePicture === '') {
+        // Option 1: User deleted the image
+        if (user.profilePicture?.includes('cloudinary')) {
+          try { await cloudinary.uploader.destroy(`recruiters/recruiter_${user._id}`); } catch {}
+        }
+        user.profilePicture = '';
+      } 
+      else if (req.body.profilePicture.startsWith('data:image')) {
+        // Option 2: User uploaded a new base64 image
         try {
-          // Delete old Cloudinary image first
           if (user.profilePicture?.includes('cloudinary')) {
             try { await cloudinary.uploader.destroy(`recruiters/recruiter_${user._id}`); } catch {}
           }
@@ -104,17 +106,16 @@ export const updateUserProfile = async (req, res) => {
         } catch (uploadError) {
           return res.status(500).json({ message: 'Image upload failed', error: uploadError.message });
         }
-      } else {
-        // Already a URL — just store it
+      } 
+      else {
+        // Option 3: Image URL remains unchanged
         user.profilePicture = req.body.profilePicture;
       }
     }
 
     // ── Sync displayName to Firebase Auth ─────────────────────────────────
-    // Keeps Firebase display name consistent with the DB profile
     if (user.firebaseUid) {
       const fbUpdates = {};
-
       const newFirst = req.body.firstName?.trim();
       const newLast  = req.body.lastName?.trim();
       if (newFirst || newLast) {
@@ -123,12 +124,10 @@ export const updateUserProfile = async (req, res) => {
       if (req.body.email && req.body.email.trim() !== user.email) {
         fbUpdates.email = req.body.email.trim();
       }
-
       if (Object.keys(fbUpdates).length > 0) {
         try {
           await admin.auth().updateUser(user.firebaseUid, fbUpdates);
         } catch (fbErr) {
-          // Non-fatal — log but don't fail the whole request
           console.error('[Profile] Firebase sync error (non-fatal):', fbErr.message);
         }
       }
@@ -202,7 +201,6 @@ export const createRecruiter = async (req, res) => {
       if (idExists) return res.status(400).json({ message: 'Recruiter ID already exists.' });
     }
 
-    // Create in Firebase Auth first
     let firebaseUser;
     try {
       firebaseUser = await admin.auth().createUser({
@@ -271,7 +269,6 @@ export const updateRecruiter = async (req, res) => {
       if (emailExists) return res.status(400).json({ message: 'Email already exists' });
     }
 
-    // Sync to Firebase
     if (user.firebaseUid) {
       const fbUpdates = {};
       if (req.body.password)                        fbUpdates.password    = req.body.password;
@@ -292,7 +289,11 @@ export const updateRecruiter = async (req, res) => {
     user.role           = req.body.role           || user.role;
     user.username       = req.body.username       || user.username;
     user.recruiterId    = req.body.recruiterId    || user.recruiterId;
-    user.profilePicture = req.body.profilePicture || user.profilePicture;
+    
+    // Explicitly allow picture deletion by admins too
+    if (req.body.profilePicture !== undefined) {
+      user.profilePicture = req.body.profilePicture;
+    }
 
     const updatedUser = await user.save();
     res.json({
@@ -302,6 +303,7 @@ export const updateRecruiter = async (req, res) => {
       email:       updatedUser.email,
       role:        updatedUser.role,
       recruiterId: updatedUser.recruiterId,
+      profilePicture: updatedUser.profilePicture
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

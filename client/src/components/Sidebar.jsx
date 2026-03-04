@@ -12,15 +12,15 @@ import clsx from 'clsx';
 export default function Sidebar({ isOpen, toggleSidebar }) {
   const { userRole, logout, currentUser } = useAuth();
   
-  // -- Colors --
+  // -- Colors matching the PDF --
   const sidebarBg = "bg-[#283086]"; 
   const mainBackgroundColor = "#f3f6fd"; 
-  const activeBgClass = `bg-[${mainBackgroundColor}]`; 
+  const activeBgClass = `bg-[#f3f6fd]`; 
   
   const activeTextClass = "text-[#283086] font-extrabold"; 
-  const inactiveTextClass = "text-white font-medium hover:bg-white/10 rounded-l-[50px]";
+  const inactiveTextClass = "text-white font-medium hover:bg-white/10";
 
-  const adminLinks = [
+  const managerLinks = [
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
     { name: 'OverAll Candidates', path: '/admin/add-candidate', icon: Users }, 
     { name: 'Recruiters', path: '/admin/recruiters', icon: Briefcase },
@@ -44,80 +44,61 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
   ];
 
   let links = [];
-  if (userRole === 'admin') {
-    links = adminLinks;
-  } else if (userRole === 'manager') {
-    const filteredAdminLinks = adminLinks.filter(
-      (link) => link.name !== 'Client Info' && link.name !== 'Invoices'
-    );
-    const myCandidatesLink = { 
-      name: 'My Candidates', 
-      path: '/recruiter/candidates', 
-      icon: UserPlus 
-    };
+  if (userRole === 'manager') {
+    links = managerLinks;
+  } else if (userRole === 'admin') {
+    // ✅ FIXED: Cleanly built the admin links array and updated the path to /admin/my-candidates
     links = [
-      filteredAdminLinks[0], filteredAdminLinks[1], myCandidatesLink, ...filteredAdminLinks.slice(2) 
+      { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
+      { name: 'OverAll Candidates', path: '/admin/add-candidate', icon: Users },
+      { name: 'My Candidates', path: '/admin/my-candidates', icon: UserPlus }, // <-- Fixed Path
+      { name: 'Recruiters', path: '/admin/recruiters', icon: Briefcase },
+      { name: 'Requirements', path: '/admin/requirements', icon: ClipboardList },
+      { name: 'Messages', path: '/admin/messages', icon: MessageSquare },
+      { name: 'Reports', path: '/admin/reports', icon: BarChart3 },
+      { name: 'Settings', path: '/admin/settings', icon: Settings },
     ];
   } else {
     links = recruiterLinks;
   }
 
   return (
-    <div 
-      className={clsx(
-        "flex flex-col h-screen fixed left-0 top-0 z-50 transition-all duration-300",
-        sidebarBg,
-        isOpen ? "w-80" : "w-20"
-      )}
-    >
+    <div className={clsx("flex flex-col h-screen fixed left-0 top-0 z-50 transition-all duration-300", sidebarBg, isOpen ? "w-80" : "w-20")}>
       
       {/* --- Toggle Button --- */}
-      <button 
-        onClick={toggleSidebar}
-        className="absolute -right-3 top-12 bg-white text-[#283086] rounded-full p-1 shadow-md hover:scale-110 transition-transform z-50 border border-gray-200"
-      >
+      <button onClick={toggleSidebar} className="absolute -right-3 top-12 bg-white text-[#283086] rounded-full p-1 shadow-md z-50 border border-gray-200">
         {isOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
       </button>
 
       {/* --- Header / Logo --- */}
       <div className={clsx("h-28 flex items-center transition-all duration-300", isOpen ? "px-8" : "justify-center px-0")}>
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm border border-white/10">
+          <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center flex-shrink-0 border border-white/10">
             <span className="text-white font-extrabold text-2xl">V</span>
           </div>
-          <span className={clsx("text-white font-bold text-2xl tracking-tight whitespace-nowrap transition-opacity duration-200", isOpen ? "opacity-100 block" : "opacity-0 hidden")}>
-            VTS Tracker
-          </span>
+          <span className={clsx("text-white font-bold text-2xl tracking-tight transition-opacity", isOpen ? "opacity-100 block" : "opacity-0 hidden")}>VTS Tracker</span>
         </div>
       </div>
 
       {/* --- User Profile Card --- */}
       <div className={clsx("mb-8 transition-all duration-300", isOpen ? "px-6" : "px-2")}>
-        <div className={clsx("bg-[#3d4692] rounded-2xl flex items-center overflow-hidden shadow-inner border border-white/5 transition-all", isOpen ? "p-4 gap-4" : "p-2 justify-center")}>
-          
-          {/* UPDATED: Profile Image logic */}
-          <div className="w-10 h-10 rounded-full border-2 border-white/20 flex-shrink-0 overflow-hidden bg-gray-200 flex items-center justify-center">
-             {currentUser?.profilePicture ? (
-               <img src={currentUser.profilePicture} alt="Profile" className="w-full h-full object-cover" />
-             ) : (
-               <User className="h-5 w-5 text-gray-500" />
-             )}
+        <div className={clsx("bg-white/10 backdrop-blur-md rounded-full flex items-center overflow-hidden border border-white/10 transition-all", isOpen ? "p-3 gap-4" : "p-2 justify-center")}>
+          <div className="w-10 h-10 rounded-full border-2 border-white/20 flex-shrink-0 overflow-hidden bg-gray-200">
+             {currentUser?.profilePicture ? <img src={currentUser.profilePicture} className="w-full h-full object-cover" /> : <User className="h-full w-full p-2 text-gray-500" />}
           </div>
-
-          <div className={clsx("flex-1 min-w-0 transition-opacity duration-200", isOpen ? "opacity-100 block" : "opacity-0 hidden")}>
-            {/* UPDATED: Show Name, Fallback to Email */}
-            <p className="text-sm font-bold text-white truncate">
-              {currentUser?.name || currentUser?.email || 'User'}
-            </p>
-            <p className="text-[11px] text-blue-200 uppercase font-bold mt-0.5 tracking-wide">
-              {userRole} Account
-            </p>
-          </div>
+          {isOpen && (
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-white truncate">{currentUser?.name || currentUser?.username || currentUser?.email || 'User'}</p>
+              <p className="text-[10px] text-blue-200 uppercase font-bold tracking-wider">
+                {userRole === 'admin' ? 'Admin' : userRole === 'manager' ? 'Manager' : 'Recruiter'} Account
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
       {/* --- Navigation Links --- */}
-      <div className={clsx("flex-1 overflow-y-auto space-y-2 py-2 pr-0 [&::-webkit-scrollbar]:hidden", isOpen ? "pl-6" : "pl-2")}>
+      <div className={clsx("flex-1 overflow-y-auto space-y-1 py-2 pr-0 [&::-webkit-scrollbar]:hidden", isOpen ? "pl-6" : "pl-2")}>
         {links.map((link) => (
           <NavLink
             key={link.path}
@@ -127,46 +108,36 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
               clsx(
                 "group flex items-center relative transition-all duration-200 py-4",
                 isActive 
-                  ? `${activeBgClass} ${activeTextClass} rounded-l-[50px] rounded-r-none`
+                  ? `${activeBgClass} ${activeTextClass} rounded-l-[40px]`
                   : inactiveTextClass,
-                isOpen ? "pl-8 justify-start" : "justify-center pl-0"
+                isOpen ? "pl-8" : "justify-center pl-0"
               )
             }
           >
             {({ isActive }) => (
               <>
-                {/* --- SEAMLESS CURVES --- */}
-                {isActive && (
+                {isActive && isOpen && (
                   <>
                     <div 
-                      className="absolute right-0 -top-8 w-8 h-8 bg-transparent pointer-events-none z-50"
+                      className="absolute right-0 -top-[30px] w-[30px] h-[30px] bg-transparent pointer-events-none"
                       style={{
-                        borderBottomRightRadius: '100%', 
-                        boxShadow: `15px 15px 0 15px ${mainBackgroundColor}` 
+                        borderBottomRightRadius: '25px', 
+                        boxShadow: `10px 10px 0 10px ${mainBackgroundColor}` 
                       }}
                     />
                     <div 
-                      className="absolute right-0 -bottom-8 w-8 h-8 bg-transparent pointer-events-none z-50"
+                      className="absolute right-0 -bottom-[30px] w-[30px] h-[30px] bg-transparent pointer-events-none"
                       style={{
-                        borderTopRightRadius: '100%',
-                        boxShadow: `15px -15px 0 15px ${mainBackgroundColor}`
+                        borderTopRightRadius: '25px',
+                        boxShadow: `10px -10px 0 10px ${mainBackgroundColor}`
                       }}
                     />
                   </>
                 )}
 
-                <div className={clsx("flex items-center z-20 relative transition-all duration-300", isOpen ? "gap-5" : "gap-0")}>
-                  <link.icon 
-                    className={clsx(
-                      "h-5 w-5 flex-shrink-0 transition-transform duration-300", 
-                      isActive ? "scale-110 stroke-[3px]" : "group-hover:scale-110 stroke-[2.5px]"
-                    )} 
-                  />
-                  <span className={clsx("text-[15px] tracking-wide whitespace-nowrap transition-all duration-200 overflow-hidden", 
-                    isOpen ? "opacity-100 w-auto" : "opacity-0 w-0"
-                  )}>
-                    {link.name}
-                  </span>
+                <div className={clsx("flex items-center z-20 relative transition-all", isOpen ? "gap-5" : "gap-0")}>
+                  <link.icon className={clsx("h-5 w-5 transition-transform", isActive ? "scale-110 stroke-[3px]" : "stroke-[2.5px]")} />
+                  {isOpen && <span className="text-[15px] tracking-wide whitespace-nowrap">{link.name}</span>}
                 </div>
               </>
             )}
@@ -175,22 +146,10 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
       </div>
 
       {/* --- Sign Out Button --- */}
-      <div className={clsx(
-        "mt-auto transition-all duration-300", 
-        isOpen ? "pl-6 pr-6 mb-6" : "pl-2 pr-2 mb-4"
-      )}>
-        <button 
-          onClick={logout} 
-          className={clsx(
-            "flex items-center w-full bg-red-600 text-white hover:bg-red-700 transition-all shadow-lg group relative overflow-hidden",
-            isOpen ? "justify-start pl-8 py-4 gap-5 rounded-2xl" : "justify-center p-3 rounded-2xl"
-          )}
-          title="Sign Out"
-        >
-          <Power className="h-6 w-6 flex-shrink-0 group-hover:scale-110 transition-transform stroke-[3px]" />
-          <span className={clsx("font-extrabold tracking-wide text-base transition-all duration-200 overflow-hidden whitespace-nowrap", isOpen ? "block" : "hidden w-0")}>
-            Sign Out
-          </span>
+      <div className={clsx("mt-auto p-4 mb-4", isOpen ? "px-6" : "px-2")}>
+        <button onClick={logout} className={clsx("flex items-center w-full bg-red-600 text-white py-4 gap-4 transition-all shadow-lg", isOpen ? "rounded-2xl px-8" : "rounded-xl justify-center")}>
+          <Power className="h-6 w-6" />
+          {isOpen && <span className="font-extrabold">Sign Out</span>}
         </button>
       </div>
     </div>

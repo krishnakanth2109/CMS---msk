@@ -7,18 +7,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   User, Briefcase, Camera, CheckCircle, TrendingUp,
   Edit, Loader2, Globe, Linkedin, Github, Twitter,
-  Phone, MapPin, Calendar, Hash
+  Phone, MapPin, Calendar, Hash, Trash2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 // ─── Session helpers ───────────────────────────────────────────────────────────
-// AuthContext stores in sessionStorage key 'currentUser':
-//   { _id, email, username, role, firebaseUid, idToken, refreshToken, sessionExpiry }
-// idToken  = current Firebase Bearer token (auto-refreshed every ~55 min by AuthContext)
-// _id      = MongoDB ObjectId – we use this for display/reference only;
-//            the backend protect middleware reads the idToken to identify the user.
 const getSession = () => {
   try { return JSON.parse(sessionStorage.getItem('currentUser') || '{}'); }
   catch { return {}; }
@@ -40,7 +35,6 @@ export default function RecruiterProfile() {
   const [activeTab,      setActiveTab]      = useState('profile');
   const [imagePreview,   setImagePreview]   = useState('');
 
-  // profile = committed state (what backend currently has)
   const [profile, setProfile] = useState({
     _id: '', firstName: '', lastName: '', email: '', username: '',
     phone: '', location: '', specialization: '', experience: '',
@@ -48,15 +42,12 @@ export default function RecruiterProfile() {
     socials: { linkedin: '', github: '', twitter: '', website: '' },
   });
 
-  // draft = working copy; diverges from profile only while isEditing === true
   const [draft, setDraft] = useState({ ...profile });
 
   const [stats, setStats] = useState({
     totalSubmissions: 0, interviews: 0, offers: 0, joined: 0, rejected: 0, successRate: 0,
   });
 
-  // ── 1. GET /api/recruiters/profile ────────────────────────────────────────
-  // protect middleware extracts Bearer idToken → looks up MongoDB user → returns full doc
   useEffect(() => {
     (async () => {
       setProfileLoading(true);
@@ -91,7 +82,6 @@ export default function RecruiterProfile() {
         setDraft(fetched);
         if (d.profilePicture) setImagePreview(d.profilePicture);
 
-        // Keep sessionStorage in sync so Sidebar / Header show correct name & avatar
         const session = getSession();
         sessionStorage.setItem('currentUser', JSON.stringify({
           ...session, firstName: d.firstName, lastName: d.lastName, profilePicture: d.profilePicture,
@@ -104,9 +94,6 @@ export default function RecruiterProfile() {
     })();
   }, []);
 
-  // ── 2. GET /api/recruiters/profile/stats ──────────────────────────────────
-  // Returns candidate counts for the logged-in recruiter grouped by pipeline stage.
-  // See recruiterRoutes.js addition below.
   useEffect(() => {
     (async () => {
       setStatsLoading(true);
@@ -127,7 +114,6 @@ export default function RecruiterProfile() {
     })();
   }, []);
 
-  // ── Image → base64 (Cloudinary upload handled by recruiterController.updateUserProfile) ─
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -146,10 +132,16 @@ export default function RecruiterProfile() {
     reader.readAsDataURL(file);
   };
 
+  // ── Added: Remove Image Handler ──
+  const handleRemoveImage = () => {
+    setImagePreview('');
+    setDraft(prev => ({ ...prev, profilePicture: '' }));
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const setField  = (k, v) => setDraft(prev => ({ ...prev, [k]: v }));
   const setSocial = (k, v) => setDraft(prev => ({ ...prev, socials: { ...prev.socials, [k]: v } }));
 
-  // ── 3. PUT /api/recruiters/profile ────────────────────────────────────────
   const handleSave = async () => {
     if (!draft.firstName.trim() || !draft.lastName.trim()) {
       toast({ title: 'Validation', description: 'First and last name are required.', variant: 'destructive' }); return;
@@ -170,7 +162,7 @@ export default function RecruiterProfile() {
           specialization: draft.specialization,
           experience:     draft.experience,
           bio:            draft.bio,
-          profilePicture: draft.profilePicture, // base64 → Cloudinary in recruiterController
+          profilePicture: draft.profilePicture, 
           socials:        draft.socials,
         }),
       });
@@ -193,7 +185,7 @@ export default function RecruiterProfile() {
         ...session, firstName: d.firstName, lastName: d.lastName,
         email: d.email, profilePicture: d.profilePicture,
       }));
-      window.dispatchEvent(new Event('storage')); // trigger Sidebar/Header refresh
+      window.dispatchEvent(new Event('storage')); 
 
       toast({ title: 'Saved!', description: 'Profile updated successfully.' });
       setIsEditing(false);
@@ -204,13 +196,11 @@ export default function RecruiterProfile() {
 
   const handleCancelEdit = () => { setDraft({ ...profile }); setImagePreview(profile.profilePicture); setIsEditing(false); };
 
-  // Helpers
   const displayName = (fn, ln) => `${fn} ${ln}`.trim() || 'Your Name';
   const initials    = (fn, ln) => ((fn?.[0] || '') + (ln?.[0] || '')).toUpperCase() || 'U';
   const joinedDate  = profile.createdAt
     ? new Date(profile.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '';
 
-  // While editing show draft values, while viewing show committed profile values
   const val    = (k) => isEditing ? draft[k]               : profile[k];
   const social = (k) => isEditing ? (draft.socials?.[k] || '') : (profile.socials?.[k] || '');
 
@@ -264,7 +254,6 @@ export default function RecruiterProfile() {
             <TabsTrigger value="performance" className="data-[state=active]:bg-slate-100">Performance Metrics</TabsTrigger>
           </TabsList>
 
-          {/* ══════════════════ PROFILE TAB ══════════════════════════════ */}
           <TabsContent value="profile">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -272,25 +261,43 @@ export default function RecruiterProfile() {
               <div className="lg:col-span-1 h-fit rounded-xl border border-slate-200 bg-white shadow-sm p-6 flex flex-col items-center space-y-4">
                 <h3 className="font-semibold text-slate-900 self-start text-sm">Profile Picture</h3>
 
-                <div className={`relative group ${isEditing ? 'cursor-pointer' : ''}`}
-                  onClick={() => isEditing && fileInputRef.current?.click()}>
-                  <Avatar className="w-32 h-32 border-4 border-slate-100">
-                    <AvatarImage src={imagePreview} className="object-cover" />
-                    <AvatarFallback className="text-2xl font-bold bg-blue-50 text-blue-600">
-                      {isEditing ? initials(draft.firstName, draft.lastName)
-                                 : initials(profile.firstName, profile.lastName)}
-                    </AvatarFallback>
-                  </Avatar>
-                  {isEditing && (
-                    <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Camera className="text-white h-8 w-8" />
-                    </div>
-                  )}
-                  <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+                <div className="relative">
+                  <div className={`relative group ${isEditing ? 'cursor-pointer' : ''}`}
+                    onClick={() => isEditing && fileInputRef.current?.click()}>
+                    <Avatar className="w-32 h-32 border-4 border-slate-100">
+                      <AvatarImage src={imagePreview} className="object-cover" />
+                      <AvatarFallback className="text-2xl font-bold bg-blue-50 text-blue-600">
+                        {isEditing ? initials(draft.firstName, draft.lastName)
+                                   : initials(profile.firstName, profile.lastName)}
+                      </AvatarFallback>
+                    </Avatar>
+                    {isEditing && (
+                      <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Camera className="text-white h-8 w-8" />
+                      </div>
+                    )}
+                    <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+                  </div>
                 </div>
-                {isEditing && <p className="text-xs text-slate-400 text-center">Click to upload · Max 5MB · JPG/PNG</p>}
+                
+                {isEditing && (
+                  <div className="flex flex-col items-center gap-2">
+                    <p className="text-xs text-slate-400 text-center">Click avatar to upload · Max 5MB</p>
+                    
+                    {/* Delete Option added here for better visibility */}
+                    {imagePreview && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveImage}
+                        className="flex items-center gap-1.5 px-3 py-1.5 mt-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Remove Photo
+                      </button>
+                    )}
+                  </div>
+                )}
 
-                {/* Name + role badges */}
                 <div className="text-center w-full">
                   <h3 className="text-lg font-bold text-slate-900">
                     {isEditing ? displayName(draft.firstName, draft.lastName)
@@ -311,7 +318,6 @@ export default function RecruiterProfile() {
                   </div>
                 </div>
 
-                {/* Quick-info pills — view mode only */}
                 {!isEditing && (
                   <div className="w-full space-y-2 pt-3 border-t border-slate-100">
                     {profile.email && (
@@ -343,14 +349,11 @@ export default function RecruiterProfile() {
                   </div>
                 )}
 
-                {/* Social links — view mode only */}
                 {!isEditing && Object.values(profile.socials || {}).some(Boolean) && (
                   <div className="w-full pt-3 border-t border-slate-100 flex flex-wrap gap-x-4 gap-y-2">
                     {[
                       { key: 'linkedin', Icon: Linkedin, color: 'text-blue-600',  label: 'LinkedIn' },
-                    
                       { key: 'twitter',  Icon: Twitter,  color: 'text-sky-500',   label: 'Twitter' },
-                 
                     ].filter(({ key }) => profile.socials?.[key]).map(({ key, Icon, color, label }) => {
                       const href = profile.socials[key].startsWith('http')
                         ? profile.socials[key] : `https://${profile.socials[key]}`;
@@ -367,8 +370,6 @@ export default function RecruiterProfile() {
 
               {/* Right — Forms */}
               <div className="lg:col-span-2 space-y-6">
-
-                {/* Basic Information */}
                 <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-6">
                   <h3 className="font-semibold text-slate-900 flex items-center gap-2 mb-4">
                     <User className="h-5 w-5 text-blue-600" /> Basic Information
@@ -403,7 +404,6 @@ export default function RecruiterProfile() {
                   </div>
                 </div>
 
-                {/* Professional Information */}
                 <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-6">
                   <h3 className="font-semibold text-slate-900 flex items-center gap-2 mb-4">
                     <Briefcase className="h-5 w-5 text-blue-600" /> Professional Information
@@ -420,7 +420,6 @@ export default function RecruiterProfile() {
                   </div>
                 </div>
 
-                {/* Social Links */}
                 <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-6">
                   <h3 className="font-semibold text-slate-900 flex items-center gap-2 mb-4">
                     <Globe className="h-5 w-5 text-blue-600" /> Social Links
@@ -428,9 +427,7 @@ export default function RecruiterProfile() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
                       { key: 'linkedin', Icon: Linkedin, label: 'LinkedIn', ph: 'linkedin.com/in/you' },
-               
                       { key: 'twitter',  Icon: Twitter,  label: 'Twitter',  ph: 'twitter.com/you' },
-         
                     ].map(({ key, Icon, label, ph }) => (
                       <Field key={key} label={<span className="flex items-center gap-1"><Icon className="h-3.5 w-3.5" />{label}</span>}>
                         <input className={inp(!isEditing)} value={social(key)}
@@ -440,7 +437,6 @@ export default function RecruiterProfile() {
                   </div>
                 </div>
 
-                {/* Save / Cancel */}
                 {isEditing && (
                   <div className="flex justify-end gap-3">
                     <button onClick={handleCancelEdit} disabled={saving}
@@ -458,7 +454,7 @@ export default function RecruiterProfile() {
             </div>
           </TabsContent>
 
-          {/* ══════════════════ PERFORMANCE TAB ══════════════════════════ */}
+          {/* Performance Tab (Unchanged) */}
           <TabsContent value="performance">
             {statsLoading ? (
               <div className="flex items-center justify-center py-24">
@@ -466,7 +462,6 @@ export default function RecruiterProfile() {
               </div>
             ) : (
               <>
-                {/* KPI Cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
                   {[
                     { label: 'Submissions',  value: stats.totalSubmissions,  color: 'text-blue-600',   bg: 'bg-blue-50',   border: 'border-blue-100' },
@@ -482,7 +477,6 @@ export default function RecruiterProfile() {
                   ))}
                 </div>
 
-                {/* Funnel Progress Bars */}
                 <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-6 mb-6">
                   <h3 className="font-semibold text-slate-900 flex items-center gap-2 mb-6">
                     <TrendingUp className="h-5 w-5 text-blue-600" /> Recruitment Funnel
@@ -508,7 +502,6 @@ export default function RecruiterProfile() {
                   </div>
                 </div>
 
-                {/* Pipeline Breakdown */}
                 <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-6">
                   <h3 className="font-semibold text-slate-900 mb-4">Pipeline Breakdown</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

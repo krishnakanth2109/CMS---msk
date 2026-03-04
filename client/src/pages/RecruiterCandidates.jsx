@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -12,6 +12,17 @@ import { useToast } from '@/hooks/use-toast';
 
 const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
 const API_URL = `${BASE_URL}/api`;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const getRecruiterName = (r) => {
+  if (!r) return '-';
+  if (r.name) return r.name;
+  const first = r.firstName || '';
+  const last = r.lastName || '';
+  if (first || last) return `${first} ${last}`.trim();
+  if (r.username) return r.username;
+  return r.email || '-';
+};
 
 // ── UI Components ─────────────────────────────────────────────────────────────
 
@@ -86,7 +97,7 @@ const NativeSelect = ({ value, onChange, children, className = '', disabled }) =
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function RecruiterCandidates() {
-  const { currentUser, userRole, authHeaders } = useAuth(); // Added userRole here
+  const { currentUser, userRole, authHeaders } = useAuth(); 
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
 
@@ -119,6 +130,22 @@ export default function RecruiterCandidates() {
 
   const [errors, setErrors] = useState({});
 
+  // Refs for Top and Bottom Scrollbars
+  const topScrollRef = useRef(null);
+  const bottomScrollRef = useRef(null);
+
+  const handleTopScroll = () => {
+    if (bottomScrollRef.current && topScrollRef.current) {
+      bottomScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+    }
+  };
+
+  const handleBottomScroll = () => {
+    if (topScrollRef.current && bottomScrollRef.current) {
+      topScrollRef.current.scrollLeft = bottomScrollRef.current.scrollLeft;
+    }
+  };
+
   const standardSources = ['Portal', 'LinkedIn', 'Referral', 'Direct', 'Agency', 'Naukri', 'Indeed'];
 
   const allStatuses = [
@@ -140,7 +167,7 @@ export default function RecruiterCandidates() {
     noticePeriod: '',
     servingNoticePeriod: 'false',
     noticePeriodDays: '',
-    lwd: '', // Last Working Day
+    lwd: '', 
     reasonForChange: '',
     offersInHand: 'false',
     offerPackage: '',
@@ -158,13 +185,11 @@ export default function RecruiterCandidates() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate size (5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast({ title: 'Error', description: 'File size must be less than 5MB', variant: 'destructive' });
       return;
     }
 
-    // Validate type using extension fallback
     const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
     const validExtensions = ['.pdf', '.doc', '.docx'];
     const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
@@ -227,30 +252,8 @@ export default function RecruiterCandidates() {
       const authH = await authHeaders();
       const headers = { ...authH };
 
-      // 🔴 CHECK ROLE: If Manager or Recruiter, fetch "My Candidates". Otherwise fetch All.
-      // NOTE: Your backend MUST have a `/candidates/my` route for this to work.
-      // If your backend only has GET /candidates with a query param, adjust the URL below.
-      // For now, assuming you have separate endpoints or logic.
-      
-      let candidateEndpoint = `${API_URL}/candidates`;
-      
-      // If user is recruiter OR manager, fetch strictly "my" candidates
-      if (userRole === 'recruiter' || userRole === 'manager') {
-        // Backend usually handles this by checking req.user in the /candidates endpoint 
-        // OR by having a specific /my route. 
-        // Assuming your backend supports /candidates?view=my or similar filter logic
-        // OR simply filtering inside the GET /candidates logic on the backend.
-        
-        // IF YOUR BACKEND IS ALREADY FILTERING BASED ON ROLE for GET /candidates:
-        candidateEndpoint = `${API_URL}/candidates`; 
-        
-        // IF YOU EXPLICITLY WANT TO FORCE "MY CANDIDATES" logic:
-        // You might need to pass a query param if the backend supports it.
-        // candidateEndpoint = `${API_URL}/candidates?filter=my`;
-      }
-
       const [candRes, jobRes, clientRes] = await Promise.all([
-        fetch(candidateEndpoint, { headers }),
+        fetch(`${API_URL}/candidates`, { headers }),
         fetch(`${API_URL}/jobs`, { headers }),
         fetch(`${API_URL}/clients`, { headers })
       ]);
@@ -260,15 +263,10 @@ export default function RecruiterCandidates() {
         const allJobs = await jobRes.json();
         const allClients = await clientRes.json();
 
-        // 🔴 CLIENT-SIDE FILTERING (Fallback safety)
-        // If the backend returns everyone but we are a manager/recruiter, 
-        // filter by the current user's ID just in case.
         let finalCandidates = allCandidates;
-        
-        if ((userRole === 'manager' || userRole === 'recruiter') && currentUser?._id) {
+        if (currentUser?._id) {
            finalCandidates = allCandidates.filter(c => {
-             // Check against recruiterId object or string
-             const cRecruiterId = typeof c.recruiterId === 'object' ? c.recruiterId._id : c.recruiterId;
+             const cRecruiterId = typeof c.recruiterId === 'object' ? c.recruiterId?._id : c.recruiterId;
              return cRecruiterId === currentUser._id;
            });
         }
@@ -279,6 +277,7 @@ export default function RecruiterCandidates() {
           ...c,
           status: Array.isArray(c.status) ? c.status : [c.status || 'Submitted']
         }));
+        
         setCandidates(fixedCandidates);
         setJobs(allJobs);
         setClients(allClients);
@@ -296,11 +295,6 @@ export default function RecruiterCandidates() {
     const status = searchParams.get('status');
     if (status) { setActiveStatFilter(status); setStatusFilter('all'); }
   }, [searchParams]);
-
-  const uniquePositions = useMemo(() => {
-    const positions = jobs.map(j => j.position).filter(Boolean);
-    return Array.from(new Set(positions));
-  }, [jobs]);
 
   const handleInputChange = (key, value) => {
     let newValue = value;
@@ -400,7 +394,6 @@ export default function RecruiterCandidates() {
     return 'secondary';
   };
 
-  const getInitials = (n) => n.split(' ').map(i => i[0]).join('').toUpperCase().substring(0, 2);
   const getCandidateId = (c) => c.candidateId || c._id.substring(c._id.length - 6).toUpperCase();
   const formatSkills = (skills) => !skills ? 'N/A' : Array.isArray(skills) ? skills.slice(0, 3).join(', ') + (skills.length > 3 ? '...' : '') : skills.length > 50 ? skills.substring(0, 50) + '...' : skills;
   const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
@@ -709,7 +702,25 @@ export default function RecruiterCandidates() {
 
   return (
     <>
-      <main className="flex-1 p-6 overflow-y-auto">
+      <style>{`
+        /* Custom sleek horizontal scrollbar */
+        .sleek-scrollbar::-webkit-scrollbar {
+          height: 10px;
+        }
+        .sleek-scrollbar::-webkit-scrollbar-track {
+          background: #f1f5f9; 
+          border-radius: 6px;
+        }
+        .sleek-scrollbar::-webkit-scrollbar-thumb {
+          background: #cbd5e1; 
+          border-radius: 6px;
+        }
+        .sleek-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #94a3b8; 
+        }
+      `}</style>
+
+      <main className="flex-1 p-6 overflow-y-auto pb-48">
         <div className="max-w-[1800px] mx-auto space-y-6">
           {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -771,60 +782,78 @@ export default function RecruiterCandidates() {
             </div>
           </div>
 
-          {/* Table View */}
+          {/* Table View With Double Custom Scrollbar */}
           {viewMode === 'table' ? (
-            <div className="overflow-hidden border border-slate-200 rounded-xl shadow-sm bg-white">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left border-collapse">
+            <div className="border border-slate-200 rounded-xl shadow-sm bg-white flex flex-col">
+              
+              {/* TOP SCROLLBAR (Sleek) */}
+              <div 
+                ref={topScrollRef} 
+                onScroll={handleTopScroll} 
+                className="overflow-x-auto overflow-y-hidden sleek-scrollbar rounded-t-xl bg-slate-50 border-b border-slate-100"
+                style={{ height: '10px' }}
+              >
+                <div style={{ width: '1600px', height: '1px' }}></div>
+              </div>
+
+              {/* TABLE CONTAINER */}
+              <div ref={bottomScrollRef} onScroll={handleBottomScroll} className="overflow-x-auto sleek-scrollbar rounded-b-xl">
+                <table className="w-full text-sm text-left border-collapse min-w-[1600px]">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b">
                     <tr>
                       <th className="p-4 w-12"><input type="checkbox" checked={getFilteredCandidates.length > 0 && selectedCandidates.length === getFilteredCandidates.length} onChange={selectAllCandidates} className="h-4 w-4 rounded border-slate-300" /></th>
-                      <th className="p-3">ID</th><th className="p-3">Name</th>
-                      <th className="p-3">Phone</th><th className="p-3">Email</th><th className="p-3">Client</th>
-                      <th className="p-3">Skills</th><th className="p-3">Date Added</th><th className="p-3">Experience</th>
-                      <th className="p-3">CTC / ECTC</th><th className="p-3">Status</th>
-                      <th className="p-3">Remarks</th><th className="p-3 text-right">Actions</th>
+                      <th className="p-3">ID</th>
+                      <th className="p-3">Name</th>
+                      <th className="p-3">Phone</th>
+                      <th className="p-3">Email</th>
+                      <th className="p-3">Client</th>
+                      <th className="p-3">Skills</th>
+                      <th className="p-3">Date Added</th>
+                      <th className="p-3">Experience</th>
+                      <th className="p-3">CTC / ECTC</th>
+                      <th className="p-3">Status</th>
+                      <th className="p-3">Remarks</th>
+                      <th className="p-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {getFilteredCandidates.map((c, index) => (
+                    {getFilteredCandidates.map((c, index) => {
+                      return (
                       <tr key={c._id} className="hover:bg-slate-50">
                         <td className="p-3 pl-4"><input type="checkbox" checked={selectedCandidates.includes(c._id)} onChange={() => toggleSelectCandidate(c._id)} className="h-4 w-4 rounded" /></td>
                         <td className="p-3 font-mono text-xs text-blue-600 font-bold cursor-pointer" onClick={() => { navigator.clipboard.writeText(getCandidateId(c)); toast({ title: "Copied ID" }); }}>{getCandidateId(c)}</td>
-                        <td className="p-3">
-                          <div className="flex items-center gap-2">
-                            <div className="h-8 w-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">{getInitials(c.name)}</div>
-                            <span className="font-semibold">{c.name}</span>
-                          </div>
+                        <td className="p-3 whitespace-nowrap">
+                          <span className="font-semibold text-slate-900">{c.name}</span>
                         </td>
-                        <td className="p-3 text-sm text-slate-600">
+                        <td className="p-3 text-sm text-slate-600 whitespace-nowrap">
                           <div className="flex items-center gap-2">{c.contact}
                             <button className="text-green-600 hover:text-green-700" onClick={() => handleWhatsApp(c)}><MessageCircle className="h-3.5 w-3.5" /></button>
                           </div>
                         </td>
                         <td className="p-3 text-sm text-slate-600"><span className="truncate max-w-[150px] block" title={c.email}>{c.email}</span></td>
-                        <td className="p-3 text-slate-600">{c.client}</td>
+                        <td className="p-3 text-slate-600 whitespace-nowrap">{c.client}</td>
                         <td className="p-3 text-xs text-slate-600 max-w-[150px] truncate" title={Array.isArray(c.skills) ? c.skills.join(', ') : c.skills}>{formatSkills(c.skills)}</td>
-                        <td className="p-3 text-sm text-slate-600">{formatDate(c.dateAdded)}</td>
-                        <td className="p-3 text-sm">{c.totalExperience} Yrs</td>
-                        <td className="p-3 text-xs"><div>{c.ctc || '-'}</div><div className="text-green-600">{c.ectc || '-'}</div></td>
+                        <td className="p-3 text-sm text-slate-600 whitespace-nowrap">{formatDate(c.dateAdded || c.createdAt)}</td>
+                        <td className="p-3 text-sm whitespace-nowrap">{c.totalExperience ? `${c.totalExperience} Yrs` : '-'}</td>
+                        <td className="p-3 text-xs whitespace-nowrap"><div>{c.ctc || '-'}</div><div className="text-green-600">{c.ectc || '-'}</div></td>
                         <td className="p-3">
                           <div className="flex flex-wrap gap-1">
                             {Array.isArray(c.status) ? c.status.map(s => (
-                              <Badge key={s} variant={getStatusBadgeVariant(s)} className="text-[10px] px-1 py-0">{s}</Badge>
-                            )) : <Badge variant={getStatusBadgeVariant(c.status)}>{c.status}</Badge>}
+                              <Badge key={s} variant={getStatusBadgeVariant(s)} className="text-[10px] px-1 py-0 whitespace-nowrap">{s}</Badge>
+                            )) : <Badge variant={getStatusBadgeVariant(c.status)} className="whitespace-nowrap">{c.status}</Badge>}
                           </div>
                         </td>
-                        <td className="p-3 text-xs text-slate-500 truncate max-w-[100px]">{c.remarks}</td>
-                        <td className="p-3 text-right">
+                        <td className="p-3 text-xs text-slate-500 truncate max-w-[150px]">{c.remarks || '-'}</td>
+                        <td className="p-3 text-right whitespace-nowrap">
                           <div className="flex justify-end gap-1">
-                            <button className="p-1 hover:bg-slate-100 rounded" onClick={() => openViewDialog(c)}><Eye className="h-3.5 w-3.5" /></button>
-                            <button className="p-1 hover:bg-slate-100 rounded" onClick={() => openEditDialog(c)}><Edit className="h-3.5 w-3.5 text-blue-600" /></button>
+                            <button className="p-1 hover:bg-slate-100 rounded" onClick={() => openViewDialog(c)}><Eye className="h-3.5 w-3.5 text-blue-600" /></button>
+                            <button className="p-1 hover:bg-slate-100 rounded" onClick={() => openEditDialog(c)}><Edit className="h-3.5 w-3.5 text-slate-600" /></button>
                             <button className="p-1 hover:bg-slate-100 rounded" onClick={() => toggleActiveStatus(c._id, c.active !== false)}><Ban className="h-3.5 w-3.5 text-red-600" /></button>
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -835,9 +864,8 @@ export default function RecruiterCandidates() {
                 <div key={c._id} className="bg-white border border-slate-200 rounded-xl hover:shadow-lg transition-all p-6">
                   <div className="flex justify-between mb-4">
                     <div className="flex gap-3">
-                      <div className="h-10 w-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold">{getInitials(c.name)}</div>
                       <div>
-                        <h3 className="font-bold">{c.name}</h3>
+                        <h3 className="font-bold text-slate-900">{c.name}</h3>
                         <p className="text-sm text-blue-600 font-mono">{getCandidateId(c)}</p>
                       </div>
                     </div>
@@ -971,7 +999,6 @@ export default function RecruiterCandidates() {
         <Modal open={isViewDialogOpen} onClose={() => setIsViewDialogOpen(false)} maxWidth="max-w-4xl">
           <ModalHeader>
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">{getInitials(viewingCandidate.name)}</div>
               <div>
                 <ModalTitle className="text-xl">{viewingCandidate.name}</ModalTitle>
                 <p className="text-sm font-mono text-blue-600">ID: {getCandidateId(viewingCandidate)}</p>

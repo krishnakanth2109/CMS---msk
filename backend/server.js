@@ -34,12 +34,10 @@ const httpServer = createServer(app);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FIX: Added 'vagarious-cms.netlify.app' to CORS allowed origins.
-// The old list only had 'cms-vagarious.netlify.app' (different subdomain).
-// Both are included now to support either deployment.
 // ─────────────────────────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = [
-  'https://vagarious-cms.netlify.app',   // ✅ ADDED — the actual live site
-  'https://cms-vagarious.netlify.app',   // kept for backward compat
+  'https://vagarious-cms.netlify.app',
+  'https://cms-vagarious.netlify.app',
   'http://localhost:5173',
   'http://localhost:5000',
   'http://localhost:8080',
@@ -123,9 +121,8 @@ app.get('/', (_req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// GET /api/reports  — Admin & Manager overview dashboard
+// GET /api/reports  — Admin (Nainika) & Manager (Sanjay/Krishna/Navya) dashboard
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🔴 FIXED: Added 'manager' so they can load the dashboard stats
 app.get('/api/reports', protect, authorize('admin', 'manager'), async (req, res) => {
   try {
     const { filter = 'month' } = req.query;

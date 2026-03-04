@@ -17,7 +17,6 @@ export default function AdminReports() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("month");
   
-  // State to hold data directly from the backend
   const [reportData, setReportData] = useState({
     overview: { totalCandidates: 0, activeRecruiters: 0, conversionRate: '0%' },
     recruiterPerformance: [],
@@ -29,7 +28,6 @@ export default function AdminReports() {
     'Authorization': `Bearer ${sessionStorage.getItem('authToken')}`
   });
 
-  // Fetch from the backend whenever the filter changes
   useEffect(() => {
     const fetchReports = async () => {
       setLoading(true);
@@ -55,7 +53,6 @@ export default function AdminReports() {
     fetchReports();
   }, [filter, toast]);
 
-  // Export functions using the backend data
   const exportToExcel = () => {
     if (!reportData.recruiterPerformance.length) return;
     const worksheet = XLSX.utils.json_to_sheet(reportData.recruiterPerformance);
@@ -80,7 +77,7 @@ export default function AdminReports() {
     contentStyle: {
       backgroundColor: '#ffffff',
       border: '1px solid #e2e8f0',
-      borderRadius: '8px',
+      borderRadius: '0px', // Removed border radius
       color: '#0f172a'
     }
   };
@@ -102,13 +99,13 @@ export default function AdminReports() {
             <p className="text-slate-500 mt-1">Comprehensive performance insights</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {/* Filter Toggle */}
-            <div className="bg-slate-200 p-1 rounded-lg flex border border-slate-300">
+            {/* Filter Toggle - Removed rounded-lg */}
+            <div className="bg-slate-200 p-1 flex border border-slate-300">
               {['day', 'week', 'month', 'all'].map(f => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium capitalize transition ${
+                  className={`px-3 py-1.5 text-sm font-medium capitalize transition ${
                     filter === f 
                       ? 'bg-white shadow text-slate-900' 
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -118,15 +115,16 @@ export default function AdminReports() {
                 </button>
               ))}
             </div>
+            {/* Buttons - Removed rounded-lg */}
             <button
               onClick={exportToExcel}
-              className="inline-flex items-center gap-2 px-3 py-2 border border-slate-300 bg-white rounded-lg text-sm font-medium hover:bg-slate-50 text-slate-700 transition"
+              className="inline-flex items-center gap-2 px-3 py-2 border border-slate-300 bg-white text-sm font-medium hover:bg-slate-50 text-slate-700 transition"
             >
               <Download className="h-4 w-4" /> Excel
             </button>
             <button
               onClick={exportToPDF}
-              className="inline-flex items-center gap-2 px-3 py-2 border border-slate-300 bg-white rounded-lg text-sm font-medium hover:bg-slate-50 text-slate-700 transition"
+              className="inline-flex items-center gap-2 px-3 py-2 border border-slate-300 bg-white text-sm font-medium hover:bg-slate-50 text-slate-700 transition"
             >
               <Download className="h-4 w-4" /> PDF
             </button>
@@ -134,7 +132,8 @@ export default function AdminReports() {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-3 bg-slate-200 border border-slate-300 p-1 rounded-lg">
+          {/* TabsList - Removed rounded-lg */}
+          <TabsList className="grid w-full max-w-md grid-cols-3 bg-slate-200 border border-slate-300 p-1">
             <TabsTrigger value="overview" className="data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm">Overview</TabsTrigger>
             <TabsTrigger value="recruiters" className="data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm">Recruiters</TabsTrigger>
             <TabsTrigger value="trends" className="data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm">Trends</TabsTrigger>
@@ -143,8 +142,8 @@ export default function AdminReports() {
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Total Candidates */}
-              <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-6">
+              {/* Total Candidates - Removed rounded-xl */}
+              <div className="border border-slate-200 bg-white shadow-sm p-6">
                 <div className="flex items-center justify-between pb-2">
                   <span className="text-sm font-medium text-slate-500">Total Candidates</span>
                   <TrendingUp className="h-4 w-4 text-blue-500" />
@@ -153,8 +152,8 @@ export default function AdminReports() {
                 <p className="text-xs text-slate-400 mt-1">Filtered by {filter}</p>
               </div>
 
-              {/* Active Recruiters */}
-              <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-6">
+              {/* Active Recruiters - Removed rounded-xl */}
+              <div className="border border-slate-200 bg-white shadow-sm p-6">
                 <div className="flex items-center justify-between pb-2">
                   <span className="text-sm font-medium text-slate-500">Active Recruiters</span>
                   <TrendingUp className="h-4 w-4 text-purple-500" />
@@ -163,8 +162,8 @@ export default function AdminReports() {
                 <p className="text-xs text-slate-400 mt-1">Total registered</p>
               </div>
 
-              {/* Conversion Rate */}
-              <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-6">
+              {/* Conversion Rate - Removed rounded-xl */}
+              <div className="border border-slate-200 bg-white shadow-sm p-6">
                 <div className="flex items-center justify-between pb-2">
                   <span className="text-sm font-medium text-slate-500">Conversion Rate</span>
                   <Calendar className="h-4 w-4 text-green-500" />
@@ -177,7 +176,7 @@ export default function AdminReports() {
 
           {/* Recruiter Performance Tab */}
           <TabsContent value="recruiters">
-            <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-6">
+            <div className="border border-slate-200 bg-white shadow-sm p-6">
               <h3 className="font-semibold text-slate-900 mb-6">Recruiter Performance Comparison ({filter})</h3>
               <div className="h-[500px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -187,10 +186,11 @@ export default function AdminReports() {
                     <YAxis className="text-sm font-medium text-slate-600" tick={{fill: '#64748b'}} />
                     <Tooltip {...tooltipStyle} />
                     <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                    <Bar dataKey="Submissions" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Turnups" fill="#a855f7" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Selected" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Joined" fill="#f97316" radius={[4, 4, 0, 0]} />
+                    {/* Radius set to 0 for square bars */}
+                    <Bar dataKey="Submissions" fill="#3b82f6" radius={0} />
+                    <Bar dataKey="Turnups" fill="#a855f7" radius={0} />
+                    <Bar dataKey="Selected" fill="#22c55e" radius={0} />
+                    <Bar dataKey="Joined" fill="#f97316" radius={0} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -199,7 +199,7 @@ export default function AdminReports() {
 
           {/* Trend Analysis Tab */}
           <TabsContent value="trends">
-            <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-6">
+            <div className="border border-slate-200 bg-white shadow-sm p-6">
               <h3 className="font-semibold text-slate-900 mb-6">6-Month Trend Analysis</h3>
               <div className="h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">

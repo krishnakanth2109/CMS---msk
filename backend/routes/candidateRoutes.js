@@ -84,13 +84,16 @@ router.post('/parse-resume', upload.single('resume'), async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     let query = {};
-    // 🔴 FIXED: Allow Managers to see all candidates (bypass recruiter lock)
+    // Allow Managers to see all candidates (bypass recruiter lock)
     if (req.user && req.user.role !== 'admin' && req.user.role !== 'manager') {
       query.recruiterId = req.user._id;
     }
+    
+    // 🔴 FIXED: Populating firstName, lastName, and email to pass to the frontend table
     const candidates = await Candidate.find(query)
-      .populate('recruiterId', 'name')
+      .populate('recruiterId', 'name firstName lastName email')
       .sort({ createdAt: -1 });
+      
     res.json(candidates);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -131,7 +134,7 @@ router.post('/', upload.single('resume'), async (req, res) => {
     let targetRecruiterId = req.user._id;
     let targetRecruiterName = req.user.name;
 
-    // 🔴 FIXED: Allow Managers to assign candidates to specific recruiters
+    // Allow Managers to assign candidates to specific recruiters
     if ((req.user.role === 'admin' || req.user.role === 'manager') && candidateData.recruiterId) {
       const assignedRecruiter = await User.findById(candidateData.recruiterId);
       if (assignedRecruiter) {
@@ -156,10 +159,10 @@ router.post('/', upload.single('resume'), async (req, res) => {
 // GET SINGLE
 router.get('/:id', async (req, res) => {
   try {
-    const candidate = await Candidate.findById(req.params.id).populate('recruiterId', 'name');
+    const candidate = await Candidate.findById(req.params.id).populate('recruiterId', 'name firstName lastName email');
     if (!candidate) return res.status(404).json({ message: 'Candidate not found' });
 
-    // 🔴 FIXED: Managers bypass ownership check
+    // Managers bypass ownership check
     if (req.user.role !== 'admin' && req.user.role !== 'manager' && candidate.recruiterId._id.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized to view this candidate' });
     }
@@ -184,7 +187,7 @@ router.put('/:id', upload.single('resume'), async (req, res) => {
     const existingCandidate = await Candidate.findById(req.params.id);
     if (!existingCandidate) return res.status(404).json({ message: 'Candidate not found' });
 
-    // 🔴 FIXED: Managers bypass ownership check
+    // Managers bypass ownership check
     if (req.user.role !== 'admin' && req.user.role !== 'manager' && existingCandidate.recruiterId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized' });
     }
@@ -207,7 +210,7 @@ router.delete('/:id', async (req, res) => {
     const candidate = await Candidate.findById(req.params.id);
     if (!candidate) return res.status(404).json({ message: 'Candidate not found' });
 
-    // 🔴 FIXED: Managers bypass ownership check
+    // Managers bypass ownership check
     if (req.user.role !== 'admin' && req.user.role !== 'manager' && candidate.recruiterId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized' });
     }

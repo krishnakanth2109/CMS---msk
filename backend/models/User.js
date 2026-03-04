@@ -55,9 +55,10 @@ const userSchema = new mongoose.Schema(
     },
 
     // 🔹 Role Management
+    // Updated: Nainika = admin, Sanjay/Navya/Krishna = manager
     role: {
       type: String,
-      enum: ['admin', 'recruiter', 'manager'],
+      enum: ['admin', 'manager', 'recruiter'],
       default: 'recruiter',
     },
 

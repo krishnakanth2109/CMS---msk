@@ -99,35 +99,27 @@ export const getUserProfile = async (req, res) => {
 
 // @desc    Update user profile (Handles Image Edit & Remove)
 // @route   PUT /api/auth/profile
-// REPLACE your updateUserProfile function with this:
 export const updateUserProfile = async (req, res) => {
   try {
-    // 1. Find user by ID (from protect middleware)
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ message: 'User not found.' });
 
-    // 2. Handle Name Splitting (Full Name -> First & Last)
     if (req.body.name) {
       const nameParts = req.body.name.trim().split(/\s+/);
       user.firstName = nameParts[0];
-      user.lastName = nameParts.slice(1).join(' ') || ""; // Handles single names or multiple middle names
+      user.lastName = nameParts.slice(1).join(' ') || "";
     }
 
-    // 3. Handle Email (Optional: Syncing email to Firebase is complex, 
-    // usually we keep the original login email and just update profile email)
     if (req.body.email) {
       user.email = req.body.email;
     }
 
-    // 4. Handle Profile Picture
     if (req.body.profilePicture !== undefined) {
       user.profilePicture = req.body.profilePicture;
     }
 
-    // 5. Save to MongoDB
     const updatedUser = await user.save();
 
-    // 6. Return the EXACT object the frontend needs
     res.json({
       _id: updatedUser._id,
       firstName: updatedUser.firstName,
@@ -153,4 +145,26 @@ export const forgotPassword = async (req, res) => {
     console.log(`Reset link: ${resetLink}`);
     res.json({ message: 'Reset link sent if registered.' });
   } catch (error) { res.status(500).json({ message: 'Error' }); }
+};
+
+// @desc    Delete user profile (Danger Zone)
+// @route   DELETE /api/auth/profile
+export const deleteUserProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+
+    // 1. Delete from Firebase Authentication
+    if (user.firebaseUid) {
+      await admin.auth().deleteUser(user.firebaseUid);
+    }
+
+    // 2. Delete from MongoDB Database
+    await User.findByIdAndDelete(req.user._id);
+
+    res.json({ message: 'Account deleted successfully.' });
+  } catch (error) {
+    console.error('Delete Account Error:', error);
+    res.status(500).json({ message: 'Server error deleting account.' });
+  }
 };

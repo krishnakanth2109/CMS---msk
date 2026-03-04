@@ -11,7 +11,6 @@ import DashboardLayout from '@/components/DashboardLayout';
 
 // Admin Pages
 import AdminDashboard from '@/pages/AdminDashboard';
-import AdminCandidate from '@/pages/AdminCandidate';
 import AddCandidate from '@/pages/AddCandidate';
 import AdminRecruiters from '@/pages/AdminRecruiters';
 import AdminClientInfo from '@/pages/AdminClientInfo';
@@ -75,8 +74,11 @@ function AppRoutes() {
         </ProtectedRoute>
       }>
         <Route index element={<AdminDashboard />} />
-        <Route path="candidates" element={<AdminCandidate />} />
         <Route path="add-candidate" element={<AddCandidate />} />
+        
+        {/* ✅ FIX: Added the "My Candidates" route specifically for the Admin/Manager using the Recruiter component */}
+        <Route path="my-candidates" element={<RecruiterCandidates />} />
+        
         <Route path="recruiters" element={<AdminRecruiters />} />
         <Route path="clients" element={<AdminClientInfo />} />
         <Route path="invoices" element={<AdminClientInvoice />} />
@@ -88,9 +90,9 @@ function AppRoutes() {
       </Route>
 
       {/* ===================== RECRUITER ROUTES ===================== */}
-      {/* 🔴 FIX: Added 'manager' here so they can access /recruiter/candidates */}
+      {/* ✅ FIX: Added 'admin' here so they aren't completely blocked from these components if needed */}
       <Route path="/recruiter" element={
-        <ProtectedRoute allowedRoles={['recruiter', 'manager']}>
+        <ProtectedRoute allowedRoles={['recruiter', 'manager', 'admin']}>
           <DashboardLayout />
         </ProtectedRoute>
       }>

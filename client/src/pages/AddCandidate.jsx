@@ -2,7 +2,11 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Search, Plus, Eye, Loader2, MessageCircle,
-  ArrowUpDown, ArrowUp, ArrowDown, Users, Download
+  ArrowUpDown, ArrowUp, ArrowDown, Users, Download,
+  X, Edit, Trash2, Ban, List, LayoutGrid, Calendar, 
+  GraduationCap, Award, UserCircle, Target, IndianRupee, 
+  Upload, FileUp, AlertTriangle, FileSpreadsheet, Linkedin, 
+  Building, Mail, Phone, Briefcase, UserPlus
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -56,6 +60,19 @@ const StatCard = ({ title, value, colorTheme, active, onClick, hasDot }) => {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const getInitials = (name = '') => name.split(' ').map((n) => n[0]).join('').toUpperCase().substring(0, 2);
 const getCandidateId = (c) => c.candidateId || c._id?.substring(c._id.length - 6).toUpperCase();
+const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
+const formatSkills = (skills) => !skills ? 'N/A' : Array.isArray(skills) ? skills.slice(0, 3).join(', ') + (skills.length > 3 ? '...' : '') : skills.length > 50 ? skills.substring(0, 50) + '...' : skills;
+
+// ✅ New Helper to safely grab the Recruiter/Admin Name since some users only have a 'username'
+const getRecruiterName = (r) => {
+  if (!r) return 'Unassigned';
+  if (r.name) return r.name;
+  const first = r.firstName || '';
+  const last = r.lastName || '';
+  if (first || last) return `${first} ${last}`.trim();
+  if (r.username) return r.username;
+  return r.email || 'Unknown';
+};
 
 const ALL_STATUSES = [
   'Submitted', 'Shared Profiles', 'Yet to attend', 'Turnups',
@@ -94,6 +111,22 @@ export default function AdminCandidates() {
   const [viewCandidate, setViewCandidate] = useState(null);
   const [errors, setErrors] = useState({});
 
+  // Refs for Top and Bottom Scrollbars
+  const topScrollRef = useRef(null);
+  const bottomScrollRef = useRef(null);
+
+  const handleTopScroll = () => {
+    if (bottomScrollRef.current && topScrollRef.current) {
+      bottomScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+    }
+  };
+
+  const handleBottomScroll = () => {
+    if (topScrollRef.current && bottomScrollRef.current) {
+      topScrollRef.current.scrollLeft = bottomScrollRef.current.scrollLeft;
+    }
+  };
+
   const initialFormData = {
     firstName: '', lastName: '', contact: '', alternateNumber: '', email: '',
     currentLocation: '', preferredLocation: '', position: '', client: '', currentCompany: '',
@@ -102,7 +135,7 @@ export default function AdminCandidates() {
     noticePeriod: '', servingNoticePeriod: 'false', lwd: '',
     reasonForChange: '', offersInHand: 'false', offerPackage: '', source: 'Portal',
     recruiterId: '', status: 'Submitted',
-    skills: '' // comma-separated
+    skills: '', remarks: '' 
   };
   const [formData, setFormData] = useState(initialFormData);
 
@@ -146,13 +179,11 @@ export default function AdminCandidates() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate size (5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast({ title: 'Error', description: 'File size must be less than 5MB', variant: 'destructive' });
       return;
     }
 
-    // Validate type
     const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
     const validExtensions = ['.pdf', '.doc', '.docx'];
     const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
@@ -169,7 +200,7 @@ export default function AdminCandidates() {
       uploadFormData.append('resume', file);
 
       const headers = getAuthHeader();
-      delete headers['Content-Type']; // Let browser set multipart/form-data
+      delete headers['Content-Type']; 
 
       const res = await fetch(`${API_URL}/candidates/parse-resume`, {
         method: 'POST',
@@ -210,7 +241,7 @@ export default function AdminCandidates() {
       toast({ title: 'Warning', description: 'Could not parse some details. Please fill manually.', variant: 'default' });
     } finally {
       setIsParsingResume(false);
-      e.target.value = ''; // Reset input
+      e.target.value = ''; 
     }
   };
 
@@ -305,7 +336,8 @@ export default function AdminCandidates() {
       source: c.source || 'Portal',
       status: Array.isArray(c.status) ? c.status[0] : c.status || 'Submitted',
       recruiterId: typeof c.recruiterId === 'object' ? c.recruiterId?._id : c.recruiterId || '',
-      skills: Array.isArray(c.skills) ? c.skills.join(', ') : c.skills || ''
+      skills: Array.isArray(c.skills) ? c.skills.join(', ') : c.skills || '',
+      remarks: c.remarks || ''
     });
     setErrors({});
     setIsDialogOpen(true);
@@ -369,7 +401,6 @@ export default function AdminCandidates() {
       return;
     }
 
-    // CSV Headers
     const headers = [
       'Candidate ID', 'First Name', 'Last Name', 'Full Name', 'Email', 'Contact', 'Alternate Contact',
       'Role/Position', 'Client', 'Assigned Recruiter', 'Status', 'Current Location', 'Preferred Location',
@@ -378,12 +409,11 @@ export default function AdminCandidates() {
       'Notice Period', 'Serving Notice', 'LWD', 'Offers In Hand', 'Offer Package', 'Source', 'Skills'
     ];
 
-    // Map filtered candidates into rows
     const csvRows = [headers.join(',')];
 
     filteredCandidates.forEach(c => {
       const recruiterName = typeof c.recruiterId === 'object'
-        ? c.recruiterId?.name || `${c.recruiterId?.firstName || ''} ${c.recruiterId?.lastName || ''}`.trim()
+        ? getRecruiterName(c.recruiterId)
         : c.recruiterName || '';
 
       const statusStr = Array.isArray(c.status) ? c.status.join(' | ') : (c.status || '');
@@ -465,6 +495,14 @@ export default function AdminCandidates() {
     }
   };
 
+  const handleWhatsApp = (c) => {
+    if (!c.contact) return;
+    let phone = c.contact.replace(/\D/g, '');
+    if (phone.length === 10) phone = '91' + phone;
+    const msg = `Hi ${c.firstName || c.name.split(' ')[0]}, regarding your application for ${c.position} at ${c.client}.`;
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+  };
+
   return (
     <div className="flex-1 p-6 pb-48 overflow-y-auto bg-slate-50 dark:bg-slate-950 min-h-screen">
       <div className="max-w-[1800px] mx-auto space-y-6">
@@ -518,8 +556,9 @@ export default function AdminCandidates() {
               {ALL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
             <select value={recruiterFilter} onChange={(e) => setRecruiterFilter(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
-              <option value="all">All Recruiters</option>
-              {recruiters.map((r) => <option key={r._id || r.id} value={r._id || r.id}>{r.name || `${r.firstName} ${r.lastName}`}</option>)}
+              <option value="all">All Users</option>
+              {/* ✅ USING getRecruiterName HELPER HERE */}
+              {recruiters.map((r) => <option key={r._id || r.id} value={r._id || r.id}>{getRecruiterName(r)}</option>)}
             </select>
           </div>
         </div>
@@ -537,10 +576,11 @@ export default function AdminCandidates() {
                 onChange={(e) => setBulkRecruiterId(e.target.value)}
                 className="border border-blue-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none min-w-[200px]"
               >
-                <option value="">Assign to Recruiter...</option>
+                <option value="">Assign to User...</option>
+                {/* ✅ USING getRecruiterName HELPER HERE */}
                 {recruiters.map((r) => (
                   <option key={r._id || r.id} value={r._id || r.id}>
-                    {r.name || `${r.firstName} ${r.lastName}`}
+                    {getRecruiterName(r)}
                   </option>
                 ))}
               </select>
@@ -562,87 +602,109 @@ export default function AdminCandidates() {
           </div>
         )}
 
-        {/* Table */}
-        <div className="overflow-hidden border border-slate-200 rounded-xl shadow-sm bg-white">
+        {/* Table Area With Double Horizontal Scroll Bar */}
+        <div className="overflow-hidden border border-slate-200 rounded-xl shadow-sm bg-white flex flex-col">
           {loading ? (
             <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left border-collapse">
-                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
-                  <tr>
-                    <th className="px-4 py-3 w-12 text-center">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.length === filteredCandidates.length && filteredCandidates.length > 0}
-                        onChange={handleSelectAll}
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
-                      />
-                    </th>
-                    <th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('candidateId')}>ID <SortIcon field="candidateId" /></th>
-                    <th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('name')}>Name <SortIcon field="name" /></th>
-                    <th className="px-4 py-3">Phone</th>
-                    <th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('position')}>Role <SortIcon field="position" /></th>
-                    <th className="px-4 py-3">Recruiter</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredCandidates.map((c) => {
-                    const statusArr = Array.isArray(c.status) ? c.status : [c.status || 'Submitted'];
-                    const isSelected = selectedIds.includes(c._id);
-                    return (
-                      <tr key={c._id} className={`transition-colors ${isSelected ? 'bg-blue-50/50 hover:bg-blue-50' : 'hover:bg-slate-50'}`}>
-                        <td className="px-4 py-3 text-center">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => handleSelectOne(e, c._id)}
-                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
-                          />
-                        </td>
-                        <td className="px-4 py-3 font-mono text-xs text-blue-600 font-bold">{getCandidateId(c)}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold">{getInitials(c.name)}</div>
-                            <div>
-                              <div className="font-medium text-slate-900">{c.name}</div>
-                              <div className="text-xs text-slate-400">{c.email}</div>
+            <>
+              {/* TOP SCROLLBAR */}
+              <div 
+                ref={topScrollRef} 
+                onScroll={handleTopScroll} 
+                className="overflow-x-auto overflow-y-hidden"
+                style={{ height: '14px' }}
+              >
+                <div style={{ width: '1800px', height: '1px' }}></div>
+              </div>
+
+              {/* TABLE CONTAINER */}
+              <div ref={bottomScrollRef} onScroll={handleBottomScroll} className="overflow-x-auto">
+                <table className="w-full text-sm text-left border-collapse min-w-[1800px]">
+                  <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-3 w-12 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.length === filteredCandidates.length && filteredCandidates.length > 0}
+                          onChange={handleSelectAll}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+                        />
+                      </th>
+                      <th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('candidateId')}>ID <SortIcon field="candidateId" /></th>
+                      <th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('name')}>Name <SortIcon field="name" /></th>
+                      <th className="px-4 py-3">Phone</th>
+                      <th className="px-4 py-3">Email</th>
+                      <th className="px-4 py-3">Client</th>
+                      <th className="px-4 py-3">Skills</th>
+                      <th className="px-4 py-3">Date Added</th>
+                      <th className="px-4 py-3">Assigned To</th>
+                      <th className="px-4 py-3">Experience</th>
+                      <th className="px-4 py-3">CTC / ECTC</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Remarks</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredCandidates.map((c) => {
+                      const statusArr = Array.isArray(c.status) ? c.status : [c.status || 'Submitted'];
+                      const isSelected = selectedIds.includes(c._id);
+                      return (
+                        <tr key={c._id} className={`transition-colors ${isSelected ? 'bg-blue-50/50 hover:bg-blue-50' : 'hover:bg-slate-50'}`}>
+                          <td className="px-4 py-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => handleSelectOne(e, c._id)}
+                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+                            />
+                          </td>
+                          <td className="px-4 py-3 font-mono text-xs text-blue-600 font-bold cursor-pointer" onClick={() => { navigator.clipboard.writeText(getCandidateId(c)); toast({ title: "Copied ID" }); }}>{getCandidateId(c)}</td>
+                          <td className="px-4 py-3 font-semibold text-slate-900">{c.name}</td>
+                          <td className="px-4 py-3 text-slate-600">
+                            <div className="flex items-center gap-2">
+                              {c.contact || '-'}
+                              {c.contact && <MessageCircle className="h-3.5 w-3.5 text-green-500 cursor-pointer" onClick={() => handleWhatsApp(c)} />}
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-slate-500">{c.contact || '-'}</td>
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-slate-900">{c.position || '-'}</div>
-                          <div className="text-xs text-slate-400">{c.client || '-'}</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="text-sm font-medium text-slate-700">
-                            {typeof c.recruiterId === 'object' ? c.recruiterId?.name || `${c.recruiterId?.firstName || ''} ${c.recruiterId?.lastName || ''}`.trim() : c.recruiterName || '-'}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          {statusArr.map((s) => (
-                            <span key={s} className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-1">{s}</span>
-                          ))}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => setViewCandidate(c) || setIsViewDialogOpen(true)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md" title="View"><Eye className="h-4 w-4" /></button>
-                            <button onClick={() => openEditDialog(c)} className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-md text-xs font-medium">Edit</button>
-                            <button onClick={() => handleDelete(c._id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-md text-xs font-medium">Del</button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              {filteredCandidates.length === 0 && !loading && (
-                <div className="text-center py-12 text-slate-500">No candidates match your search filters.</div>
-              )}
-            </div>
+                          </td>
+                          <td className="px-4 py-3 text-slate-500"><span className="truncate max-w-[150px] block" title={c.email}>{c.email || '-'}</span></td>
+                          <td className="px-4 py-3 text-slate-600 font-medium">{c.client || '-'}</td>
+                          <td className="px-4 py-3 text-xs text-slate-500 max-w-[150px] truncate" title={Array.isArray(c.skills) ? c.skills.join(', ') : c.skills}>
+                            {!c.skills ? 'N/A' : Array.isArray(c.skills) ? c.skills.slice(0, 3).join(', ') + (c.skills.length > 3 ? '...' : '') : c.skills.length > 50 ? c.skills.substring(0, 50) + '...' : c.skills}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">{c.dateAdded ? new Date(c.dateAdded).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-')}</td>
+                          {/* ✅ USING getRecruiterName HELPER HERE */}
+                          <td className="px-4 py-3 text-sm font-medium text-slate-700">
+                             {typeof c.recruiterId === 'object' ? getRecruiterName(c.recruiterId) : c.recruiterName || '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm">{c.totalExperience ? `${c.totalExperience} Yrs` : '-'}</td>
+                          <td className="px-4 py-3 text-xs"><div>{c.ctc || '-'}</div><div className="text-green-600">{c.ectc || '-'}</div></td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-wrap gap-1">
+                              {statusArr.map((s) => (
+                                <span key={s} className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800 mr-1">{s}</span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-500 truncate max-w-[100px]">{c.remarks || '-'}</td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex justify-end items-center gap-2">
+                              <Eye className="h-4 w-4 text-blue-600 cursor-pointer" onClick={() => setViewCandidate(c) || setIsViewDialogOpen(true)} />
+                              <Edit className="h-4 w-4 text-slate-600 cursor-pointer" onClick={() => openEditDialog(c)} />
+                              <Trash2 className="h-4 w-4 text-red-500 cursor-pointer" onClick={() => handleDelete(c._id)} />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {filteredCandidates.length === 0 && !loading && (
+                  <div className="text-center py-12 text-slate-500">No candidates match your search filters.</div>
+                )}
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -660,8 +722,6 @@ export default function AdminCandidates() {
             </div>
 
             <div className="p-6 overflow-y-auto flex-1 space-y-8 pb-48">
-
-              {/* SECTION 0: Resume Upload */}
               {!isEditMode && (
                 <section>
                   <h3 className="text-base font-semibold text-blue-700 border-b border-blue-100 pb-2 mb-4">Upload Resume (Auto Fill)</h3>
@@ -699,7 +759,6 @@ export default function AdminCandidates() {
                 </section>
               )}
 
-              {/* SECTION 1: Personal Info */}
               <section>
                 <h3 className="text-base font-semibold text-blue-700 border-b border-blue-100 pb-2 mb-4">Personal Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -738,7 +797,6 @@ export default function AdminCandidates() {
                 </div>
               </section>
 
-              {/* SECTION 2: Professional Info */}
               <section>
                 <h3 className="text-base font-semibold text-blue-700 border-b border-blue-100 pb-2 mb-4">Professional Details</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -780,7 +838,6 @@ export default function AdminCandidates() {
                 </div>
               </section>
 
-              {/* SECTION 3: Compensation & Availability */}
               <section>
                 <h3 className="text-base font-semibold text-blue-700 border-b border-blue-100 pb-2 mb-4">Financial & Availability</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -844,7 +901,6 @@ export default function AdminCandidates() {
                 </div>
               </section>
 
-              {/* SECTION 4: Tracking & Assignment */}
               <section>
                 <h3 className="text-base font-semibold text-blue-700 border-b border-blue-100 pb-2 mb-4">Tracking & Assignment</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -861,11 +917,16 @@ export default function AdminCandidates() {
                     </select>
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-1 text-slate-700">Assign Recruiter</label>
+                    <label className="block text-sm font-medium mb-1 text-slate-700">Assign to User</label>
                     <select value={formData.recruiterId} onChange={(e) => handleInputChange('recruiterId', e.target.value)} className={inputCls(false)}>
-                      <option value="">Select Recruiter</option>
-                      {recruiters.map((r) => <option key={r._id || r.id} value={r._id || r.id}>{r.name || `${r.firstName} ${r.lastName}`}</option>)}
+                      <option value="">Select User</option>
+                      {/* ✅ USING getRecruiterName HELPER HERE */}
+                      {recruiters.map((r) => <option key={r._id || r.id} value={r._id || r.id}>{getRecruiterName(r)}</option>)}
                     </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-1 text-slate-700">Remarks</label>
+                    <Textarea value={formData.remarks} onChange={(e) => handleInputChange('remarks', e.target.value)} className={inputCls(false)} placeholder="Add any comments or remarks here..." rows={3} />
                   </div>
                 </div>
               </section>
@@ -919,8 +980,10 @@ export default function AdminCandidates() {
                   ['Reason for Change', viewCandidate.reasonForChange],
                   ['Offers in Hand', viewCandidate.offersInHand ? `Yes (${viewCandidate.offerPackage})` : 'No'],
                   ['Source', viewCandidate.source],
-                  ['Assigned Recruiter', typeof viewCandidate.recruiterId === 'object' ? viewCandidate.recruiterId?.name || `${viewCandidate.recruiterId?.firstName} ${viewCandidate.recruiterId?.lastName}` : viewCandidate.recruiterName],
-                  ['Status', Array.isArray(viewCandidate.status) ? viewCandidate.status.join(', ') : viewCandidate.status]
+                  // ✅ USING getRecruiterName HELPER HERE
+                  ['Assigned Recruiter', typeof viewCandidate.recruiterId === 'object' ? getRecruiterName(viewCandidate.recruiterId) : viewCandidate.recruiterName],
+                  ['Status', Array.isArray(viewCandidate.status) ? viewCandidate.status.join(', ') : viewCandidate.status],
+                  ['Remarks', viewCandidate.remarks]
                 ].map(([label, val]) => val ? (
                   <div key={label} className="col-span-2 md:col-span-1 border-b border-slate-100 pb-2">
                     <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">{label}</span>

@@ -14,7 +14,6 @@ const otpStore  = new Map();
 const OTP_TTL   = 10 * 60 * 1000; 
 const makeOTP = () => String(Math.floor(100000 + Math.random() * 900000));
 
-// OTP Logic (Same as your provided code)
 router.post('/send-otp', protect, async (req, res) => {
   const { email } = req.body;
   if (req.user.email !== email) return res.status(403).json({ message: 'Unauthorized' });
@@ -60,6 +59,6 @@ router.post('/login', loginUser);
 router.post('/register', registerUser);
 router.post('/forgot-password', forgotPassword);
 router.get('/profile', protect, getUserProfile);
-router.put('/profile', protect, updateUserProfile); // <--- Matches "Save Profile" button
+router.put('/profile', protect, updateUserProfile);
 
 export default router;

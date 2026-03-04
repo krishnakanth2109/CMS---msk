@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
-import User from './models/User.js'; // Make sure this path is correct
+import User from './models/User.js';
 
 dotenv.config();
 
@@ -10,45 +10,60 @@ const seedData = async () => {
     const conn = await mongoose.connect(process.env.MONGO_URL);
     console.log(`MongoDB Connected: ${conn.connection.host}`);
 
-    // 2️⃣ Define Users (No deleteMany — existing users will remain)
-
+    // 2️⃣ Define Users
     const users = [
-      // 🔹 Recruiter User
-      // {
-      //   username: 'urstruelykrishnkanth@gmail.com',
-      //   password: '987654321', // Will be hashed by pre-save middleware
-      //   name: 'Mahesh',
-      //   role: 'recruiter',
-      //   email: 'urstruelykrishnkanth@gmail.com',
-      // },
-
-      // 🔹 Admin User
-      // {
-      //   username: 'kkanth355@gmail.com',
-      //   password: '123456789', // Will be hashed by pre-save middleware
-      //   name: 'Navya',
-      //   role: 'admin',
-      //   email: 'kkanth355@gmail.com',
-      // },
-
-      // 🔹 Manager User (New Role Added)
       {
-        username: 'nainika@gmail.com',
-        password: '123456789', // Will be hashed by pre-save middleware
-        name: 'Nainika Shantholla',
+        username: 'Krishna Kanth',
+        password: '123456789',
+        name: 'Krishna Kanth',
+        role: 'manager', 
+        email: 'kkanth355@gmail.com',
+      },
+      {
+        username: 'Sanjay',
+        password: '123456789',
+        name: 'Sanjay',
         role: 'manager',
-        email: 'Shanthollanainika@gmail.com',
+        email: 'ops@vagarioussolutions.com',
+      },
+      {
+        username: 'Navya',
+        password: '123456789',
+        name: 'Navya',
+        role: 'manager',
+        email: 'navya@vagarioussolutions.com',
+      },
+      {
+        username: 'Santholla Naininka',
+        password: '123456789',
+        name: 'Nainika Shantholla',
+        role: 'admin',
+        email: 'nainika@vagarioussolutions.com',
       },
     ];
 
-    // 3️⃣ Create Users
-    // Using create() so that pre-save middleware runs (password hashing)
-    await User.create(users);
+    // 3️⃣ Upsert Users (Update if exists, Create if not)
+    // This prevents the "Duplicate Key" error
+    console.log('Syncing users...');
+    
+    for (const userData of users) {
+      await User.findOneAndUpdate(
+        { email: userData.email }, // Find user by email
+        userData,                 // Update with this data
+        { 
+          upsert: true,           // Create if not found
+          new: true,              // Return the updated doc
+          runValidators: true,
+          setDefaultsOnInsert: true 
+        }
+      );
+      console.log(`Synced user: ${userData.email} as ${userData.role}`);
+    }
 
-    console.log('Users Seeded Successfully!');
+    console.log('✅ Users Seeded/Updated Successfully!');
     process.exit();
   } catch (error) {
-    console.error(`Error: ${error.message}`);
+    console.error(`❌ Error: ${error.message}`);
     process.exit(1);
   }
 };

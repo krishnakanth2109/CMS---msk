@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   AlertTriangle, UserPlus, Search, Mail, Phone, TrendingUp,
   Download, Grid3X3, List, Edit, Trash2, UserX, UserCheck,
-  Camera, Briefcase, MoreVertical, Users, Eye, EyeOff, ArrowUpDown
+  Camera, Briefcase, MoreVertical, Users, Eye, EyeOff, ArrowUpDown, ShieldAlert
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -36,19 +36,6 @@ export default function AdminRecruiters() {
   const { authHeaders } = useAuth();
 
   // ── Auth helper ──────────────────────────────────────────────────────────
-  //
-  // ✅ ROOT CAUSE FIX:
-  //
-  // The previous code was:
-  //   const getAuthHeader = () => ({ ...authHeaders() })
-  //
-  // authHeaders() is an ASYNC function — it returns a Promise<object>.
-  // Spreading a Promise into an object gives {}, so no Authorization header
-  // was ever sent, causing every request to return 401 "no token provided".
-  //
-  // Fix: getAuthHeader is now async and properly awaits authHeaders().
-  // Every call site below uses:  const headers = await getAuthHeader();
-  //
   const getAuthHeader = async () => {
     const ah = await authHeaders();   // ← await the async authHeaders()
     return {
@@ -111,7 +98,7 @@ export default function AdminRecruiters() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const headers = await getAuthHeader();   // ✅ await
+      const headers = await getAuthHeader();
       const [rr, rc] = await Promise.all([
         fetch(`${API_URL}/recruiters`, { headers }),
         fetch(`${API_URL}/candidates`, { headers }),
@@ -119,7 +106,7 @@ export default function AdminRecruiters() {
 
       if (!rr.ok) {
         const e = await rr.json().catch(() => ({}));
-        throw new Error(e.message || 'Failed to fetch recruiters');
+        throw new Error(e.message || 'Failed to fetch users');
       }
       if (!rc.ok) {
         const e = await rc.json().catch(() => ({}));
@@ -129,7 +116,12 @@ export default function AdminRecruiters() {
       const recruiterData = await rr.json();
       const candidateData = await rc.json();
 
-      setRecruiters(recruiterData.map((r) => ({ ...r, id: r._id })));
+      // ✅ FIX: Filter to keep 'recruiter', 'admin', and 'manager' users
+      const allUsers = recruiterData
+        .filter((user) => ['recruiter', 'admin', 'manager'].includes(user.role))
+        .map((r) => ({ ...r, id: r._id }));
+
+      setRecruiters(allUsers);
       setCandidates(candidateData.map((c) => ({ ...c, id: c._id })));
     } catch (error) {
       console.error(error);
@@ -169,16 +161,16 @@ export default function AdminRecruiters() {
   const handleAddRecruiter = async () => {
     if (!validateForm(newRecruiter)) return;
     try {
-      const headers = await getAuthHeader();   // ✅ await
+      const headers = await getAuthHeader();
       const res = await fetch(`${API_URL}/recruiters`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ ...newRecruiter, role: 'recruiter' }),
+        body: JSON.stringify(newRecruiter), // role is dynamic from form
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to create recruiter');
+      if (!res.ok) throw new Error(data.message || 'Failed to create user');
 
-      toast({ title: "Success", description: "Recruiter added successfully!" });
+      toast({ title: "Success", description: "User added successfully!" });
       setShowModal(false);
       setNewRecruiter(EMPTY_RECRUITER);
       setErrors({});
@@ -191,8 +183,8 @@ export default function AdminRecruiters() {
   const handleEditRecruiter = async () => {
     if (!validateForm(editRecruiter, true)) return;
     try {
-      const headers = await getAuthHeader();   // ✅ await
-      const payload = { ...editRecruiter, role: 'recruiter' };
+      const headers = await getAuthHeader();
+      const payload = { ...editRecruiter };
       if (!payload.password) delete payload.password; // Don't send blank password
 
       const res = await fetch(`${API_URL}/recruiters/${editRecruiter.id}`, {
@@ -201,9 +193,9 @@ export default function AdminRecruiters() {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to update recruiter');
+      if (!res.ok) throw new Error(data.message || 'Failed to update user');
 
-      toast({ title: "Success", description: "Recruiter updated!" });
+      toast({ title: "Success", description: "User updated!" });
       setShowEditModal(false);
       setErrors({});
       fetchData();
@@ -215,13 +207,13 @@ export default function AdminRecruiters() {
   const handleDeleteRecruiter = async () => {
     if (!recruiterToDelete) return;
     try {
-      const headers = await getAuthHeader();   // ✅ await
+      const headers = await getAuthHeader();
       const res = await fetch(`${API_URL}/recruiters/${recruiterToDelete.id}`, {
         method: 'DELETE', headers,
       });
-      if (!res.ok) throw new Error('Failed to delete recruiter');
+      if (!res.ok) throw new Error('Failed to delete user');
 
-      toast({ title: "Deleted", description: "Recruiter removed." });
+      toast({ title: "Deleted", description: "User removed." });
       setShowDeleteModal(false);
       setRecruiterToDelete(null);
       fetchData();
@@ -232,7 +224,7 @@ export default function AdminRecruiters() {
 
   const handleToggleStatus = async (recruiter) => {
     try {
-      const headers = await getAuthHeader();   // ✅ await
+      const headers = await getAuthHeader();
       const res = await fetch(`${API_URL}/recruiters/${recruiter.id}/status`, {
         method: 'PATCH', headers,
       });
@@ -251,7 +243,7 @@ export default function AdminRecruiters() {
       id: r.id, recruiterId: r.recruiterId || "",
       firstName: r.firstName, lastName: r.lastName,
       email: r.email, phone: r.phone || "", username: r.username || "",
-      profilePicture: r.profilePicture || "", role: "recruiter", password: "",
+      profilePicture: r.profilePicture || "", role: r.role || "recruiter", password: "",
     });
     setErrors({});
     setShowEditModal(true);
@@ -309,7 +301,8 @@ export default function AdminRecruiters() {
       return fullName.includes(q) ||
              (r.email      || '').toLowerCase().includes(q) ||
              (r.username   || '').toLowerCase().includes(q) ||
-             (r.recruiterId || '').toLowerCase().includes(q);
+             (r.recruiterId || '').toLowerCase().includes(q) ||
+             (r.role       || '').toLowerCase().includes(q);
     })
     .sort((a, b) => {
       const sa = calcStats(a.id), sb = calcStats(b.id);
@@ -398,35 +391,35 @@ export default function AdminRecruiters() {
         <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-              Recruiters Management
+              Users Management
             </h1>
-            <p className="text-gray-500 mt-1">Manage your recruitment team</p>
+            <p className="text-gray-500 mt-1">Manage Admins, Managers, and Recruiters</p>
           </div>
           <Button
             onClick={() => { setShowModal(true); setErrors({}); setNewRecruiter(EMPTY_RECRUITER); }}
             className="bg-blue-600 hover:bg-blue-700">
-            <UserPlus className="h-4 w-4 mr-2" /> Add Recruiter
+            <UserPlus className="h-4 w-4 mr-2" /> Add User
           </Button>
         </div>
 
         {/* ── Summary Cards ────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           <Card className="bg-blue-600 text-white cursor-pointer hover:bg-blue-700 transition"
-            onClick={() => { setSelectedStatsRecruiters(recruiters); setStatsModalTitle("All Recruiters"); setShowStatsModal(true); }}>
+            onClick={() => { setSelectedStatsRecruiters(recruiters); setStatsModalTitle("All Users"); setShowStatsModal(true); }}>
             <CardContent className="p-4 flex justify-between items-center">
               <div><p className="text-blue-100 text-sm">Total</p><p className="text-3xl font-bold">{totalR}</p></div>
               <Users className="h-10 w-10 opacity-70" />
             </CardContent>
           </Card>
           <Card className="bg-green-600 text-white cursor-pointer hover:bg-green-700 transition"
-            onClick={() => { setSelectedStatsRecruiters(recruiters.filter((r) => r.active !== false)); setStatsModalTitle("Active Recruiters"); setShowStatsModal(true); }}>
+            onClick={() => { setSelectedStatsRecruiters(recruiters.filter((r) => r.active !== false)); setStatsModalTitle("Active Users"); setShowStatsModal(true); }}>
             <CardContent className="p-4 flex justify-between items-center">
               <div><p className="text-green-100 text-sm">Active</p><p className="text-3xl font-bold">{activeR}</p></div>
               <UserCheck className="h-10 w-10 opacity-70" />
             </CardContent>
           </Card>
           <Card className="bg-red-500 text-white cursor-pointer hover:bg-red-600 transition"
-            onClick={() => { setSelectedStatsRecruiters(recruiters.filter((r) => r.active === false)); setStatsModalTitle("Inactive Recruiters"); setShowStatsModal(true); }}>
+            onClick={() => { setSelectedStatsRecruiters(recruiters.filter((r) => r.active === false)); setStatsModalTitle("Inactive Users"); setShowStatsModal(true); }}>
             <CardContent className="p-4 flex justify-between items-center">
               <div><p className="text-red-100 text-sm">Inactive</p><p className="text-3xl font-bold">{inactiveR}</p></div>
               <UserX className="h-10 w-10 opacity-70" />
@@ -440,7 +433,7 @@ export default function AdminRecruiters() {
             <div className="relative w-full md:max-w-md">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search by name, email, ID…"
+                placeholder="Search by name, email, ID, role…"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -452,7 +445,7 @@ export default function AdminRecruiters() {
                 <SelectContent>
                   <SelectItem value="name">Name</SelectItem>
                   <SelectItem value="email">Email</SelectItem>
-                  <SelectItem value="id">Recruiter ID</SelectItem>
+                  <SelectItem value="id">User ID</SelectItem>
                   <SelectItem value="total">Candidates</SelectItem>
                   <SelectItem value="joined">Joined</SelectItem>
                   <SelectItem value="selected">Selected</SelectItem>
@@ -474,7 +467,7 @@ export default function AdminRecruiters() {
         ) : filteredRecruiters.length === 0 ? (
           <div className="text-center py-16 text-gray-500">
             <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p className="text-lg font-medium">No recruiters found</p>
+            <p className="text-lg font-medium">No users found</p>
           </div>
         ) : (
           <>
@@ -483,18 +476,21 @@ export default function AdminRecruiters() {
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {filteredRecruiters.map((r) => {
                   const st = calcStats(r.id);
+                  const isAdmin = r.role === 'admin';
                   return (
-                    <Card key={r.id} className="hover:shadow-lg transition-shadow">
+                    <Card key={r.id} className={`hover:shadow-lg transition-shadow ${isAdmin ? 'border-purple-200 bg-purple-50/10' : ''}`}>
                       <CardHeader className="flex flex-row items-start justify-between pb-2">
                         <div className="flex items-center gap-3">
-                          <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600
-                            flex items-center justify-center text-white font-bold overflow-hidden">
+                          <div className={`h-12 w-12 rounded-full flex items-center justify-center text-white font-bold overflow-hidden ${isAdmin ? 'bg-gradient-to-br from-purple-500 to-indigo-600' : 'bg-gradient-to-br from-blue-500 to-cyan-500'}`}>
                             {r.profilePicture
                               ? <img src={r.profilePicture} className="w-full h-full object-cover" alt="pfp" />
                               : getInitials(r.firstName, r.lastName)}
                           </div>
                           <div>
-                            <CardTitle className="text-base">{r.firstName} {r.lastName}</CardTitle>
+                            <CardTitle className="text-base flex items-center gap-1">
+                              {r.firstName} {r.lastName}
+                              {isAdmin && <ShieldAlert className="h-4 w-4 text-purple-600" />}
+                            </CardTitle>
                             <div className="flex flex-wrap items-center gap-1.5 mt-1">
                               {r.recruiterId && <Badge variant="outline" className="text-xs">{r.recruiterId}</Badge>}
                               <StatusBadge recruiter={r} />
@@ -536,7 +532,10 @@ export default function AdminRecruiters() {
                         <div className="space-y-1.5 text-sm text-gray-500 mb-4">
                           <div className="flex items-center gap-2"><Mail      className="h-4 w-4 flex-shrink-0" /> {r.email}</div>
                           {r.phone && <div className="flex items-center gap-2"><Phone className="h-4 w-4 flex-shrink-0" /> {r.phone}</div>}
-                          <div className="flex items-center gap-2"><Briefcase className="h-4 w-4 flex-shrink-0" /> {r.role || 'recruiter'}</div>
+                          <div className="flex items-center gap-2 capitalize">
+                            <Briefcase className="h-4 w-4 flex-shrink-0" />
+                            {isAdmin ? <span className="text-purple-600 font-medium">Admin</span> : (r.role || 'Recruiter')}
+                          </div>
                         </div>
 
                         {/* Per-recruiter mini stats */}
@@ -575,11 +574,12 @@ export default function AdminRecruiters() {
                     <thead className="bg-gray-50 dark:bg-gray-800 text-xs uppercase text-gray-500">
                       <tr>
                         <th className="px-4 py-3 cursor-pointer" onClick={() => toggleSort('name')}>
-                          <span className="flex items-center">Recruiter <SortIcon field="name" /></span>
+                          <span className="flex items-center">User <SortIcon field="name" /></span>
                         </th>
                         <th className="px-4 py-3 cursor-pointer" onClick={() => toggleSort('id')}>
                           <span className="flex items-center">ID <SortIcon field="id" /></span>
                         </th>
+                        <th className="px-4 py-3">Role</th>
                         <th className="px-4 py-3">Status</th>
                         <th className="px-4 py-3 text-center cursor-pointer" onClick={() => toggleSort('total')}>
                           <span className="flex items-center justify-center">Total <SortIcon field="total" /></span>
@@ -597,22 +597,31 @@ export default function AdminRecruiters() {
                     <tbody>
                       {filteredRecruiters.map((r) => {
                         const st = calcStats(r.id);
+                        const isAdmin = r.role === 'admin';
                         return (
-                          <tr key={r.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
+                          <tr key={r.id} className={`border-b hover:bg-gray-50 dark:hover:bg-gray-800 ${isAdmin ? 'bg-purple-50/20' : ''}`}>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
-                                <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold overflow-hidden flex-shrink-0">
+                                <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold overflow-hidden flex-shrink-0 text-white ${isAdmin ? 'bg-purple-500' : 'bg-blue-500'}`}>
                                   {r.profilePicture
                                     ? <img src={r.profilePicture} className="w-full h-full object-cover rounded-full" alt="pfp" />
                                     : getInitials(r.firstName, r.lastName)}
                                 </div>
                                 <div>
-                                  <div className="font-medium">{r.firstName} {r.lastName}</div>
+                                  <div className="font-medium flex items-center gap-1">
+                                    {r.firstName} {r.lastName}
+                                    {isAdmin && <ShieldAlert className="h-3 w-3 text-purple-600" />}
+                                  </div>
                                   <div className="text-xs text-gray-500">{r.email}</div>
                                 </div>
                               </div>
                             </td>
                             <td className="px-4 py-3 text-gray-500">{r.recruiterId || '-'}</td>
+                            <td className="px-4 py-3 capitalize">
+                              <span className={isAdmin ? 'text-purple-600 font-medium' : 'text-gray-600'}>
+                                {r.role}
+                              </span>
+                            </td>
                             <td className="px-4 py-3"><StatusBadge recruiter={r} /></td>
                             <td className="px-4 py-3 text-center font-bold text-blue-600 cursor-pointer hover:underline"
                               onClick={() => { setSelectedRecruiter(r); setCandidatesModalTitle(`All — ${r.firstName} ${r.lastName}`); setCandidateFilterType(null); setShowCandidatesModal(true); }}>
@@ -665,12 +674,12 @@ export default function AdminRecruiters() {
             MODALS
         ════════════════════════════════════════════════════════════ */}
 
-        {/* ── Add Recruiter ──────────────────────────────────────────── */}
+        {/* ── Add User ──────────────────────────────────────────── */}
         <Dialog open={showModal} onClose={() => setShowModal(false)} className="relative z-50">
           <DialogBackdrop className="fixed inset-0 bg-black/50" />
           <div className="fixed inset-0 flex items-center justify-center p-4">
             <DialogPanel className="bg-white dark:bg-gray-900 w-full max-w-lg rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
-              <DialogTitle className="text-xl font-bold mb-1">Add Recruiter</DialogTitle>
+              <DialogTitle className="text-xl font-bold mb-1">Add User</DialogTitle>
               <p className="text-sm text-gray-500 mb-4">First name, last name, email & password are required.</p>
 
               <div className="space-y-4">
@@ -687,14 +696,23 @@ export default function AdminRecruiters() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium">Recruiter ID</label>
+                    <label className="text-sm font-medium">User ID</label>
                     <Input value={newRecruiter.recruiterId}
                       onChange={(e) => handleInputChange('recruiterId', e.target.value, false)}
                       placeholder="e.g. REC001" />
                   </div>
                   <div>
-                    <label className="text-sm font-medium">Role</label>
-                    <Input value="Recruiter" disabled className="bg-gray-100 dark:bg-gray-800 text-gray-500" />
+                    <label className="text-sm font-medium">Role <span className="text-red-500">*</span></label>
+                    <Select value={newRecruiter.role} onValueChange={(val) => handleInputChange('role', val, false)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="recruiter">Recruiter</SelectItem>
+                        <SelectItem value="manager">Manager</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
@@ -758,19 +776,19 @@ export default function AdminRecruiters() {
 
                 <div className="flex justify-end gap-2 pt-2">
                   <Button variant="outline" onClick={() => setShowModal(false)}>Cancel</Button>
-                  <Button onClick={handleAddRecruiter} className="bg-blue-600 hover:bg-blue-700">Save Recruiter</Button>
+                  <Button onClick={handleAddRecruiter} className="bg-blue-600 hover:bg-blue-700">Save User</Button>
                 </div>
               </div>
             </DialogPanel>
           </div>
         </Dialog>
 
-        {/* ── Edit Recruiter ─────────────────────────────────────────── */}
+        {/* ── Edit User ─────────────────────────────────────────── */}
         <Dialog open={showEditModal} onClose={() => setShowEditModal(false)} className="relative z-50">
           <DialogBackdrop className="fixed inset-0 bg-black/50" />
           <div className="fixed inset-0 flex items-center justify-center p-4">
             <DialogPanel className="bg-white dark:bg-gray-900 w-full max-w-lg rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
-              <DialogTitle className="text-xl font-bold mb-4">Edit Recruiter</DialogTitle>
+              <DialogTitle className="text-xl font-bold mb-4">Edit User</DialogTitle>
 
               <div className="space-y-4">
                 <div className="flex items-center gap-4">
@@ -785,13 +803,22 @@ export default function AdminRecruiters() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium">Recruiter ID</label>
+                    <label className="text-sm font-medium">User ID</label>
                     <Input value={editRecruiter.recruiterId}
                       onChange={(e) => handleInputChange('recruiterId', e.target.value, true)} />
                   </div>
                   <div>
-                    <label className="text-sm font-medium">Role</label>
-                    <Input value="Recruiter" disabled className="bg-gray-100 dark:bg-gray-800 text-gray-500" />
+                    <label className="text-sm font-medium">Role <span className="text-red-500">*</span></label>
+                    <Select value={editRecruiter.role} onValueChange={(val) => handleInputChange('role', val, true)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="recruiter">Recruiter</SelectItem>
+                        <SelectItem value="manager">Manager</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
@@ -856,7 +883,7 @@ export default function AdminRecruiters() {
 
                 <div className="flex justify-end gap-2 pt-2">
                   <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
-                  <Button onClick={handleEditRecruiter} className="bg-blue-600 hover:bg-blue-700">Update Recruiter</Button>
+                  <Button onClick={handleEditRecruiter} className="bg-blue-600 hover:bg-blue-700">Update User</Button>
                 </div>
               </div>
             </DialogPanel>
@@ -959,21 +986,24 @@ export default function AdminRecruiters() {
                 {selectedStatsRecruiters.map((r) => (
                   <div key={r.id} className="flex items-center justify-between py-2.5">
                     <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold overflow-hidden">
+                      <div className={`h-9 w-9 rounded-full flex items-center justify-center text-xs font-bold overflow-hidden text-white ${r.role === 'admin' ? 'bg-purple-500' : 'bg-blue-500'}`}>
                         {r.profilePicture
                           ? <img src={r.profilePicture} className="w-full h-full object-cover" alt="pfp" />
                           : getInitials(r.firstName, r.lastName)}
                       </div>
                       <div>
-                        <div className="font-medium">{r.firstName} {r.lastName}</div>
-                        <div className="text-xs text-gray-500">{r.email}</div>
+                        <div className="font-medium flex items-center gap-1">
+                          {r.firstName} {r.lastName}
+                          {r.role === 'admin' && <ShieldAlert className="h-3 w-3 text-purple-600" />}
+                        </div>
+                        <div className="text-xs text-gray-500 capitalize">{r.role} • {r.email}</div>
                       </div>
                     </div>
                     <StatusBadge recruiter={r} />
                   </div>
                 ))}
                 {selectedStatsRecruiters.length === 0 && (
-                  <p className="text-center text-gray-400 py-6">No recruiters in this category.</p>
+                  <p className="text-center text-gray-400 py-6">No users in this category.</p>
                 )}
               </div>
               <div className="flex justify-end mt-4">

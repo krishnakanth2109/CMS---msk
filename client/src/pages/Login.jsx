@@ -33,7 +33,7 @@ export default function Login() {
     try {
       const user = await login(email, password);
       
-      // 🔴 FIXED: Both Admin and Manager now route to the same dashboard
+      // ADMIN (Nainika) and MANAGER (Sanjay/Navya/Krishna) both go to dashboard
       if (user?.role === 'admin' || user?.role === 'manager') {
         navigate('/admin');
       } else {
@@ -59,11 +59,11 @@ export default function Login() {
               "url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop')",
           }}
         />
-        <div className="absolute -top-24 -left-24 w-96 h-96 bg-blue-600/30 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-600/20 rounded-full blur-3xl" />
+        <div className="absolute -top-24 -left-24 w-96 h-96 bg-blue-600/30 blur-3xl" />
+        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-600/20 blur-3xl" />
 
         <div className="relative z-10 max-w-lg space-y-8">
-          <div className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-3xl flex items-center justify-center shadow-2xl border border-white/10">
+          <div className="w-20 h-20 bg-white/10 backdrop-blur-md flex items-center justify-center shadow-2xl border border-white/10">
             <img
               src="https://image2url.com/images/1764921567560-55d1b6d6-49f3-4473-82e3-1cdd2f7c19c2.jpg"
               alt="Brand Logo"
@@ -108,7 +108,7 @@ export default function Login() {
 
             {/* Error Banner */}
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">
+              <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3">
                 {error}
               </div>
             )}
@@ -126,7 +126,7 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={loading}
-                className="w-full h-12 px-4 rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-900 placeholder-zinc-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all disabled:opacity-50"
+                className="w-full h-12 px-4 border border-zinc-200 bg-zinc-50 text-zinc-900 placeholder-zinc-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all disabled:opacity-50"
               />
             </div>
 
@@ -144,7 +144,7 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={loading}
-                  className="w-full h-12 px-4 pr-11 rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-900 placeholder-zinc-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all disabled:opacity-50"
+                  className="w-full h-12 px-4 pr-11 border border-zinc-200 bg-zinc-50 text-zinc-900 placeholder-zinc-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all disabled:opacity-50"
                 />
                 <button
                   type="button"
@@ -171,7 +171,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-12 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-base font-medium shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-base font-medium shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <>

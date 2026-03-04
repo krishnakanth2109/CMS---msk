@@ -6,10 +6,16 @@ import User from '../models/User.js';
 export const getCandidates = async (req, res) => {
   try {
     let query = {};
-    if (req.user.role !== 'admin') {
+    // Allow Admins and Managers to see everything, Recruiters see only theirs
+    if (req.user.role !== 'admin' && req.user.role !== 'manager') {
       query.recruiterId = req.user._id;
     }
-    const candidates = await Candidate.find(query).sort({ createdAt: -1 });
+    
+    // 🔴 FIXED: Added firstName, lastName, and email to populate so the frontend table can display it
+    const candidates = await Candidate.find(query)
+      .populate('recruiterId', 'name firstName lastName email')
+      .sort({ createdAt: -1 });
+      
     res.json(candidates);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -21,20 +27,16 @@ export const getCandidates = async (req, res) => {
 export const createCandidate = async (req, res) => {
   try {
     const body = { ...req.body };
-
-    // Set name based on First & Last
     body.name = `${body.firstName || ''} ${body.lastName || ''}`.trim();
 
-    // Skills handling
     if (typeof body.skills === 'string') {
       body.skills = body.skills.split(',').map(s => s.trim()).filter(Boolean);
     }
 
-    // Recruiter Assignment logic
     let targetRecruiterId = req.user._id;
     let targetRecruiterName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.email;
 
-    if (req.user.role === 'admin' && body.recruiterId) {
+    if ((req.user.role === 'admin' || req.user.role === 'manager') && body.recruiterId) {
       const assignedRecruiter = await User.findById(body.recruiterId);
       if (assignedRecruiter) {
         targetRecruiterId = assignedRecruiter._id;
@@ -53,13 +55,12 @@ export const createCandidate = async (req, res) => {
 };
 
 // @desc    Update candidate
-// @route   PUT /api/candidates/:id
 export const updateCandidate = async (req, res) => {
   try {
     const candidate = await Candidate.findById(req.params.id);
     if (!candidate) return res.status(404).json({ message: 'Candidate not found' });
 
-    if (req.user.role !== 'admin' && candidate.recruiterId.toString() !== req.user._id.toString()) {
+    if (req.user.role !== 'admin' && req.user.role !== 'manager' && candidate.recruiterId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
@@ -70,12 +71,7 @@ export const updateCandidate = async (req, res) => {
       body.skills = body.skills.split(',').map(s => s.trim()).filter(Boolean);
     }
 
-    const updatedCandidate = await Candidate.findByIdAndUpdate(
-      req.params.id,
-      body,
-      { new: true }
-    );
-
+    const updatedCandidate = await Candidate.findByIdAndUpdate(req.params.id, body, { new: true });
     res.json(updatedCandidate);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -83,13 +79,12 @@ export const updateCandidate = async (req, res) => {
 };
 
 // @desc    Delete candidate
-// @route   DELETE /api/candidates/:id
 export const deleteCandidate = async (req, res) => {
   try {
     const candidate = await Candidate.findById(req.params.id);
     if (!candidate) return res.status(404).json({ message: 'Candidate not found' });
 
-    if (req.user.role !== 'admin' && candidate.recruiterId.toString() !== req.user._id.toString()) {
+    if (req.user.role !== 'admin' && req.user.role !== 'manager' && candidate.recruiterId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
