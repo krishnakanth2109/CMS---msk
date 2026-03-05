@@ -603,6 +603,12 @@ export default function AdminCandidates() {
         )}
 
         {/* Table Area With Double Horizontal Scroll Bar */}
+        <style>{`
+          .sleek-scrollbar::-webkit-scrollbar { height: 6px; }
+          .sleek-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 6px; }
+          .sleek-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; }
+          .sleek-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        `}</style>
         <div className="overflow-hidden border border-slate-200 rounded-xl shadow-sm bg-white flex flex-col">
           {loading ? (
             <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>
@@ -612,14 +618,14 @@ export default function AdminCandidates() {
               <div 
                 ref={topScrollRef} 
                 onScroll={handleTopScroll} 
-                className="overflow-x-auto overflow-y-hidden"
-                style={{ height: '14px' }}
+                className="overflow-x-auto overflow-y-hidden sleek-scrollbar rounded-t-xl bg-slate-50 border-b border-slate-100"
+                style={{ height: '10px' }}
               >
                 <div style={{ width: '1800px', height: '1px' }}></div>
               </div>
 
               {/* TABLE CONTAINER */}
-              <div ref={bottomScrollRef} onScroll={handleBottomScroll} className="overflow-x-auto">
+              <div ref={bottomScrollRef} onScroll={handleBottomScroll} className="overflow-x-auto sleek-scrollbar rounded-b-xl">
                 <table className="w-full text-sm text-left border-collapse min-w-[1800px]">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                     <tr>
@@ -638,7 +644,7 @@ export default function AdminCandidates() {
                       <th className="px-4 py-3">Client</th>
                       <th className="px-4 py-3">Skills</th>
                       <th className="px-4 py-3">Date Added</th>
-                      <th className="px-4 py-3">Assigned To</th>
+                      <th className="px-4 py-3">Recruiter</th>
                       <th className="px-4 py-3">Experience</th>
                       <th className="px-4 py-3">CTC / ECTC</th>
                       <th className="px-4 py-3">Status</th>
