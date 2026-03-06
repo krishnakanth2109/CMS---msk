@@ -249,7 +249,7 @@ export default function AdminRequirements() {
   });
 
   return (
-    <div className="flex-1 p-6 space-y-8 bg-zinc-50 dark:bg-zinc-950 min-h-screen text-zinc-900 dark:text-zinc-100">
+    <div className="flex-1 p-6 space-y-8  dark:bg-zinc-950 min-h-screen text-zinc-900 dark:text-zinc-100">
       
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">

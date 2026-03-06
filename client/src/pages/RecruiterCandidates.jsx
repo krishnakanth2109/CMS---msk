@@ -265,12 +265,6 @@ export default function RecruiterCandidates() {
 
         let finalCandidates = allCandidates;
 
-        // ✅ FIX: Admin and Manager get all candidates scoped by the backend already.
-        // Only apply the frontend recruiterId filter for 'recruiter' role users.
-        // For admin/manager on "My Candidates" page, show only their OWN assigned candidates
-        // (recruiterId === their _id), but do NOT restrict the overall candidates page.
-        // This component is the "My Candidates" personal view — filter by current user's _id
-        // for ALL roles, but use safe String() comparison to avoid ObjectId vs string mismatch.
         if (currentUser?._id) {
           finalCandidates = allCandidates.filter(c => {
             const cRecruiterId = typeof c.recruiterId === 'object'
@@ -729,8 +723,11 @@ export default function RecruiterCandidates() {
         }
       `}</style>
 
-      <main className="flex-1 p-6 overflow-y-auto pb-48">
-        <div className="max-w-[1800px] mx-auto space-y-6">
+      {/* ✨ CRITICAL FIX 1: Added grid-cols-1, min-w-0, and overflow-x-hidden here to lock width */}
+      <main className="flex-1 grid grid-cols-1 min-w-0 w-full p-6 overflow-y-auto overflow-x-hidden pb-48">
+        
+        {/* ✨ CRITICAL FIX 2: Set width bounds strictly */}
+        <div className="w-full max-w-full mx-auto space-y-6">
           {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
@@ -793,44 +790,46 @@ export default function RecruiterCandidates() {
 
           {/* Table View With Double Custom Scrollbar */}
           {viewMode === 'table' ? (
-            <div className="border border-slate-200 rounded-xl shadow-sm bg-white flex flex-col">
+            
+            // ✨ CRITICAL FIX 3: Boxed in the wrapper so it doesn't leak size
+            <div className="w-full overflow-hidden border border-slate-200 rounded-xl shadow-sm bg-white flex flex-col">
               
               {/* TOP SCROLLBAR (Sleek) */}
               <div 
                 ref={topScrollRef} 
                 onScroll={handleTopScroll} 
-                className="overflow-x-auto overflow-y-hidden sleek-scrollbar rounded-t-xl bg-slate-50 border-b border-slate-100"
+                className="w-full overflow-x-auto overflow-y-hidden sleek-scrollbar rounded-t-xl bg-slate-50 border-b border-slate-100"
                 style={{ height: '10px' }}
               >
                 <div style={{ width: '1600px', height: '1px' }}></div>
               </div>
 
               {/* TABLE CONTAINER */}
-              <div ref={bottomScrollRef} onScroll={handleBottomScroll} className="overflow-x-auto sleek-scrollbar rounded-b-xl">
+              <div ref={bottomScrollRef} onScroll={handleBottomScroll} className="w-full overflow-x-auto sleek-scrollbar rounded-b-xl">
                 <table className="w-full text-sm text-left border-collapse min-w-[1600px]">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b">
                     <tr>
-                      <th className="p-4 w-12"><input type="checkbox" checked={getFilteredCandidates.length > 0 && selectedCandidates.length === getFilteredCandidates.length} onChange={selectAllCandidates} className="h-4 w-4 rounded border-slate-300" /></th>
-                      <th className="p-3">ID</th>
-                      <th className="p-3">Name</th>
-                      <th className="p-3">Phone</th>
-                      <th className="p-3">Email</th>
-                      <th className="p-3">Client</th>
-                      <th className="p-3">Skills</th>
-                      <th className="p-3">Date Added</th>
-                      <th className="p-3">Experience</th>
-                      <th className="p-3">CTC / ECTC</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3">Remarks</th>
-                      <th className="p-3 text-right">Actions</th>
+                      <th className="p-4 w-12 whitespace-nowrap"><input type="checkbox" checked={getFilteredCandidates.length > 0 && selectedCandidates.length === getFilteredCandidates.length} onChange={selectAllCandidates} className="h-4 w-4 rounded border-slate-300" /></th>
+                      <th className="p-3 whitespace-nowrap">ID</th>
+                      <th className="p-3 whitespace-nowrap">Name</th>
+                      <th className="p-3 whitespace-nowrap">Phone</th>
+                      <th className="p-3 whitespace-nowrap">Email</th>
+                      <th className="p-3 whitespace-nowrap">Client</th>
+                      <th className="p-3 whitespace-nowrap">Skills</th>
+                      <th className="p-3 whitespace-nowrap">Date Added</th>
+                      <th className="p-3 whitespace-nowrap">Experience</th>
+                      <th className="p-3 whitespace-nowrap">CTC / ECTC</th>
+                      <th className="p-3 whitespace-nowrap">Status</th>
+                      <th className="p-3 whitespace-nowrap">Remarks</th>
+                      <th className="p-3 text-right whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {getFilteredCandidates.map((c, index) => {
                       return (
                       <tr key={c._id} className="hover:bg-slate-50">
-                        <td className="p-3 pl-4"><input type="checkbox" checked={selectedCandidates.includes(c._id)} onChange={() => toggleSelectCandidate(c._id)} className="h-4 w-4 rounded" /></td>
-                        <td className="p-3 font-mono text-xs text-blue-600 font-bold cursor-pointer" onClick={() => { navigator.clipboard.writeText(getCandidateId(c)); toast({ title: "Copied ID" }); }}>{getCandidateId(c)}</td>
+                        <td className="p-3 pl-4 whitespace-nowrap"><input type="checkbox" checked={selectedCandidates.includes(c._id)} onChange={() => toggleSelectCandidate(c._id)} className="h-4 w-4 rounded" /></td>
+                        <td className="p-3 font-mono text-xs text-blue-600 font-bold cursor-pointer whitespace-nowrap" onClick={() => { navigator.clipboard.writeText(getCandidateId(c)); toast({ title: "Copied ID" }); }}>{getCandidateId(c)}</td>
                         <td className="p-3 whitespace-nowrap">
                           <span className="font-semibold text-slate-900">{c.name}</span>
                         </td>
@@ -839,20 +838,20 @@ export default function RecruiterCandidates() {
                             <button className="text-green-600 hover:text-green-700" onClick={() => handleWhatsApp(c)}><MessageCircle className="h-3.5 w-3.5" /></button>
                           </div>
                         </td>
-                        <td className="p-3 text-sm text-slate-600"><span className="truncate max-w-[150px] block" title={c.email}>{c.email}</span></td>
+                        <td className="p-3 text-sm text-slate-600 whitespace-nowrap"><span className="truncate max-w-[150px] block" title={c.email}>{c.email}</span></td>
                         <td className="p-3 text-slate-600 whitespace-nowrap">{c.client}</td>
-                        <td className="p-3 text-xs text-slate-600 max-w-[150px] truncate" title={Array.isArray(c.skills) ? c.skills.join(', ') : c.skills}>{formatSkills(c.skills)}</td>
+                        <td className="p-3 text-xs text-slate-600 max-w-[150px] truncate whitespace-nowrap" title={Array.isArray(c.skills) ? c.skills.join(', ') : c.skills}>{formatSkills(c.skills)}</td>
                         <td className="p-3 text-sm text-slate-600 whitespace-nowrap">{formatDate(c.dateAdded || c.createdAt)}</td>
                         <td className="p-3 text-sm whitespace-nowrap">{c.totalExperience ? `${c.totalExperience} Yrs` : '-'}</td>
                         <td className="p-3 text-xs whitespace-nowrap"><div>{c.ctc || '-'}</div><div className="text-green-600">{c.ectc || '-'}</div></td>
-                        <td className="p-3">
+                        <td className="p-3 whitespace-nowrap">
                           <div className="flex flex-wrap gap-1">
                             {Array.isArray(c.status) ? c.status.map(s => (
                               <Badge key={s} variant={getStatusBadgeVariant(s)} className="text-[10px] px-1 py-0 whitespace-nowrap">{s}</Badge>
                             )) : <Badge variant={getStatusBadgeVariant(c.status)} className="whitespace-nowrap">{c.status}</Badge>}
                           </div>
                         </td>
-                        <td className="p-3 text-xs text-slate-500 truncate max-w-[150px]">{c.remarks || '-'}</td>
+                        <td className="p-3 text-xs text-slate-500 truncate max-w-[150px] whitespace-nowrap">{c.remarks || '-'}</td>
                         <td className="p-3 text-right whitespace-nowrap">
                           <div className="flex justify-end gap-1">
                             <button className="p-1 hover:bg-slate-100 rounded" onClick={() => openViewDialog(c)}><Eye className="h-3.5 w-3.5 text-blue-600" /></button>

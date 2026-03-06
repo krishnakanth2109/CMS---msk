@@ -74,6 +74,11 @@ export const updateCandidate = async (req, res) => {
     const body = { ...req.body };
     body.name = `${body.firstName || ''} ${body.lastName || ''}`.trim();
 
+    // ✅ FIX: Always strip dateAdded and timestamps so they are NEVER overwritten on edit
+    delete body.dateAdded;
+    delete body.createdAt;
+    delete body.updatedAt;
+
     if (typeof body.skills === 'string') {
       body.skills = body.skills.split(',').map(s => s.trim()).filter(Boolean);
     }

@@ -236,6 +236,11 @@ router.put('/:id', upload.single('resume'), async (req, res) => {
     // Sanitize the body
     let updateData = sanitizeBody(req.body);
 
+    // ✅ FIX: Always strip dateAdded and createdAt so they are NEVER overwritten on edit
+    delete updateData.dateAdded;
+    delete updateData.createdAt;
+    delete updateData.updatedAt;
+
     const existingCandidate = await Candidate.findById(req.params.id);
     if (!existingCandidate) return res.status(404).json({ message: 'Candidate not found' });
 

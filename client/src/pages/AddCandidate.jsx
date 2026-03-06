@@ -150,8 +150,6 @@ export default function AdminCandidates() {
       const headers = getAuthHeader();
       const [resCand, resRec, resCli] = await Promise.all([
         fetch(`${API_URL}/candidates`, { headers }),
-        // ✅ FIX: /api/recruiters now returns ALL active users (admin + manager + recruiter)
-        // so every user can be assigned to candidates
         fetch(`${API_URL}/recruiters`, { headers }),
         fetch(`${API_URL}/clients`, { headers }),
       ]);
@@ -349,7 +347,9 @@ export default function AdminCandidates() {
       status: Array.isArray(c.status) ? c.status[0] : c.status || 'Submitted',
       recruiterId: typeof c.recruiterId === 'object' ? c.recruiterId?._id : c.recruiterId || '',
       skills: Array.isArray(c.skills) ? c.skills.join(', ') : c.skills || '',
-      remarks: c.remarks || ''
+      remarks: c.remarks || '',
+      // ✅ FIX: Preserve original dateAdded so it never gets reset on edit
+      dateAdded: c.dateAdded ? new Date(c.dateAdded).toISOString().split('T')[0] : '',
     });
     setErrors({});
     setIsDialogOpen(true);
@@ -516,8 +516,9 @@ export default function AdminCandidates() {
   };
 
   return (
-    <div className="flex-1 p-6 pb-48 overflow-y-auto bg-slate-50 dark:bg-slate-950 min-h-screen">
-      <div className="max-w-[1800px] mx-auto space-y-6">
+    // 🔴 FIX: Added 'grid grid-cols-1 min-w-0 w-full overflow-x-hidden' to STOP the page from stretching to 1800px!
+    <div className="flex-1 grid grid-cols-1 min-w-0 w-full p-6 pb-48 overflow-y-auto overflow-x-hidden bg-slate-50 dark:bg-slate-950 min-h-screen">
+      <div className="w-full max-w-full mx-auto space-y-6">
 
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -620,27 +621,29 @@ export default function AdminCandidates() {
           .tbl-scroll::-webkit-scrollbar-thumb:hover { background: #1e293b; }
           .tbl-scroll { scrollbar-width: thin; scrollbar-color: #475569 #e2e8f0; }
         `}</style>
-        <div className="overflow-hidden border border-slate-200 rounded-xl shadow-sm bg-white flex flex-col">
+
+        {/* 🔴 FIX: w-full overflow-hidden strictly bounds the table wrapper so the scrollbar works INSIDE it */}
+        <div className="w-full overflow-hidden border border-slate-200 rounded-xl shadow-sm bg-white flex flex-col">
           {loading ? (
             <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>
           ) : (
             <>
-              {/* TOP SCROLLBAR — always visible, synced with table below */}
+              {/* TOP SCROLLBAR */}
               <div 
                 ref={topScrollRef} 
                 onScroll={handleTopScroll} 
-                className="tbl-scroll rounded-t-xl bg-slate-100 border-b border-slate-200"
-                style={{ overflowX: 'scroll', overflowY: 'hidden', height: '18px' }}
+                className="tbl-scroll rounded-t-xl bg-slate-100 border-b border-slate-200 w-full"
+                style={{ overflowX: 'auto', overflowY: 'hidden', height: '18px' }}
               >
                 <div style={{ width: '1800px', height: '1px' }}></div>
               </div>
 
               {/* TABLE CONTAINER */}
-              <div ref={bottomScrollRef} onScroll={handleBottomScroll} className="tbl-scroll rounded-b-xl" style={{ overflowX: 'scroll' }}>
+              <div ref={bottomScrollRef} onScroll={handleBottomScroll} className="tbl-scroll rounded-b-xl w-full" style={{ overflowX: 'auto' }}>
                 <table className="w-full text-sm text-left border-collapse min-w-[1800px]">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                     <tr>
-                      <th className="px-4 py-3 w-12 text-center">
+                      <th className="px-4 py-3 w-12 text-center whitespace-nowrap">
                         <input
                           type="checkbox"
                           checked={selectedIds.length === filteredCandidates.length && filteredCandidates.length > 0}
@@ -648,19 +651,19 @@ export default function AdminCandidates() {
                           className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
                         />
                       </th>
-                      <th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('candidateId')}>ID <SortIcon field="candidateId" /></th>
-                      <th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('name')}>Name <SortIcon field="name" /></th>
-                      <th className="px-4 py-3">Phone</th>
-                      <th className="px-4 py-3">Email</th>
-                      <th className="px-4 py-3">Client</th>
-                      <th className="px-4 py-3">Skills</th>
-                      <th className="px-4 py-3">Date Added</th>
-                      <th className="px-4 py-3">Recruiter</th>
-                      <th className="px-4 py-3">Experience</th>
-                      <th className="px-4 py-3">CTC / ECTC</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Remarks</th>
-                      <th className="px-4 py-3 text-right">Actions</th>
+                      <th className="px-4 py-3 cursor-pointer whitespace-nowrap" onClick={() => handleSort('candidateId')}>ID <SortIcon field="candidateId" /></th>
+                      <th className="px-4 py-3 cursor-pointer whitespace-nowrap" onClick={() => handleSort('name')}>Name <SortIcon field="name" /></th>
+                      <th className="px-4 py-3 whitespace-nowrap">Phone</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Email</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Client</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Skills</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Date Added</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Recruiter</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Experience</th>
+                      <th className="px-4 py-3 whitespace-nowrap">CTC / ECTC</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Status</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Remarks</th>
+                      <th className="px-4 py-3 text-right whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -677,35 +680,34 @@ export default function AdminCandidates() {
                               className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
                             />
                           </td>
-                          <td className="px-4 py-3 font-mono text-xs text-blue-600 font-bold cursor-pointer" onClick={() => { navigator.clipboard.writeText(getCandidateId(c)); toast({ title: "Copied ID" }); }}>{getCandidateId(c)}</td>
-                          <td className="px-4 py-3 font-semibold text-slate-900">{c.name}</td>
-                          <td className="px-4 py-3 text-slate-600">
+                          <td className="px-4 py-3 font-mono text-xs text-blue-600 font-bold cursor-pointer whitespace-nowrap" onClick={() => { navigator.clipboard.writeText(getCandidateId(c)); toast({ title: "Copied ID" }); }}>{getCandidateId(c)}</td>
+                          <td className="px-4 py-3 font-semibold text-slate-900 whitespace-nowrap">{c.name}</td>
+                          <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
                             <div className="flex items-center gap-2">
                               {c.contact || '-'}
                               {c.contact && <MessageCircle className="h-3.5 w-3.5 text-green-500 cursor-pointer" onClick={() => handleWhatsApp(c)} />}
                             </div>
                           </td>
                           <td className="px-4 py-3 text-slate-500"><span className="truncate max-w-[150px] block" title={c.email}>{c.email || '-'}</span></td>
-                          <td className="px-4 py-3 text-slate-600 font-medium">{c.client || '-'}</td>
+                          <td className="px-4 py-3 text-slate-600 font-medium whitespace-nowrap">{c.client || '-'}</td>
                           <td className="px-4 py-3 text-xs text-slate-500 max-w-[150px] truncate" title={Array.isArray(c.skills) ? c.skills.join(', ') : c.skills}>
                             {!c.skills ? 'N/A' : Array.isArray(c.skills) ? c.skills.slice(0, 3).join(', ') + (c.skills.length > 3 ? '...' : '') : c.skills.length > 50 ? c.skills.substring(0, 50) + '...' : c.skills}
                           </td>
-                          <td className="px-4 py-3 text-slate-600">{c.dateAdded ? new Date(c.dateAdded).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-')}</td>
-                          {/* ✅ USING getRecruiterName HELPER HERE */}
-                          <td className="px-4 py-3 text-sm font-medium text-slate-700">
+                          <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{c.dateAdded ? new Date(c.dateAdded).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-')}</td>
+                          <td className="px-4 py-3 text-sm font-medium text-slate-700 whitespace-nowrap">
                              {typeof c.recruiterId === 'object' ? getRecruiterName(c.recruiterId) : c.recruiterName || '-'}
                           </td>
-                          <td className="px-4 py-3 text-sm">{c.totalExperience ? `${c.totalExperience} Yrs` : '-'}</td>
-                          <td className="px-4 py-3 text-xs"><div>{c.ctc || '-'}</div><div className="text-green-600">{c.ectc || '-'}</div></td>
+                          <td className="px-4 py-3 text-sm whitespace-nowrap">{c.totalExperience ? `${c.totalExperience} Yrs` : '-'}</td>
+                          <td className="px-4 py-3 text-xs whitespace-nowrap"><div>{c.ctc || '-'}</div><div className="text-green-600">{c.ectc || '-'}</div></td>
                           <td className="px-4 py-3">
-                            <div className="flex flex-wrap gap-1">
+                            <div className="flex flex-wrap gap-1 min-w-[120px]">
                               {statusArr.map((s) => (
-                                <span key={s} className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800 mr-1">{s}</span>
+                                <span key={s} className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800 mr-1 whitespace-nowrap">{s}</span>
                               ))}
                             </div>
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-500 truncate max-w-[100px]">{c.remarks || '-'}</td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3 text-right whitespace-nowrap">
                             <div className="flex justify-end items-center gap-2">
                               <Eye className="h-4 w-4 text-blue-600 cursor-pointer" onClick={() => setViewCandidate(c) || setIsViewDialogOpen(true)} />
                               <Edit className="h-4 w-4 text-slate-600 cursor-pointer" onClick={() => openEditDialog(c)} />
@@ -996,7 +998,6 @@ export default function AdminCandidates() {
                   ['Reason for Change', viewCandidate.reasonForChange],
                   ['Offers in Hand', viewCandidate.offersInHand ? `Yes (${viewCandidate.offerPackage})` : 'No'],
                   ['Source', viewCandidate.source],
-                  // ✅ USING getRecruiterName HELPER HERE
                   ['Assigned Recruiter', typeof viewCandidate.recruiterId === 'object' ? getRecruiterName(viewCandidate.recruiterId) : viewCandidate.recruiterName],
                   ['Status', Array.isArray(viewCandidate.status) ? viewCandidate.status.join(', ') : viewCandidate.status],
                   ['Remarks', viewCandidate.remarks]

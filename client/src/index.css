@@ -66,7 +66,8 @@
 
 /* --- CUSTOM SCROLLBAR THAT ADAPTS TO THEME --- */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 8px; /* Vertical Scrollbar Width */
+  height: 8px; /* 👈 THE FIX: Horizontal Scrollbar Height */
 }
 
 ::-webkit-scrollbar-track {
@@ -74,35 +75,14 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 dark:bg-white/10 rounded-full border-2 border-transparent bg-clip-content;
+  @apply bg-slate-300 dark:bg-white/10 rounded-full border-2 border-transparent bg-clip-content;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-primary-500;
+  @apply bg-slate-400 dark:bg-white/20;
 }
 
 /* Glass Utility for smoother cards */
 .glass {
   @apply bg-white/70 dark:bg-[#050505]/70 backdrop-blur-xl border border-gray-200 dark:border-white/10;
-}
-
-
-@layer base {
-  body {
-    @apply antialiased text-slate-900 dark:text-white bg-white dark:bg-bg-950;
-  }
-}
-
-/* Custom scrollbar for a premium feel */
-::-webkit-scrollbar {
-  width: 8px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  @apply bg-slate-300 dark:bg-white/10 rounded-full;
-}
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-primary-500;
 }
