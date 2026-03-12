@@ -33,16 +33,31 @@ const app        = express();
 const httpServer = createServer(app);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FIX: Added 'vagarious-cms.netlify.app' to CORS allowed origins.
+// CORS: Allowed origins — add new Netlify/Render URLs here as needed.
 // ─────────────────────────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = [
   'https://vagarious-cms.netlify.app',
   'https://cms-vagarious.netlify.app',
+  'https://cms-kbmg.onrender.com',
   'http://localhost:5173',
   'http://localhost:5000',
   'http://localhost:8080',
   'http://127.0.0.1:8080',
 ];
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (Postman, curl, server-to-server)
+    if (!origin) return callback(null, true);
+    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    console.warn(`[CORS] Blocked origin: ${origin}`);
+    return callback(new Error(`CORS policy: origin ${origin} not allowed`), false);
+  },
+  credentials:         true,
+  methods:             ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders:      ['Content-Type', 'Authorization', 'X-Requested-With'],
+  optionsSuccessStatus: 200,
+};
 
 // ── Socket.IO ──────────────────────────────────────────────────────────────────
 const io = new Server(httpServer, {
@@ -53,13 +68,11 @@ const io = new Server(httpServer, {
   },
 });
 
-// ── CORS ───────────────────────────────────────────────────────────────────────
-app.use(cors({
-  origin:         ALLOWED_ORIGINS,
-  credentials:    true,
-  methods:        ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-}));
+// ── CORS — MUST be before all routes ──────────────────────────────────────────
+app.use(cors(corsOptions));
+
+// ── Handle OPTIONS preflight for every route ──────────────────────────────────
+app.options('*', cors(corsOptions));
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
