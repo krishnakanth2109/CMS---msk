@@ -174,8 +174,11 @@ export const getRecruiters = async (req, res) => {
     // ✅ FIX: Fetch only 'recruiter' and 'admin' roles — managers are intentionally excluded.
     // The Recruiters page shows admins + recruiters only.
     // Managers are managed separately and should not appear in this list.
+    // ✅ FIX: Removed active:true filter — fetch ALL users (active + inactive)
+    // The frontend AdminRecruiters.jsx handles active/inactive display and counts.
+    // Filtering by active:true here meant deactivated users were never returned,
+    // so the Inactive counter always showed 0 and deactivated cards disappeared.
     const recruiters = await User.find({
-      active: true,
       role: { $in: ['recruiter', 'admin'] }
     }).select('-password').sort({ role: 1, firstName: 1 });
     res.json(recruiters);
@@ -352,15 +355,29 @@ export const toggleRecruiterStatus = async (req, res) => {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'Recruiter not found' });
 
-    user.active = !user.active;
+    // ✅ FIX: Robust boolean toggle — handles undefined/null/string 'false' safely.
+    // Old code: !user.active → when active=undefined, !undefined=true (always activates!)
+    // New code: explicitly check current state then set clean boolean false/true.
+    const currentlyActive = user.active !== false && user.active !== 'false';
+    user.active = !currentlyActive;   // true → false (deactivate), false → true (activate)
+
     await user.save();
 
+    // Also disable/enable in Firebase Auth so they can't log in when deactivated
     if (user.firebaseUid) {
-      try { await admin.auth().updateUser(user.firebaseUid, { disabled: !user.active }); } catch {}
+      try {
+        await admin.auth().updateUser(user.firebaseUid, { disabled: !user.active });
+      } catch (fbErr) {
+        console.error('[toggleStatus] Firebase sync error (non-fatal):', fbErr.message);
+      }
     }
 
-    res.json({ message: `Recruiter set to ${user.active ? 'Active' : 'Inactive'}`, active: user.active });
+    res.json({
+      message: `${user.firstName} has been ${user.active ? 'activated' : 'deactivated'}`,
+      active:  user.active,
+    });
   } catch (error) {
+    console.error('[toggleRecruiterStatus]', error.message);
     res.status(500).json({ message: error.message });
   }
 };

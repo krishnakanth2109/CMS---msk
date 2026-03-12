@@ -334,16 +334,23 @@ export default function AdminRecruiters() {
   };
 
   // ── Summary stats ─────────────────────────────────────────────────────────
+  // isActive: true when active===true OR active===undefined/null (legacy docs)
+  // isInactive: ONLY when active is explicitly false (boolean false or string 'false')
+  const isActive   = (r) => r.active !== false && r.active !== 'false';
+  const isInactive = (r) => r.active === false  || r.active === 'false';
+
   const totalR    = recruiters.length;
-  const activeR   = recruiters.filter((r) => r.active !== false).length;
-  const inactiveR = recruiters.filter((r) => r.active === false).length;
+  const activeR   = recruiters.filter(isActive).length;
+  const inactiveR = recruiters.filter(isInactive).length;
 
   // ── Status badge ──────────────────────────────────────────────────────────
   const StatusBadge = ({ recruiter }) => {
-    const active = recruiter.active !== false;
+    const active = recruiter.active !== false && recruiter.active !== 'false';
     return (
       <Badge variant="secondary"
-        className={active ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+        className={active
+          ? "bg-green-100 text-green-800 border border-green-200"
+          : "bg-red-100 text-red-800 border border-red-200"}>
         {active
           ? <><UserCheck className="h-3 w-3 mr-1" />Active</>
           : <><UserX    className="h-3 w-3 mr-1" />Inactive</>}
@@ -413,14 +420,14 @@ export default function AdminRecruiters() {
             </CardContent>
           </Card>
           <Card className="bg-green-600 text-white cursor-pointer hover:bg-green-700 transition"
-            onClick={() => { setSelectedStatsRecruiters(recruiters.filter((r) => r.active !== false)); setStatsModalTitle("Active Users"); setShowStatsModal(true); }}>
+            onClick={() => { setSelectedStatsRecruiters(recruiters.filter(isActive)); setStatsModalTitle("Active Users"); setShowStatsModal(true); }}>
             <CardContent className="p-4 flex justify-between items-center">
               <div><p className="text-green-100 text-sm">Active</p><p className="text-3xl font-bold">{activeR}</p></div>
               <UserCheck className="h-10 w-10 opacity-70" />
             </CardContent>
           </Card>
           <Card className="bg-red-500 text-white cursor-pointer hover:bg-red-600 transition"
-            onClick={() => { setSelectedStatsRecruiters(recruiters.filter((r) => r.active === false)); setStatsModalTitle("Inactive Users"); setShowStatsModal(true); }}>
+            onClick={() => { setSelectedStatsRecruiters(recruiters.filter(isInactive)); setStatsModalTitle("Inactive Users"); setShowStatsModal(true); }}>
             <CardContent className="p-4 flex justify-between items-center">
               <div><p className="text-red-100 text-sm">Inactive</p><p className="text-3xl font-bold">{inactiveR}</p></div>
               <UserX className="h-10 w-10 opacity-70" />
@@ -479,7 +486,10 @@ export default function AdminRecruiters() {
                   const st = calcStats(r.id);
                   const isAdmin = r.role === 'admin';
                   return (
-                    <Card key={r.id} className={`hover:shadow-lg transition-shadow ${isAdmin ? 'border-purple-200 bg-purple-50/10' : ''}`}>
+                    <Card key={r.id} className={`hover:shadow-lg transition-shadow relative ${
+                      !isActive(r) ? 'opacity-70 border-red-200 bg-red-50/20' :
+                      isAdmin ? 'border-purple-200 bg-purple-50/10' : ''
+                    }`}>
                       <CardHeader className="flex flex-row items-start justify-between pb-2">
                         <div className="flex items-center gap-3">
                           <div className={`h-12 w-12 rounded-full flex items-center justify-center text-white font-bold overflow-hidden ${isAdmin ? 'bg-gradient-to-br from-purple-500 to-indigo-600' : 'bg-gradient-to-br from-blue-500 to-cyan-500'}`}>
@@ -518,8 +528,11 @@ export default function AdminRecruiters() {
                               <Users className="h-4 w-4 mr-2" /> View Candidates
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleToggleStatus(r)}>
-                              {r.active !== false ? 'Deactivate' : 'Activate'}
+                            <DropdownMenuItem onClick={() => handleToggleStatus(r)}
+                              className={isActive(r) ? 'text-orange-600' : 'text-green-600'}>
+                              {isActive(r)
+                                ? <><UserX className="h-4 w-4 mr-2" />Deactivate</>
+                                : <><UserCheck className="h-4 w-4 mr-2" />Activate</>}
                             </DropdownMenuItem>
                             <DropdownMenuItem className="text-red-600"
                               onClick={() => { setRecruiterToDelete(r); setShowDeleteModal(true); }}>
@@ -600,7 +613,10 @@ export default function AdminRecruiters() {
                         const st = calcStats(r.id);
                         const isAdmin = r.role === 'admin';
                         return (
-                          <tr key={r.id} className={`border-b hover:bg-gray-50 dark:hover:bg-gray-800 ${isAdmin ? 'bg-purple-50/20' : ''}`}>
+                          <tr key={r.id} className={`border-b hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                            !isActive(r) ? 'opacity-60 bg-red-50/30' :
+                            isAdmin ? 'bg-purple-50/20' : ''
+                          }`}>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
                                 <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold overflow-hidden flex-shrink-0 text-white ${isAdmin ? 'bg-purple-500' : 'bg-blue-500'}`}>
@@ -650,8 +666,11 @@ export default function AdminRecruiters() {
                                     <TrendingUp className="h-4 w-4 mr-2" /> Performance
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={() => handleToggleStatus(r)}>
-                                    {r.active !== false ? 'Deactivate' : 'Activate'}
+                                  <DropdownMenuItem onClick={() => handleToggleStatus(r)}
+                                    className={isActive(r) ? 'text-orange-600' : 'text-green-600'}>
+                                    {isActive(r)
+                                      ? <><UserX className="h-4 w-4 mr-2" />Deactivate</>
+                                      : <><UserCheck className="h-4 w-4 mr-2" />Activate</>}
                                   </DropdownMenuItem>
                                   <DropdownMenuItem className="text-red-600"
                                     onClick={() => { setRecruiterToDelete(r); setShowDeleteModal(true); }}>

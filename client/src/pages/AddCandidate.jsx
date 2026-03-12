@@ -6,7 +6,8 @@ import {
   X, Edit, Trash2, Ban, List, LayoutGrid, Calendar, 
   GraduationCap, Award, UserCircle, Target, IndianRupee, 
   Upload, FileUp, AlertTriangle, FileSpreadsheet, Linkedin, 
-  Building, Mail, Phone, Briefcase, UserPlus
+  Building, Mail, Phone, Briefcase, UserPlus,
+  CheckCircle2, FileText, Sparkles
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -96,6 +97,7 @@ export default function AdminCandidates() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isParsingResume, setIsParsingResume] = useState(false);
+  const [resumeSuccess, setResumeSuccess] = useState({ show: false, fileName: '', fieldsCount: 0 });
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -245,13 +247,22 @@ export default function AdminCandidates() {
         currentLocation: prev.currentLocation || data.currentLocation || '',
       }));
 
-      toast({ title: 'Success', description: 'Resume parsed successfully. Fields auto-filled.' });
+      setResumeSuccess({
+        show: true,
+        fileName: file.name,
+        fieldsCount: Object.values({
+          name: data.name, email: data.email, contact: data.contact,
+          skills: data.skills, experience: data.totalExperience,
+          company: data.currentCompany, location: data.currentLocation,
+        }).filter(Boolean).length,
+      });
+      setTimeout(() => setResumeSuccess(s => ({ ...s, show: false })), 5000);
     } catch (error) {
       console.error('Parsing error:', error);
-      toast({ title: 'Warning', description: 'Could not parse some details. Please fill manually.', variant: 'default' });
+      toast({ title: 'Warning', description: 'Could not parse resume automatically. Please fill in details manually.', variant: 'default' });
     } finally {
       setIsParsingResume(false);
-      e.target.value = ''; 
+      e.target.value = '';
     }
   };
 
@@ -390,6 +401,7 @@ export default function AdminCandidates() {
     setSelectedCandidateId(null);
     setFormData(initialFormData);
     setErrors({});
+    setResumeSuccess({ show: false, fileName: '', fieldsCount: 0 });
     setIsDialogOpen(true);
   };
 
@@ -817,6 +829,79 @@ export default function AdminCandidates() {
             </div>
 
             <div className="p-6 overflow-y-auto flex-1 space-y-8 pb-48">
+              {/* ── Resume Extracted Success Banner (inline, top of form) ── */}
+              {resumeSuccess.show && (
+                <div style={{
+                  background: 'linear-gradient(to right, #f0fdf4, #ecfdf5, #f0fdf4)',
+                  border: '1.5px solid #86efac',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 24px rgba(34,197,94,0.13)',
+                  overflow: 'hidden',
+                  animation: 'resumeSlideIn 0.35s cubic-bezier(0.16,1,0.3,1)'
+                }}>
+                  <div style={{display:'flex', alignItems:'flex-start', gap:'12px', padding:'14px 16px'}}>
+                    {/* Icon */}
+                    <div style={{
+                      flexShrink:0, width:'40px', height:'40px', borderRadius:'50%',
+                      background:'#dcfce7', border:'2px solid #86efac',
+                      display:'flex', alignItems:'center', justifyContent:'center'
+                    }}>
+                      <CheckCircle2 style={{width:'20px',height:'20px',color:'#16a34a'}} />
+                    </div>
+                    {/* Text */}
+                    <div style={{flex:1, minWidth:0}}>
+                      <div style={{display:'flex', alignItems:'center', gap:'6px', marginBottom:'2px'}}>
+                        <Sparkles style={{width:'14px',height:'14px',color:'#22c55e'}} />
+                        <p style={{fontSize:'14px', fontWeight:700, color:'#14532d', margin:0}}>
+                          Resume Extracted Successfully!
+                        </p>
+                      </div>
+                      <p style={{fontSize:'12px', color:'#15803d', margin:'3px 0 0 0', display:'flex', alignItems:'center', gap:'4px'}}>
+                        <FileText style={{width:'12px',height:'12px',flexShrink:0}} />
+                        <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontWeight:500}}>
+                          {resumeSuccess.fileName}
+                        </span>
+                      </p>
+                      {resumeSuccess.fieldsCount > 0 && (
+                        <p style={{fontSize:'12px', color:'#16a34a', margin:'5px 0 0 0'}}>
+                          ✓ {resumeSuccess.fieldsCount} field{resumeSuccess.fieldsCount !== 1 ? 's' : ''} auto-filled — please review and complete any missing details.
+                        </p>
+                      )}
+                    </div>
+                    {/* Close */}
+                    <button
+                      onClick={() => setResumeSuccess(s => ({ ...s, show: false }))}
+                      style={{
+                        flexShrink:0, background:'none', border:'none', cursor:'pointer',
+                        padding:'4px', borderRadius:'6px', color:'#4ade80', lineHeight:1
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background='#bbf7d0'}
+                      onMouseLeave={e => e.currentTarget.style.background='none'}
+                    >
+                      <X style={{width:'16px',height:'16px'}} />
+                    </button>
+                  </div>
+                  {/* Progress bar */}
+                  <div style={{height:'3px', background:'#bbf7d0'}}>
+                    <div style={{
+                      height:'100%', background:'#22c55e',
+                      animation:'resumeBarShrink 5s linear forwards'
+                    }} />
+                  </div>
+                </div>
+              )}
+
+              <style>{`
+                @keyframes resumeSlideIn {
+                  from { opacity: 0; transform: translateY(-12px); }
+                  to   { opacity: 1; transform: translateY(0); }
+                }
+                @keyframes resumeBarShrink {
+                  from { width: 100%; }
+                  to   { width: 0%; }
+                }
+              `}</style>
+
               {!isEditMode && (
                 <section>
                   <h3 className="text-base font-semibold text-blue-700 border-b border-blue-100 pb-2 mb-4">Upload Resume (Auto Fill)</h3>
