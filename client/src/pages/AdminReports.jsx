@@ -10,7 +10,9 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useToast } from '@/hooks/use-toast';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// ✅ FIX: Normalize API_URL — VITE_API_URL on Render has no /api suffix
+const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/+$/, '');
+const API_URL  = BASE_URL.endsWith('/api') ? BASE_URL : `${BASE_URL}/api`;
 
 export default function AdminReports() {
   const { toast } = useToast();
@@ -23,10 +25,19 @@ export default function AdminReports() {
     monthlyData: []
   });
 
-  const getAuthHeader = () => ({
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${sessionStorage.getItem('authToken')}`
-  });
+  // ✅ FIX: Token is stored as JSON under 'currentUser' key, not 'authToken'
+  const getAuthHeader = () => {
+    try {
+      const user = JSON.parse(sessionStorage.getItem('currentUser') || '{}');
+      const token = user.idToken || user.token || user.accessToken || '';
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      };
+    } catch {
+      return { 'Content-Type': 'application/json' };
+    }
+  };
 
   useEffect(() => {
     const fetchReports = async () => {
