@@ -16,11 +16,11 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
   
   const sidebarBg = "bg-[#283086]"; 
   const mainBackgroundColor = "#f3f6fd"; 
-  const activeBgClass = `bg-[#f3f6fd]`; 
+  const activeBgClass = "bg-[#f3f6fd]"; 
   const activeTextClass = "text-[#283086] font-extrabold"; 
   const inactiveTextClass = "text-white font-medium hover:bg-white/10";
 
-  // ✅ Manager links — Messages now points to /admin/manager-messages
+  // Manager links
   const managerLinks = [
     { name: 'Dashboard',          path: '/admin',                   icon: LayoutDashboard },
     { name: 'OverAll Candidates', path: '/admin/add-candidate',     icon: Users }, 
@@ -28,11 +28,12 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
     { name: 'Client Info',        path: '/admin/clients',           icon: Building2 },
     { name: 'Invoices',           path: '/admin/invoices',          icon: Receipt },
     { name: 'Requirements',       path: '/admin/requirements',      icon: ClipboardList },
-    { name: 'Messages',           path: '/admin/manager-messages',  icon: MessageSquare }, // ✅ UPDATED
+    { name: 'Messages',           path: '/admin/manager-messages',  icon: MessageSquare },
     { name: 'Reports',            path: '/admin/reports',           icon: BarChart3 },
     { name: 'Settings',           path: '/admin/settings',          icon: Settings }, 
   ];
 
+  // Recruiter links
   const recruiterLinks = [
     { name: 'Dashboard',    path: '/recruiter',            icon: LayoutDashboard },
     { name: 'My Candidates',path: '/recruiter/candidates', icon: UserPlus },
@@ -54,7 +55,7 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
       { name: 'My Candidates',      path: '/admin/my-candidates', icon: UserPlus },
       { name: 'Recruiters',         path: '/admin/recruiters',    icon: Briefcase },
       { name: 'Requirements',       path: '/admin/requirements',  icon: ClipboardList },
-      { name: 'Messages',           path: '/admin/messages',      icon: MessageSquare }, // Admin keeps AdminMessages
+      { name: 'Messages',           path: '/admin/messages',      icon: MessageSquare },
       { name: 'Reports',            path: '/admin/reports',       icon: BarChart3 },
       { name: 'Settings',           path: '/admin/settings',      icon: Settings },
     ];
@@ -82,7 +83,7 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
         </div>
 
         {/* --- User Profile Card --- */}
-        <div className={clsx("mb-8 transition-all duration-300", isOpen ? "px-6" : "px-2")}>
+        <div className={clsx("mb-2 transition-all duration-300", isOpen ? "px-6" : "px-2")}>
           <div className={clsx("bg-white/10 backdrop-blur-md rounded-full flex items-center overflow-hidden border border-white/10 transition-all", isOpen ? "p-3 gap-4" : "p-2 justify-center")}>
             <div className="w-10 h-10 rounded-full border-2 border-white/20 flex-shrink-0 overflow-hidden bg-gray-200">
                {currentUser?.profilePicture ? <img src={currentUser.profilePicture} className="w-full h-full object-cover" /> : <User className="h-full w-full p-2 text-gray-500" />}
@@ -99,7 +100,8 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
         </div>
 
         {/* --- Navigation Links --- */}
-        <div className={clsx("flex-1 overflow-y-auto space-y-1 py-2 pr-0 [&::-webkit-scrollbar]:hidden", isOpen ? "pl-6" : "pl-2")}>
+        {/* ✅ FIX: Added pt-8 and pb-8. Prevents clipping of the top and bottom absolute curves in the overflow container */}
+        <div className={clsx("flex-1 overflow-y-auto space-y-1 pt-8 pb-8 pr-0 relative [&::-webkit-scrollbar]:hidden", isOpen ? "pl-6" : "pl-2")}>
           {links.map((link) => (
             <NavLink
               key={link.path}
@@ -107,30 +109,41 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
               end={link.path === '/admin' || link.path === '/recruiter'}
               className={({ isActive }) =>
                 clsx(
-                  "group flex items-center relative transition-all duration-200 py-4",
-                  isActive 
-                    ? `${activeBgClass} ${activeTextClass} rounded-l-[40px]`
-                    : inactiveTextClass,
-                  isOpen ? "pl-8" : "justify-center pl-0"
+                  // ✅ FIX: Added outline-none, focus:outline-none, and select-none to remove browser "blue bar" outlines
+                  "group flex items-center relative py-4 select-none outline-none focus:outline-none focus:ring-0",
+                  isActive
+                    ? `${activeBgClass} ${activeTextClass}`
+                    : `${inactiveTextClass} transition-colors duration-200`,
+                  isOpen ? "pl-8 rounded-l-[40px]" : "justify-center pl-0 rounded-xl mx-2"
                 )
               }
             >
               {({ isActive }) => (
                 <>
+                  {/* ✅ FIX: Strictly render only when active without opacity transitions to prevent the "blue blink" bleed-through effect */}
                   {isActive && isOpen && (
                     <>
-                      <div 
+                      <div
                         className="absolute right-0 -top-[30px] w-[30px] h-[30px] bg-transparent pointer-events-none"
-                        style={{ borderBottomRightRadius: '25px', boxShadow: `10px 10px 0 10px ${mainBackgroundColor}` }}
+                        style={{
+                          borderBottomRightRadius: '30px',
+                          boxShadow: `15px 15px 0 15px ${mainBackgroundColor}`,
+                        }}
                       />
-                      <div 
+                      <div
                         className="absolute right-0 -bottom-[30px] w-[30px] h-[30px] bg-transparent pointer-events-none"
-                        style={{ borderTopRightRadius: '25px', boxShadow: `10px -10px 0 10px ${mainBackgroundColor}` }}
+                        style={{
+                          borderTopRightRadius: '30px',
+                          boxShadow: `15px -15px 0 15px ${mainBackgroundColor}`,
+                        }}
                       />
                     </>
                   )}
-                  <div className={clsx("flex items-center z-20 relative transition-all", isOpen ? "gap-5" : "gap-0")}>
-                    <link.icon className={clsx("h-5 w-5 transition-transform", isActive ? "scale-110 stroke-[3px]" : "stroke-[2.5px]")} />
+                  <div className={clsx("flex items-center z-20 relative", isOpen ? "gap-5" : "gap-0")}>
+                    <link.icon className={clsx(
+                      "h-5 w-5",
+                      isActive ? "scale-110 stroke-[3px]" : "stroke-[2.5px]"
+                    )} />
                     {isOpen && <span className="text-[15px] tracking-wide whitespace-nowrap">{link.name}</span>}
                   </div>
                 </>

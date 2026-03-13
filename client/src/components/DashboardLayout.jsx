@@ -14,11 +14,15 @@ export default function DashboardLayout() {
 
       <div 
         className={clsx(
-          "flex-1 min-h-screen flex flex-col transition-all duration-300 ease-in-out",
+          "flex-1 min-h-screen flex flex-col",
+          "transition-all duration-300 ease-in-out",
           isSidebarOpen ? "ml-80" : "ml-20"
         )}
       >
-        <main className="flex-1 w-full p-4 md:p-8 overflow-x-hidden overflow-y-auto">
+        {/* ✅ FIX: Removed key={location.pathname} and keyframe animation 
+            React Router handles smooth DOM diffing. Forcing a re-render 
+            with a key is what caused the entire page to "blink" and flash. */}
+        <main className="flex-1 w-full p-4 md:p-8 overflow-x-hidden overflow-y-auto bg-[#f3f6fd]">
           <Outlet />
         </main>
       </div>

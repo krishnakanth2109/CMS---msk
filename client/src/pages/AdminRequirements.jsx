@@ -4,7 +4,8 @@ import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   XMarkIcon, EyeIcon, PencilIcon, PlusIcon, CheckCircleIcon, NoSymbolIcon,
-  BriefcaseIcon, AcademicCapIcon, BuildingOfficeIcon, CalendarIcon, MapPinIcon
+  BriefcaseIcon, AcademicCapIcon, BuildingOfficeIcon, CalendarIcon, MapPinIcon,
+  TrashIcon 
 } from "@heroicons/react/24/outline";
 
 const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
@@ -229,8 +230,12 @@ export default function AdminRequirements() {
         // Strip everything except letters and spaces
         newValue = newValue.replace(/[^a-zA-Z\s]/g, '');
       } else if (name === 'experience' || name === 'relevantExperience') {
-        // Strip everything except numbers
-        newValue = newValue.replace(/\D/g, '');
+        // ✅ Allow numbers and a single decimal point
+        newValue = newValue.replace(/[^0-9.]/g, '');
+        const parts = newValue.split('.');
+        if (parts.length > 2) {
+          newValue = parts[0] + '.' + parts.slice(1).join('');
+        }
       } else if (name === 'jobCode') {
         // Strip invalid characters for Job Code (only allow alphanumeric, hyphens, underscores)
         newValue = newValue.replace(/[^a-zA-Z0-9\-_]/g, '');
@@ -356,6 +361,27 @@ export default function AdminRequirements() {
     }
   };
 
+  // ✅ DELETE REQUIREMENT HANDLER
+  const handleDeleteJob = async (jobId) => {
+    if (!window.confirm("Are you sure you want to delete this requirement? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/jobs/${jobId}`, {
+        method: 'DELETE',
+        headers: await getAuthHeader()
+      });
+
+      if (!response.ok) throw new Error('Failed to delete job');
+
+      toast({ title: "Deleted", description: "Requirement deleted successfully." });
+      fetchData(); // Refresh the list
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to delete requirement.", variant: "destructive" });
+    }
+  };
+
   const filteredJobs = jobs.filter(j => {
     const matchesSearch = j.position?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           j.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -436,14 +462,14 @@ export default function AdminRequirements() {
                 {/* 5. Experience */}
                 <div className="md:col-span-1">
                   <label className="block text-xs font-medium text-zinc-500 mb-1">5. Experience (Years) *</label>
-                  <input name="experience" placeholder="E.g. 5" value={form.experience} onChange={handleChange} className={`${inputCls} ${errors.experience ? "border-red-500 focus:ring-red-500" : ""}`} />
+                  <input name="experience" placeholder="E.g. 5.5" value={form.experience} onChange={handleChange} className={`${inputCls} ${errors.experience ? "border-red-500 focus:ring-red-500" : ""}`} />
                   {errors.experience && <p className="text-xs text-red-500 mt-1">{errors.experience}</p>}
                 </div>
 
                 {/* 6. Relevant Experience */}
                 <div className="md:col-span-1">
                   <label className="block text-xs font-medium text-zinc-500 mb-1">6. Relevant Experience (Years)</label>
-                  <input name="relevantExperience" placeholder="E.g. 2" value={form.relevantExperience} onChange={handleChange} className={`${inputCls} ${errors.relevantExperience ? "border-red-500 focus:ring-red-500" : ""}`} />
+                  <input name="relevantExperience" placeholder="E.g. 2.5" value={form.relevantExperience} onChange={handleChange} className={`${inputCls} ${errors.relevantExperience ? "border-red-500 focus:ring-red-500" : ""}`} />
                   {errors.relevantExperience && <p className="text-xs text-red-500 mt-1">{errors.relevantExperience}</p>}
                 </div>
 
@@ -693,14 +719,21 @@ export default function AdminRequirements() {
                         {/* Actions */}
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            {/* View Button */}
                             <button onClick={() => setSelectedJob(job)} title="View Details" className="p-1.5 rounded-lg text-zinc-400 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-zinc-800 dark:hover:text-blue-400 transition-colors">
                               <EyeIcon className="w-5 h-5" />
                             </button>
+                            {/* Edit Button */}
                             <button onClick={() => handleEditJob(job)} title="Edit Requirement" className="p-1.5 rounded-lg text-zinc-400 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-zinc-800 dark:hover:text-amber-400 transition-colors">
                               <PencilIcon className="w-5 h-5" />
                             </button>
+                            {/* Toggle Active Button */}
                             <button onClick={() => handleToggleActive(job)} title={job.active !== false ? "Mark as Inactive" : "Mark as Active"} className={`p-1.5 rounded-lg transition-colors ${job.active !== false ? 'text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-zinc-800 dark:hover:text-red-400' : 'text-zinc-400 hover:bg-green-50 hover:text-green-600 dark:hover:bg-zinc-800 dark:hover:text-green-400'}`}>
                               {job.active !== false ? <NoSymbolIcon className="w-5 h-5" /> : <CheckCircleIcon className="w-5 h-5" />}
+                            </button>
+                            {/* ✅ Delete Button added here */}
+                            <button onClick={() => handleDeleteJob(job.id)} title="Delete Requirement" className="p-1.5 rounded-lg text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-zinc-800 dark:hover:text-red-400 transition-colors">
+                              <TrashIcon className="w-5 h-5" />
                             </button>
                           </div>
                         </td>

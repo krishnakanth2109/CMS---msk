@@ -648,7 +648,7 @@ export default function RecruiterCandidates() {
         {errors.name && <span className="text-xs text-red-500">{errors.name}</span>}
       </div>
       <div className="space-y-1">
-        <Label className={errors.email ? "text-red-500" : ""}>Email *</Label>
+        <Label className={errors.email ? "text-red-500" : ""}>Email *</Label><br />
         <Input value={formData.email} onChange={e => handleInputChange('email', e.target.value)} className={errors.email ? "border-red-500" : ""} placeholder="user@domain.com" />
         {errors.email && <span className="text-xs text-red-500">{errors.email}</span>}
       </div>
@@ -1184,7 +1184,7 @@ export default function RecruiterCandidates() {
               <div className="bg-slate-50 p-4 rounded-lg space-y-3">
                 <h3 className="font-semibold text-slate-800 border-b pb-2 flex items-center gap-2"><UserCircle className="h-4 w-4" /> Personal Information</h3>
                 <div className="grid grid-cols-2 gap-y-3 text-sm">
-                  <div><Label className="text-xs text-slate-500">Email</Label><div>{viewingCandidate.email}</div></div>
+                  <div><Label className="text-xs text-slate-500">Email</Label><div>{viewingCandidate.email}</div></div><br /><br />
                   <div><Label className="text-xs text-slate-500">Phone</Label>
                     <div className="flex items-center gap-2">
                       <div>{viewingCandidate.contact}</div>
