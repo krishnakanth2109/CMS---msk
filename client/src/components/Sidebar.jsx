@@ -5,7 +5,7 @@ import {
   LayoutDashboard, UserPlus, Briefcase, 
   Building2, Receipt, ClipboardList, MessageSquare, 
   BarChart3, Settings, Power, User, Users,
-  ChevronLeft, ChevronRight 
+  ChevronLeft, ChevronRight, Calendar 
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -28,6 +28,7 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
     { name: 'Client Info',        path: '/admin/clients',           icon: Building2 },
     { name: 'Invoices',           path: '/admin/invoices',          icon: Receipt },
     { name: 'Requirements',       path: '/admin/requirements',      icon: ClipboardList },
+    { name: 'Schedules',          path: '/admin/schedules',         icon: Calendar },
     { name: 'Messages',           path: '/admin/manager-messages',  icon: MessageSquare },
     { name: 'Reports',            path: '/admin/reports',           icon: BarChart3 },
     { name: 'Settings',           path: '/admin/settings',          icon: Settings }, 
@@ -38,7 +39,7 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
     { name: 'Dashboard',    path: '/recruiter',            icon: LayoutDashboard },
     { name: 'My Candidates',path: '/recruiter/candidates', icon: UserPlus },
     { name: 'Assignments',  path: '/recruiter/assignments',icon: Briefcase },
-    { name: 'Schedules',    path: '/recruiter/schedules',  icon: ClipboardList },
+    { name: 'Schedules',    path: '/recruiter/schedules',  icon: Calendar },
     { name: 'Messages',     path: '/recruiter/messages',   icon: MessageSquare },
     { name: 'Reports',      path: '/recruiter/reports',    icon: BarChart3 },
     { name: 'My Profile',   path: '/recruiter/profile',    icon: User },
@@ -55,6 +56,7 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
       { name: 'My Candidates',      path: '/admin/my-candidates', icon: UserPlus },
       { name: 'Recruiters',         path: '/admin/recruiters',    icon: Briefcase },
       { name: 'Requirements',       path: '/admin/requirements',  icon: ClipboardList },
+      { name: 'Schedules',          path: '/admin/schedules',     icon: Calendar },
       { name: 'Messages',           path: '/admin/messages',      icon: MessageSquare },
       { name: 'Reports',            path: '/admin/reports',       icon: BarChart3 },
       { name: 'Settings',           path: '/admin/settings',      icon: Settings },

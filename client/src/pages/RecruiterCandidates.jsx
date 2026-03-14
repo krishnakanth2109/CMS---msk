@@ -130,6 +130,7 @@ export default function RecruiterCandidates() {
 
   const [errors, setErrors] = useState({});
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+  const [isCheckingPhone, setIsCheckingPhone] = useState(false);
 
   // Refs for Top and Bottom Scrollbars
   const topScrollRef = useRef(null);
@@ -208,6 +209,32 @@ export default function RecruiterCandidates() {
       // silently ignore network errors during check
     } finally {
       setIsCheckingEmail(false);
+    }
+  };
+
+  // ── Phone duplicate check (called onBlur on contact field) ─────────────────
+  const checkPhoneDuplicate = async (phone) => {
+    const digits = phone ? phone.replace(/\D/g, '').slice(-10) : '';
+    if (!digits || digits.length !== 10) return;
+    setIsCheckingPhone(true);
+    try {
+      const authH = await authHeaders();
+      const excludeParam = selectedCandidateId ? `&excludeId=${selectedCandidateId}` : '';
+      const res = await fetch(`${API_URL}/candidates/check-phone?phone=${encodeURIComponent(digits)}${excludeParam}`, {
+        headers: { ...authH },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.exists) {
+        setErrors(prev => ({
+          ...prev,
+          contact: `A candidate with this phone already exists (ID: ${data.candidateId}${data.name ? ' — ' + data.name : ''})`,
+        }));
+      }
+    } catch (_) {
+      // silently ignore
+    } finally {
+      setIsCheckingPhone(false);
     }
   };
 
@@ -413,6 +440,10 @@ export default function RecruiterCandidates() {
     const contact = trimStr(data.contact);
     if (!contact) newErrors.contact = "Phone is required";
     else if (contact.length !== 10) newErrors.contact = "Must be exactly 10 digits";
+    else if (errors.contact && errors.contact.includes('already exists')) {
+      // Preserve duplicate-phone error set by checkPhoneDuplicate onBlur
+      newErrors.contact = errors.contact;
+    }
 
     if (data.linkedin && !/^(https?:\/\/)?([\w\d\-]+\.)+\w{2,}(\/.*)?$/i.test(trimStr(data.linkedin))) {
       newErrors.linkedin = "Invalid LinkedIn URL format";
@@ -602,6 +633,27 @@ export default function RecruiterCandidates() {
       } catch (_) { /* ignore, fall through */ }
     }
 
+    // ── Pre-submit duplicate phone check (hard block) ───────────────────────
+    if (formData.contact) {
+      const digits = formData.contact.replace(/\D/g, '').slice(-10);
+      if (digits.length === 10) {
+        try {
+          const phH = await authHeaders();
+          const excludeParam = isEdit && selectedCandidateId ? `&excludeId=${selectedCandidateId}` : '';
+          const phRes = await fetch(`${API_URL}/candidates/check-phone?phone=${encodeURIComponent(digits)}${excludeParam}`, { headers: { ...phH } });
+          if (phRes.ok) {
+            const phData = await phRes.json();
+            if (phData.exists) {
+              const phMsg = `A candidate with this phone already exists (ID: ${phData.candidateId}${phData.name ? ' — ' + phData.name : ''})`;
+              setErrors(prev => ({ ...prev, contact: phMsg }));
+              toast({ title: "Duplicate Phone", description: "This phone number is already registered to another candidate.", variant: "destructive" });
+              return; // hard stop
+            }
+          }
+        } catch (_) { /* ignore */ }
+      }
+    }
+
     if (!validateForm()) { toast({ title: "Validation Error", description: "Please fix the highlighted errors", variant: "destructive" }); return; }
     setIsSubmitting(true);
     try {
@@ -751,7 +803,20 @@ export default function RecruiterCandidates() {
       </div>
       <div className="space-y-1">
         <Label className={errors.contact ? "text-red-500" : ""}>Phone *</Label>
-        <Input value={formData.contact} onChange={e => handleInputChange('contact', e.target.value)} className={errors.contact ? "border-red-500" : ""} placeholder="10 Digits Only" />
+        <div className="relative">
+          <Input
+            value={formData.contact}
+            onChange={e => handleInputChange('contact', e.target.value)}
+            onBlur={e => checkPhoneDuplicate(e.target.value)}
+            className={errors.contact ? "border-red-500" : ""}
+            placeholder="10 Digits Only"
+          />
+          {isCheckingPhone && (
+            <span className="absolute right-3 top-2.5 text-xs text-slate-400 flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" /> Checking...
+            </span>
+          )}
+        </div>
         {errors.contact && <span className="text-xs text-red-500">{errors.contact}</span>}
       </div>
       <div className="space-y-1">

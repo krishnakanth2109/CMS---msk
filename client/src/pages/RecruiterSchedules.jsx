@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -211,6 +210,27 @@ export default function RecruiterSchedules() {
     }
   };
 
+  const validateForm = () => {
+    const errors = {};
+    if (!newInterviewForm.candidateId) errors.candidateName = "Please select a candidate first.";
+    if (!newInterviewForm.recruiterId) errors.recruiterId = "Please select a recruiter.";
+    
+    const today = new Date(); 
+    today.setHours(0,0,0,0); 
+    const datePart = new Date(newInterviewForm.interviewDate);
+    if (datePart < today) errors.interviewDate = "Date cannot be in the past.";
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // ✅ THIS FUNCTION WAS MISSING IN THE LAST VERSION
+  const handleNewInterviewChange = (e) => {
+    const { name, value } = e.target;
+    setNewInterviewForm(prev => ({ ...prev, [name]: value }));
+    if (formErrors[name]) setFormErrors(prev => ({ ...prev, [name]: '' }));
+  };
+
   const handleCandidateSelect = (e) => {
     const selectedId = e.target.value;
     if (!selectedId) {
@@ -232,13 +252,10 @@ export default function RecruiterSchedules() {
   };
 
   const handleSubmitNewInterview = async () => {
-    const errors = {};
-    if (!newInterviewForm.candidateId) errors.candidateName = "Please select a candidate first.";
-    const today = new Date(); 
-    today.setHours(0,0,0,0); 
-    if (new Date(newInterviewForm.interviewDate) < today) errors.interviewDate = "Date cannot be in the past.";
-    setFormErrors(errors);
-    if (Object.keys(errors).length > 0) return;
+    if (!validateForm()) { 
+        toast({ title: "Validation Error", description: "Please fix the highlighted errors.", variant: "destructive" }); 
+        return; 
+    }
 
     try {
       const headers = await getAuthHeader();
@@ -698,7 +715,6 @@ function InterviewDetailModal({ interview, candidateFull, loading, onClose, onUp
               {/* Right Column */}
               <div className="lg:col-span-2 space-y-6">
 
-                {/* Recruiter explicitly removed below */}
                 <div className="rounded-xl border-l-4 border-l-blue-500 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm p-4 grid grid-cols-1 gap-4">
                   <div className="space-y-1">
                     <p className="text-xs text-gray-500 dark:text-gray-400 uppercase">Interview Date</p>
@@ -790,14 +806,7 @@ function NewInterviewModal({ form, errors, onChange, onCandidateSelect, onGenera
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium block mb-1 text-gray-700 dark:text-gray-200">Recruiter</label>
-              <select name="recruiterId" value={form.recruiterId} onChange={onChange} className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">Select</option>
-                {recruiters.map(r => <option key={r._id} value={r._id}>{r.name || r.firstName}</option>)}
-              </select>
-              {errors.recruiterId && <p className="text-xs text-red-500 mt-1">{errors.recruiterId}</p>}
-            </div>
+            
             <div>
               <label className="text-sm font-medium block mb-1 text-gray-700 dark:text-gray-200">Round</label>
               <select name="round" value={form.round} onChange={onChange} className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">

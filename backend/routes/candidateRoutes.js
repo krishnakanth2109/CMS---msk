@@ -122,6 +122,32 @@ router.get('/check-email', async (req, res) => {
   }
 });
 
+// CHECK PHONE DUPLICATE
+// GET /api/candidates/check-phone?phone=xxx&excludeId=yyy
+// excludeId is passed on edit so the candidate being edited does not flag itself
+router.get('/check-phone', async (req, res) => {
+  try {
+    const { phone, excludeId } = req.query;
+    if (!phone) return res.json({ exists: false });
+
+    // Normalise: digits only, strip country code prefix if present
+    const digits = phone.trim().replace(/\D/g, '').replace(/^91/, '').slice(-10);
+    if (digits.length !== 10) return res.json({ exists: false });
+
+    const query = { contact: digits };
+    if (excludeId) query._id = { $ne: excludeId };
+
+    const existing = await Candidate.findOne(query).select('_id name candidateId').lean();
+    if (existing) {
+      const id = existing.candidateId || existing._id.toString().slice(-6).toUpperCase();
+      return res.json({ exists: true, candidateId: id, name: existing.name || '' });
+    }
+    res.json({ exists: false });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // Helper to fix data types from FormData (Multer converts everything to strings)
 const sanitizeBody = (body) => {
   const data = { ...body };

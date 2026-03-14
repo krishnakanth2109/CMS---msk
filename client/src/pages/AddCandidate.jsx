@@ -119,6 +119,7 @@ export default function AdminCandidates() {
   const [viewCandidate, setViewCandidate] = useState(null);
   const [errors, setErrors] = useState({});
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+  const [isCheckingPhone, setIsCheckingPhone] = useState(false);
 
   // Refs for Top and Bottom Scrollbars
   const topScrollRef = useRef(null);
@@ -220,6 +221,30 @@ export default function AdminCandidates() {
       // silently ignore network errors during check
     } finally {
       setIsCheckingEmail(false);
+    }
+  };
+
+  // ── Phone duplicate check (called onBlur on contact field) ─────────────────
+  const checkPhoneDuplicate = async (phone) => {
+    const digits = phone ? phone.replace(/\D/g, '').slice(-10) : '';
+    if (!digits || digits.length !== 10) return;
+    setIsCheckingPhone(true);
+    try {
+      const headers = getAuthHeader();
+      const excludeParam = isEditMode && selectedCandidateId ? `&excludeId=${selectedCandidateId}` : '';
+      const res = await fetch(`${API_URL}/candidates/check-phone?phone=${encodeURIComponent(digits)}${excludeParam}`, { headers });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.exists) {
+        setErrors(prev => ({
+          ...prev,
+          contact: `A candidate with this phone already exists (ID: ${data.candidateId}${data.name ? ' — ' + data.name : ''})`,
+        }));
+      }
+    } catch (_) {
+      // silently ignore
+    } finally {
+      setIsCheckingPhone(false);
     }
   };
 
@@ -336,6 +361,9 @@ export default function AdminCandidates() {
       e.contact = 'Contact number is required';
     } else if (!/^[6-9]\d{9}$/.test(d.contact.replace(/[\s\-+]/g, ''))) {
       e.contact = 'Enter a valid 10-digit Indian mobile number (starts with 6–9)';
+    } else if (errors.contact && errors.contact.includes('already exists')) {
+      // Preserve duplicate-phone error set by checkPhoneDuplicate onBlur
+      e.contact = errors.contact;
     }
 
     // ── Alternate Number: optional, validate format if filled ─────────────────
@@ -451,6 +479,27 @@ export default function AdminCandidates() {
           }
         }
       } catch (_) { /* silently ignore — fall through to normal save */ }
+    }
+
+    // ── Pre-submit duplicate phone check (hard block) ───────────────────────
+    if (formData.contact) {
+      const digits = formData.contact.replace(/\D/g, '').slice(-10);
+      if (digits.length === 10) {
+        try {
+          const phHeaders = getAuthHeader();
+          const excludeParam = isEditMode && selectedCandidateId ? `&excludeId=${selectedCandidateId}` : '';
+          const phRes = await fetch(`${API_URL}/candidates/check-phone?phone=${encodeURIComponent(digits)}${excludeParam}`, { headers: phHeaders });
+          if (phRes.ok) {
+            const phData = await phRes.json();
+            if (phData.exists) {
+              const phMsg = `A candidate with this phone already exists (ID: ${phData.candidateId}${phData.name ? ' — ' + phData.name : ''})`;
+              setErrors(prev => ({ ...prev, contact: phMsg }));
+              toast({ title: 'Duplicate Phone', description: 'This phone number is already registered to another candidate.', variant: 'destructive' });
+              return; // hard stop
+            }
+          }
+        } catch (_) { /* ignore */ }
+      }
     }
 
     if (!validateForm()) return;
@@ -1101,7 +1150,20 @@ export default function AdminCandidates() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1 text-slate-700">Contact Number *</label>
-                    <input type="text" value={formData.contact} onChange={(e) => handleInputChange('contact', e.target.value)} className={inputCls(errors.contact)} />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={formData.contact}
+                        onChange={(e) => handleInputChange('contact', e.target.value)}
+                        onBlur={(e) => checkPhoneDuplicate(e.target.value)}
+                        className={inputCls(errors.contact)}
+                      />
+                      {isCheckingPhone && (
+                        <span className="absolute right-3 top-2.5 text-xs text-slate-400 flex items-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Checking...
+                        </span>
+                      )}
+                    </div>
                     {errors.contact && <p className="text-xs text-red-500 mt-1">{errors.contact}</p>}
                   </div>
                   <div>
