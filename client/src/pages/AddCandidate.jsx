@@ -118,6 +118,7 @@ export default function AdminCandidates() {
   const [selectedCandidateId, setSelectedCandidateId] = useState(null);
   const [viewCandidate, setViewCandidate] = useState(null);
   const [errors, setErrors] = useState({});
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
 
   // Refs for Top and Bottom Scrollbars
   const topScrollRef = useRef(null);
@@ -135,8 +136,12 @@ export default function AdminCandidates() {
     }
   };
 
+  // Today in YYYY-MM-DD — used as max for DOB & dateAdded
+  const todayStr = new Date().toISOString().split('T')[0];
+
   const initialFormData = {
     firstName: '', lastName: '', contact: '', alternateNumber: '', email: '',
+    dateOfBirth: '', dateAdded: todayStr,
     currentLocation: '', preferredLocation: '', position: '', positionOther: '', client: '', currentCompany: '',
     totalExperience: '', relevantExperience: '',
     ctc: '', currentTakeHome: '', ectc: '', expectedTakeHome: '',
@@ -192,6 +197,30 @@ export default function AdminCandidates() {
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors((prev) => { const n = { ...prev }; delete n[field]; return n; });
+  };
+
+  // ── Email duplicate check (called onBlur) ──────────────────────────────────
+  const checkEmailDuplicate = async (email) => {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) return;
+    setIsCheckingEmail(true);
+    try {
+      const headers = getAuthHeader();
+      // On edit mode, pass excludeId so the candidate doesn't flag itself
+      const excludeParam = isEditMode && selectedCandidateId ? `&excludeId=${selectedCandidateId}` : '';
+      const res = await fetch(`${API_URL}/candidates/check-email?email=${encodeURIComponent(email.trim())}${excludeParam}`, { headers });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.exists) {
+        setErrors(prev => ({
+          ...prev,
+          email: `A candidate with this email already exists (ID: ${data.candidateId}${data.name ? ' — ' + data.name : ''})`,
+        }));
+      }
+    } catch (_) {
+      // silently ignore network errors during check
+    } finally {
+      setIsCheckingEmail(false);
+    }
   };
 
   const handleResumeUpload = async (e) => {
@@ -292,10 +321,14 @@ export default function AdminCandidates() {
     }
 
     // ── Email: required + valid format ────────────────────────────────────────
+    // Also carry forward any duplicate-email error already set by checkEmailDuplicate onBlur
     if (!d.email.trim()) {
       e.email = 'Email address is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email.trim())) {
       e.email = 'Enter a valid email (e.g. name@example.com)';
+    } else if (errors.email && errors.email.includes('already exists')) {
+      // Preserve the duplicate error — do not clear it just because format is valid
+      e.email = errors.email;
     }
 
     // ── Contact: required, 10-digit Indian mobile (starts 6-9) ───────────────
@@ -366,11 +399,60 @@ export default function AdminCandidates() {
       e.offerPackage = 'Please enter the offer package amount';
     }
 
+
+    // ── Date of Birth: optional, must be in the past, person must be at least 18 ──
+    // Compare as YYYY-MM-DD strings to avoid UTC vs local timezone mismatch
+    if (d.dateOfBirth) {
+      const todayDateStr = new Date().toLocaleDateString('en-CA');
+      if (d.dateOfBirth >= todayDateStr) {
+        e.dateOfBirth = 'Date of Birth must be in the past (not today or future)';
+      } else {
+        const dob = new Date(d.dateOfBirth);
+        const ageYears = (new Date() - dob) / (1000 * 60 * 60 * 24 * 365.25);
+        if (ageYears < 18) {
+          e.dateOfBirth = 'Candidate must be at least 18 years old';
+        } else if (ageYears > 80) {
+          e.dateOfBirth = 'Please enter a valid Date of Birth';
+        }
+      }
+    }
+
+    // ── Date Added: required, must not be a future date (today is the max) ───────
+    // Compare as YYYY-MM-DD strings to avoid UTC vs local timezone mismatch
+    if (!d.dateAdded) {
+      e.dateAdded = 'Date Added is required';
+    } else {
+      const todayDateStr = new Date().toLocaleDateString('en-CA');
+      if (d.dateAdded > todayDateStr) {
+        e.dateAdded = 'Date Added cannot be a future date — only today or earlier is allowed';
+      }
+    }
+
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const handleSubmit = async () => {
+    // ── Pre-submit duplicate email check (hard block before any API call) ────
+    // This covers the case where the user never blurred the email field (e.g. autofill)
+    // or the onBlur check was too fast and errors were cleared by a re-render.
+    if (formData.email && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(formData.email.trim())) {
+      try {
+        const dupHeaders = getAuthHeader();
+        const excludeParam = isEditMode && selectedCandidateId ? `&excludeId=${selectedCandidateId}` : '';
+        const dupRes = await fetch(`${API_URL}/candidates/check-email?email=${encodeURIComponent(formData.email.trim())}${excludeParam}`, { headers: dupHeaders });
+        if (dupRes.ok) {
+          const dupData = await dupRes.json();
+          if (dupData.exists) {
+            const dupMsg = `A candidate with this email already exists (ID: ${dupData.candidateId}${dupData.name ? ' — ' + dupData.name : ''})`;
+            setErrors(prev => ({ ...prev, email: dupMsg }));
+            toast({ title: 'Duplicate Email', description: 'This email is already registered to another candidate.', variant: 'destructive' });
+            return; // ← hard stop, never proceeds to save
+          }
+        }
+      } catch (_) { /* silently ignore — fall through to normal save */ }
+    }
+
     if (!validateForm()) return;
     setIsSubmitting(true);
     try {
@@ -428,7 +510,13 @@ export default function AdminCandidates() {
       setIsDialogOpen(false);
       fetchData(); // full re-fetch to sync populated fields (e.g. recruiterId object)
     } catch (err) {
-      toast({ title: 'Error', description: 'Failed to save', variant: 'destructive' });
+      const msg = err.message || '';
+      if (msg.toLowerCase().includes('email') || msg.toLowerCase().includes('duplicate') || msg.toLowerCase().includes('e11000')) {
+        setErrors(prev => ({ ...prev, email: 'A candidate with this email already exists in the database.' }));
+        toast({ title: 'Duplicate Email', description: 'This email is already registered to another candidate.', variant: 'destructive' });
+      } else {
+        toast({ title: 'Error', description: 'Failed to save', variant: 'destructive' });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -471,6 +559,7 @@ export default function AdminCandidates() {
       contact: c.contact || '',
       alternateNumber: c.alternateNumber || '',
       email: c.email || '',
+      dateOfBirth: c.dateOfBirth ? new Date(c.dateOfBirth).toISOString().split('T')[0] : '',
       currentLocation: c.currentLocation || '',
       preferredLocation: c.preferredLocation || '',
       position: positionValue,
@@ -1022,7 +1111,20 @@ export default function AdminCandidates() {
                   </div>
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium mb-1 text-slate-700">Email Address *</label>
-                    <input type="email" value={formData.email} onChange={(e) => handleInputChange('email', e.target.value)} className={inputCls(errors.email)} />
+                    <div className="relative">
+                      <input
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => handleInputChange('email', e.target.value)}
+                        onBlur={(e) => checkEmailDuplicate(e.target.value)}
+                        className={inputCls(errors.email)}
+                      />
+                      {isCheckingEmail && (
+                        <span className="absolute right-3 top-2.5 text-xs text-slate-400 flex items-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Checking...
+                        </span>
+                      )}
+                    </div>
                     {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
                   </div>
                   <div>
@@ -1032,6 +1134,29 @@ export default function AdminCandidates() {
                   <div>
                     <label className="block text-sm font-medium mb-1 text-slate-700">Preferred Location</label>
                     <input type="text" value={formData.preferredLocation} onChange={(e) => handleInputChange('preferredLocation', e.target.value)} className={inputCls(false)} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1 text-slate-700">Date of Birth</label>
+                    <input
+                      type="date"
+                      value={formData.dateOfBirth}
+                      onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+                      max={new Date(new Date().setDate(new Date().getDate() - 1)).toISOString().split('T')[0]}
+                      className={inputCls(errors.dateOfBirth)}
+                    />
+                    {errors.dateOfBirth && <p className="text-xs text-red-500 mt-1">{errors.dateOfBirth}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1 text-slate-700">Date Added</label>
+                    <input
+                      type="date"
+                      value={formData.dateAdded}
+                      onChange={(e) => handleInputChange('dateAdded', e.target.value)}
+                      max={todayStr}
+                      className={inputCls(errors.dateAdded)}
+                    />
+                    <p className="text-xs text-slate-400 mt-1">Cannot be a future date. Defaults to today.</p>
+                    {errors.dateAdded && <p className="text-xs text-red-500 mt-1">{errors.dateAdded}</p>}
                   </div>
                 </div>
               </section>

@@ -1,3 +1,4 @@
+
 import Interview from '../models/Interview.js';
 import Candidate from '../models/Candidate.js';
 
@@ -12,7 +13,7 @@ export const getInterviews = async (req, res) => {
 
     const interviews = await Interview.find(query)
       .populate('candidateId', 'name email phone position')
-      .populate('recruiterId', 'name email')
+      .populate('recruiterId', 'name firstName lastName email')
       .sort({ interviewDate: 1 });
 
     res.json(interviews);
@@ -51,6 +52,50 @@ export const createInterview = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(400).json({ message: error.message });
+  }
+};
+
+// @desc    Update interview details & Candidate status (Full Edit Support)
+// @route   PUT /api/interviews/:id
+export const updateInterview = async (req, res) => {
+  try {
+    const { status, round, interviewDate, interviewTime, meetingLink, notes } = req.body;
+    const interview = await Interview.findById(req.params.id);
+    
+    if (!interview) {
+      return res.status(404).json({ message: 'Interview not found' });
+    }
+
+    // Update Status/Round
+    if (status) interview.status = status;
+    if (round) interview.round = round;
+
+    // Update extended details from full edit
+    if (meetingLink !== undefined) interview.meetingLink = meetingLink;
+    if (notes !== undefined) interview.notes = notes;
+
+    if (interviewDate && interviewTime) {
+        interview.interviewDate = new Date(`${interviewDate}T${interviewTime}`);
+    } else if (interviewDate) {
+        // Fallback if only date was provided (preserves old time)
+        const datePart = new Date(interviewDate);
+        const currentDateTime = new Date(interview.interviewDate);
+        datePart.setHours(currentDateTime.getHours(), currentDateTime.getMinutes(), currentDateTime.getSeconds());
+        interview.interviewDate = datePart;
+    }
+
+    await interview.save();
+
+    // Sync Candidate status effectively
+    if (status || round) {
+      const candidateStatus = (status && status !== 'Scheduled') ? status : round;
+      await Candidate.findByIdAndUpdate(interview.candidateId, { status: candidateStatus });
+    }
+
+    res.json(interview);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error.message });
   }
 };
 

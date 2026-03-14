@@ -100,6 +100,28 @@ router.get('/', async (req, res) => {
   }
 });
 
+// CHECK EMAIL DUPLICATE
+// GET /api/candidates/check-email?email=xxx&excludeId=yyy
+// excludeId is passed on edit so the candidate being edited does not flag itself
+router.get('/check-email', async (req, res) => {
+  try {
+    const { email, excludeId } = req.query;
+    if (!email) return res.json({ exists: false });
+
+    const query = { email: email.trim().toLowerCase() };
+    if (excludeId) query._id = { $ne: excludeId };
+
+    const existing = await Candidate.findOne(query).select('_id name candidateId').lean();
+    if (existing) {
+      const id = existing.candidateId || existing._id.toString().slice(-6).toUpperCase();
+      return res.json({ exists: true, candidateId: id, name: existing.name || '' });
+    }
+    res.json({ exists: false });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // Helper to fix data types from FormData (Multer converts everything to strings)
 const sanitizeBody = (body) => {
   const data = { ...body };

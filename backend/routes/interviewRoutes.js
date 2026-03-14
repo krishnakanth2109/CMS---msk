@@ -1,5 +1,6 @@
+
 import express from 'express';
-import { getInterviews, createInterview, deleteInterview } from '../controllers/interviewController.js';
+import { getInterviews, createInterview, deleteInterview, updateInterview } from '../controllers/interviewController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -11,6 +12,7 @@ router.route('/')
   .post(createInterview);
 
 router.route('/:id')
+  .put(updateInterview)
   .delete(deleteInterview);
 
 export default router;

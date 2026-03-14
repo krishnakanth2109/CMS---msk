@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -6,7 +7,7 @@ import {
   Calendar, Clock, MapPin, Video, Phone, Building, Search,
   Calendar as CalendarIcon, List, Grid, Eye, Plus, Download,
   CheckCircle2, AlertCircle, X, Loader2, Mail, Briefcase,
-  DollarSign, GraduationCap, FileText, UserCircle, Target, Users, Zap
+  DollarSign, GraduationCap, FileText, UserCircle, Target, Users, Zap, Edit, Pencil, Trash2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "@/hooks/use-toast";
@@ -18,6 +19,8 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 function getStatusBadge(status) {
   const base = "px-3 py-1.5 rounded-full text-sm font-semibold flex items-center gap-1.5";
   
+  if (!status) return <span className={`${base} bg-gray-100 text-gray-800`}><Calendar className="h-3 w-3" />Unknown</span>;
+
   // Round Badges
   if (status.includes("L1")) return <span className={`${base} bg-blue-100 text-blue-800 border border-blue-200`}><Zap className="h-3 w-3" />{status}</span>;
   if (status.includes("L2")) return <span className={`${base} bg-indigo-100 text-indigo-800 border border-indigo-200`}><Target className="h-3 w-3" />{status}</span>;
@@ -27,8 +30,8 @@ function getStatusBadge(status) {
   if (status.includes("Technical")) return <span className={`${base} bg-cyan-100 text-cyan-800 border border-cyan-200`}><Briefcase className="h-3 w-3" />{status}</span>;
 
   // Status Badges
-  if (status === 'Shortlisted') return <span className={`${base} bg-green-100 text-green-800 border border-green-200`}><CheckCircle2 className="h-3 w-3" />{status}</span>;
-  if (status === 'Rejected') return <span className={`${base} bg-red-100 text-red-800 border border-red-200`}><X className="h-3 w-3" />{status}</span>;
+  if (status === 'Shortlisted' || status === 'Completed') return <span className={`${base} bg-green-100 text-green-800 border border-green-200`}><CheckCircle2 className="h-3 w-3" />{status}</span>;
+  if (status === 'Rejected' || status === 'Cancelled' || status === 'No Show') return <span className={`${base} bg-red-100 text-red-800 border border-red-200`}><X className="h-3 w-3" />{status}</span>;
   if (status === 'Hold') return <span className={`${base} bg-yellow-100 text-yellow-800 border border-yellow-200`}><AlertCircle className="h-3 w-3" />{status}</span>;
   if (status === 'Submitted') return <span className={`${base} bg-sky-100 text-sky-800 border border-sky-200`}><FileText className="h-3 w-3" />{status}</span>;
 
@@ -76,6 +79,7 @@ export default function RecruiterSchedules() {
   const [loading, setLoading] = useState(true);
 
   const [selectedInterview, setSelectedInterview] = useState(null);
+  const [editInterviewData, setEditInterviewData] = useState(null); // Full Edit State
   const [selectedCandidateFullDetails, setSelectedCandidateFullDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
@@ -87,10 +91,15 @@ export default function RecruiterSchedules() {
   const [activeStatFilter, setActiveStatFilter] = useState(null);
   const [showNewInterviewForm, setShowNewInterviewForm] = useState(false);
 
+  // FETCH RECRUITER FROM SESSION STORAGE
+  const storedUser = JSON.parse(sessionStorage.getItem('user') || '{}');
+  const sessionRecruiterId = storedUser?._id || storedUser?.id || "";
+  const sessionRecruiterName = storedUser?.firstName ? `${storedUser.firstName} ${storedUser.lastName || ''}` : (storedUser?.name || "");
+
   const [newInterviewForm, setNewInterviewForm] = useState({
     candidateId: "", candidateName: "", candidateEmail: "", candidatePhone: "", position: "",
     round: "L1 Interview", interviewDate: new Date().toISOString().split('T')[0], interviewTime: "10:00",
-    type: "Virtual", location: "Remote", duration: "60", recruiterId: "",
+    type: "Virtual", location: "Remote", duration: "60", recruiterId: sessionRecruiterId,
     notes: "", priority: "medium", meetingLink: ""
   });
   const [formErrors, setFormErrors] = useState({});
@@ -112,24 +121,37 @@ export default function RecruiterSchedules() {
 
       if (resInterviews.ok) {
         const data = await resInterviews.json();
-        setInterviews(data.map((item) => ({
-          id: item._id, 
-          interviewId: item.interviewId,
-          candidateIdRaw: item.candidateId?._id || item.candidateId, 
-          candidateName: item.candidateId?.name || "Unknown Candidate",
-          candidateEmail: item.candidateId?.email || "",
-          candidatePhone: item.candidateId?.phone || "",
-          position: item.candidateId?.position || "N/A",
-          status: item.round || "Scheduled",
-          interviewDate: item.interviewDate, 
-          interviewType: item.type,
-          recruiterId: item.recruiterId?._id || item.recruiterId, 
-          recruiterName: item.recruiterId?.firstName ? `${item.recruiterId.firstName} ${item.recruiterId.lastName}` : (item.recruiterId?.name || "Unknown"),
-          clientName: item.jobId?.clientName || "N/A",
-          notes: item.notes, 
-          priority: item.priority, 
-          meetingLink: item.meetingLink,
-        })));
+        setInterviews(data.map((item) => {
+          let rName = "Unknown";
+          if (item.recruiterId) {
+            if (item.recruiterId.firstName) rName = `${item.recruiterId.firstName} ${item.recruiterId.lastName || ''}`;
+            else if (item.recruiterId.name) rName = item.recruiterId.name;
+            else if ((item.recruiterId._id || item.recruiterId) === sessionRecruiterId) rName = sessionRecruiterName;
+          } else if (sessionRecruiterName) {
+            rName = sessionRecruiterName;
+          }
+
+          return {
+            id: item._id, 
+            interviewId: item.interviewId,
+            candidateIdRaw: item.candidateId?._id || item.candidateId, 
+            candidateName: item.candidateId?.name || "Unknown Candidate",
+            candidateEmail: item.candidateId?.email || "",
+            candidatePhone: item.candidateId?.phone || "",
+            position: item.candidateId?.position || "N/A",
+            rawStatus: item.status,
+            rawRound: item.round,
+            status: item.status !== 'Scheduled' ? item.status : (item.round || "Scheduled"),
+            interviewDate: item.interviewDate, 
+            interviewType: item.type,
+            recruiterId: item.recruiterId?._id || item.recruiterId, 
+            recruiterName: rName,
+            clientName: item.jobId?.clientName || "N/A",
+            notes: item.notes, 
+            priority: item.priority, 
+            meetingLink: item.meetingLink,
+          };
+        }));
       }
       if (resCandidates.ok) setCandidates(await resCandidates.json());
       if (resRecruiters.ok) setRecruiters(await resRecruiters.json());
@@ -189,44 +211,12 @@ export default function RecruiterSchedules() {
     }
   };
 
-  const validateForm = () => {
-    const errors = {};
-    if (!newInterviewForm.candidateId) errors.candidateName = "Please select a candidate first.";
-    if (!newInterviewForm.recruiterId) errors.recruiterId = "Please select a recruiter.";
-    
-    const today = new Date(); 
-    today.setHours(0,0,0,0); 
-    const datePart = new Date(newInterviewForm.interviewDate);
-    if (datePart < today) errors.interviewDate = "Date cannot be in the past.";
-    
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleNewInterviewChange = (e) => {
-    const { name, value } = e.target;
-    setNewInterviewForm(prev => ({ ...prev, [name]: value }));
-    if (formErrors[name]) setFormErrors(prev => ({ ...prev, [name]: '' }));
-  };
-
   const handleCandidateSelect = (e) => {
     const selectedId = e.target.value;
-    
-    // Clear details if unselected
     if (!selectedId) {
-      setNewInterviewForm(prev => ({
-        ...prev, 
-        candidateId: "", 
-        candidateName: "",
-        candidateEmail: "", 
-        candidatePhone: "",
-        position: "",
-        recruiterId: prev.recruiterId // Keep the recruiter if already set manually
-      }));
+      setNewInterviewForm(prev => ({ ...prev, candidateId: "", candidateName: "", candidateEmail: "", candidatePhone: "", position: "" }));
       return;
     }
-
-    // Find and Auto-fill details
     const candidate = candidates.find(c => c._id === selectedId || c.id === selectedId);
     if (candidate) {
       setNewInterviewForm(prev => ({
@@ -235,44 +225,77 @@ export default function RecruiterSchedules() {
         candidateName: candidate.name || "",
         candidateEmail: candidate.email || "", 
         candidatePhone: candidate.contact || candidate.phone || "",
-        position: candidate.position || "",
-        recruiterId: typeof candidate.recruiterId === 'object' ? candidate.recruiterId?._id : (candidate.recruiterId || prev.recruiterId)
+        position: candidate.position || ""
       }));
       setFormErrors({});
     }
   };
 
   const handleSubmitNewInterview = async () => {
-    if (!validateForm()) { 
-        toast({ title: "Validation Error", description: "Please fix the highlighted errors.", variant: "destructive" }); 
-        return; 
-    }
-    
+    const errors = {};
+    if (!newInterviewForm.candidateId) errors.candidateName = "Please select a candidate first.";
+    const today = new Date(); 
+    today.setHours(0,0,0,0); 
+    if (new Date(newInterviewForm.interviewDate) < today) errors.interviewDate = "Date cannot be in the past.";
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
     try {
       const headers = await getAuthHeader();
       const response = await fetch(`${API_URL}/interviews`, {
-        method: 'POST', 
-        headers, 
-        body: JSON.stringify(newInterviewForm)
+        method: 'POST', headers, body: JSON.stringify(newInterviewForm)
       });
-      
-      const data = await response.json();
-      
       if (response.ok) {
         toast({ title: "Success", description: "Interview scheduled successfully" });
         setShowNewInterviewForm(false);
         fetchData();
-        setNewInterviewForm({
-          candidateId: "", candidateName: "", candidateEmail: "", candidatePhone: "", position: "",
-          round: "L1 Interview", interviewDate: new Date().toISOString().split('T')[0], interviewTime: "10:00",
-          type: "Virtual", location: "Remote", duration: "60", recruiterId: "",
-          notes: "", priority: "medium", meetingLink: ""
-        });
-      } else {
-        throw new Error(data.message || "Failed to schedule");
-      }
+        setNewInterviewForm(prev => ({ ...prev, candidateId: "", candidateName: "", notes: "", meetingLink: "" }));
+      } else throw new Error(await response.text());
     } catch (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleDeleteInterview = async (id) => {
+    if (!window.confirm("Are you sure you want to completely delete this interview?")) return;
+    try {
+      const headers = await getAuthHeader();
+      const response = await fetch(`${API_URL}/interviews/${id}`, { method: 'DELETE', headers });
+      if (response.ok) {
+        toast({ title: "Deleted", description: "Interview removed." });
+        fetchData();
+      } else throw new Error("Failed to delete interview.");
+    } catch (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleUpdateFullInterview = async (id, payload) => {
+    try {
+      const headers = await getAuthHeader();
+      const res = await fetch(`${API_URL}/interviews/${id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        toast({ title: "Updated", description: "Interview updated successfully." });
+        fetchData();
+        setEditInterviewData(null);
+        // Optimistic update if view modal is open
+        if (selectedInterview && selectedInterview.id === id) {
+          setSelectedInterview(prev => ({ 
+            ...prev, 
+            rawStatus: payload.status, 
+            rawRound: payload.round, 
+            status: payload.status !== 'Scheduled' ? payload.status : payload.round 
+          }));
+        }
+      } else {
+        toast({ title: "Update Failed", description: "Could not update interview.", variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
     }
   };
 
@@ -301,9 +324,7 @@ export default function RecruiterSchedules() {
           <StatCard title="Total" value={interviewStats.total} icon={<Calendar />} gradient="bg-purple-600" onClick={() => setActiveStatFilter('total')} />
           <StatCard title="Today" value={interviewStats.today} icon={<CalendarIcon />} gradient="bg-orange-600" onClick={() => setActiveStatFilter('today')} />
           <StatCard title="Upcoming" value={interviewStats.upcoming} icon={<Clock />} gradient="bg-green-600" onClick={() => setActiveStatFilter('upcoming')} />
-       
           <StatCard title="Completed" value={interviewStats.completed} icon={<CheckCircle2 />} gradient="bg-blue-600" onClick={() => setActiveStatFilter('completed')} />
-         
           <StatCard title="Hold" value={interviewStats.virtual} icon={<Video />} gradient="bg-indigo-600" onClick={() => setActiveStatFilter('Hold')} />
         </div>
 
@@ -342,11 +363,22 @@ export default function RecruiterSchedules() {
             ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {filteredInterviews.map((interview) => (
-                  <InterviewGridCard key={interview.id} interview={interview} onView={() => handleViewInterview(interview)} />
+                  <InterviewGridCard 
+                    key={interview.id} 
+                    interview={interview} 
+                    onView={() => handleViewInterview(interview)} 
+                    onEdit={() => setEditInterviewData(interview)} 
+                    onDelete={() => handleDeleteInterview(interview.id)}
+                  />
                 ))}
               </div>
             ) : (
-              <InterviewListView interviews={filteredInterviews} onView={handleViewInterview} />
+              <InterviewListView 
+                interviews={filteredInterviews} 
+                onView={handleViewInterview} 
+                onEdit={(interview) => setEditInterviewData(interview)} 
+                onDelete={(id) => handleDeleteInterview(id)}
+              />
             )}
           </AnimatePresence>
         )}
@@ -366,6 +398,15 @@ export default function RecruiterSchedules() {
         <InterviewDetailModal
           interview={selectedInterview} candidateFull={selectedCandidateFullDetails}
           loading={loadingDetails} onClose={() => setSelectedInterview(null)}
+          onUpdate={handleUpdateFullInterview}
+        />
+      )}
+
+      {editInterviewData && (
+        <EditInterviewModal 
+          interview={editInterviewData} 
+          onClose={() => setEditInterviewData(null)} 
+          onSave={handleUpdateFullInterview} 
         />
       )}
     </main>
@@ -374,7 +415,7 @@ export default function RecruiterSchedules() {
 
 // --- Sub Components ---
 
-function InterviewGridCard({ interview, onView }) {
+function InterviewGridCard({ interview, onView, onEdit, onDelete }) {
   const timeStatus = getTimeStatus(interview.interviewDate);
   return (
     <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-lg transition-shadow cursor-pointer border-l-4" style={{ borderLeftColor: timeStatus.status === 'urgent' ? '#ef4444' : '#3b82f6' }}>
@@ -396,14 +437,22 @@ function InterviewGridCard({ interview, onView }) {
         </div>
         <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center">
           {getPriorityBadge(interview.priority)}
-          <button onClick={onView} className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-gray-800 dark:hover:text-blue-400 transition">View Details</button>
+          <div className="flex gap-2">
+            <button onClick={() => onEdit(interview)} className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-orange-50 hover:text-orange-600 dark:hover:bg-gray-800 transition" title="Edit Interview">
+              <Pencil className="h-4 w-4" />
+            </button>
+            <button onClick={() => onDelete(interview.id)} className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-red-50 hover:text-red-600 dark:hover:bg-gray-800 transition" title="Delete Interview">
+              <Trash2 className="h-4 w-4" />
+            </button>
+            <button onClick={onView} className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-gray-800 dark:hover:text-blue-400 transition">View Details</button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function InterviewListView({ interviews, onView }) {
+function InterviewListView({ interviews, onView, onEdit, onDelete }) {
   return (
     <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-x-auto shadow-sm">
       <table className="w-full text-sm text-left">
@@ -422,9 +471,15 @@ function InterviewListView({ interviews, onView }) {
               <td className="p-4 text-gray-600 dark:text-gray-300">{new Date(i.interviewDate).toLocaleDateString()}</td>
               <td className="p-4 text-gray-600 dark:text-gray-300">{i.recruiterName}</td>
               <td className="p-4">{getStatusBadge(i.status)}</td>
-              <td className="p-4">
-                <button onClick={() => onView(i)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+              <td className="p-4 flex items-center gap-2">
+                <button onClick={() => onView(i)} title="View Details" className="p-2 rounded-lg hover:bg-blue-50 text-gray-600 hover:text-blue-600 dark:hover:bg-gray-700 transition">
                   <Eye className="h-4 w-4" />
+                </button>
+                <button onClick={() => onEdit(i)} title="Edit Interview" className="p-2 rounded-lg hover:bg-orange-50 text-gray-600 hover:text-orange-600 dark:hover:bg-gray-700 transition">
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button onClick={() => onDelete(i.id)} title="Delete Interview" className="p-2 rounded-lg hover:bg-red-50 text-gray-600 hover:text-red-600 dark:hover:bg-gray-700 transition">
+                  <Trash2 className="h-4 w-4" />
                 </button>
               </td>
             </tr>
@@ -435,7 +490,107 @@ function InterviewListView({ interviews, onView }) {
   );
 }
 
-function InterviewDetailModal({ interview, candidateFull, loading, onClose }) {
+function EditInterviewModal({ interview, onClose, onSave }) {
+  const [isSaving, setIsSaving] = useState(false);
+  const [form, setForm] = useState({
+    round: interview.rawRound || 'L1 Interview',
+    status: interview.rawStatus || 'Scheduled',
+    interviewDate: new Date(interview.interviewDate).toISOString().split('T')[0],
+    interviewTime: new Date(interview.interviewDate).toTimeString().substring(0, 5),
+    meetingLink: interview.meetingLink || '',
+    notes: interview.notes || ''
+  });
+
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const handleSubmit = async () => {
+    setIsSaving(true);
+    await onSave(interview.id, form);
+    setIsSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
+      <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full">
+        <div className="p-5 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900 rounded-t-xl">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><Edit className="h-5 w-5 text-blue-600"/> Edit Interview</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"><X className="h-5 w-5" /></button>
+        </div>
+        
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">Editing details for <span className="font-semibold text-gray-900 dark:text-white">{interview.candidateName}</span></p>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Date</label>
+              <input type="date" name="interviewDate" value={form.interviewDate} onChange={handleChange} className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white" />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Time</label>
+              <input type="time" name="interviewTime" value={form.interviewTime} onChange={handleChange} className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Current Round</label>
+              <select name="round" value={form.round} onChange={handleChange} className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white">
+                <option>L1 Interview</option>
+                <option>L2 Interview</option>
+                <option>L3 Interview</option>
+                <option>L4 Interview</option>
+                <option>L5 Interview</option>
+                <option>Technical Round</option>
+                <option>HR Round</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Interview Status</label>
+              <select name="status" value={form.status} onChange={handleChange} className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white">
+                <option>Scheduled</option>
+                <option>Completed</option>
+                <option>Shortlisted</option>
+                <option>Hold</option>
+                <option>Submitted</option>
+                <option>Cancelled</option>
+                <option>No Show</option>
+                <option>Rejected</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Meeting Link</label>
+            <input type="text" name="meetingLink" value={form.meetingLink} onChange={handleChange} className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white" />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Notes</label>
+            <Textarea name="notes" value={form.notes} onChange={handleChange} className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white" />
+          </div>
+        </div>
+
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3 bg-gray-50 dark:bg-gray-900 rounded-b-xl">
+          <button onClick={onClose} className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition text-gray-700 dark:text-gray-200">Cancel</button>
+          <button onClick={handleSubmit} disabled={isSaving} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition flex items-center gap-2">
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Changes"}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function InterviewDetailModal({ interview, candidateFull, loading, onClose, onUpdate }) {
+  const [editStatus, setEditStatus] = useState(interview.rawStatus || 'Scheduled');
+  const [editRound, setEditRound] = useState(interview.rawRound || 'L1 Interview');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSaveStatus = async () => {
+    setIsSaving(true);
+    await onUpdate(interview.id, { status: editStatus, round: editRound });
+    setIsSaving(false);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
       <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto flex flex-col">
@@ -447,7 +602,10 @@ function InterviewDetailModal({ interview, candidateFull, loading, onClose }) {
               <AvatarFallback className="text-blue-700 font-bold text-xl bg-white">{interview.candidateName.substring(0, 2).toUpperCase()}</AvatarFallback>
             </Avatar>
             <div>
-              <h2 className="text-2xl font-bold">{interview.candidateName}</h2>
+              <h2 className="text-2xl font-bold flex items-center gap-3">
+                {interview.candidateName}
+                {getStatusBadge(interview.status)}
+              </h2>
               <div className="flex gap-2 text-blue-100 items-center mt-1">
                 <Briefcase className="h-4 w-4" />
                 <span>{interview.position} at {interview.clientName}</span>
@@ -471,6 +629,48 @@ function InterviewDetailModal({ interview, candidateFull, loading, onClose }) {
 
               {/* Left Column */}
               <div className="space-y-6">
+                
+                {/* STATUS EDIT BLOCK */}
+                <div className="rounded-xl border-l-4 border-l-orange-500 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm p-4">
+                  <h3 className="font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2 mb-3">
+                    <Edit className="h-4 w-4" /> Update Status
+                  </h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Current Round</label>
+                      <select value={editRound} onChange={(e) => setEditRound(e.target.value)} className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:border-blue-500 text-gray-800 dark:text-white">
+                        <option>L1 Interview</option>
+                        <option>L2 Interview</option>
+                        <option>L3 Interview</option>
+                        <option>L4 Interview</option>
+                        <option>L5 Interview</option>
+                        <option>Technical Round</option>
+                        <option>HR Round</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Interview Status</label>
+                      <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:border-blue-500 text-gray-800 dark:text-white">
+                        <option>Scheduled</option>
+                        <option>Completed</option>
+                        <option>Shortlisted</option>
+                        <option>Hold</option>
+                        <option>Submitted</option>
+                        <option>Cancelled</option>
+                        <option>No Show</option>
+                        <option>Rejected</option>
+                      </select>
+                    </div>
+                    <button 
+                      onClick={handleSaveStatus} 
+                      disabled={isSaving}
+                      className="w-full mt-2 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition flex justify-center items-center gap-2"
+                    >
+                      {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Changes'}
+                    </button>
+                  </div>
+                </div>
+
                 <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm p-4">
                   <h3 className="font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2 mb-3"><UserCircle className="h-4 w-4" /> Contact Info</h3>
                   <div className="space-y-3 text-sm">
@@ -498,16 +698,13 @@ function InterviewDetailModal({ interview, candidateFull, loading, onClose }) {
               {/* Right Column */}
               <div className="lg:col-span-2 space-y-6">
 
-                <div className="rounded-xl border-l-4 border-l-blue-500 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm p-4 grid grid-cols-2 gap-4">
+                {/* Recruiter explicitly removed below */}
+                <div className="rounded-xl border-l-4 border-l-blue-500 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm p-4 grid grid-cols-1 gap-4">
                   <div className="space-y-1">
                     <p className="text-xs text-gray-500 dark:text-gray-400 uppercase">Interview Date</p>
                     <p className="font-medium flex items-center gap-2 text-gray-900 dark:text-white"><Calendar className="h-4 w-4 text-blue-600" /> {new Date(interview.interviewDate).toLocaleString()}</p>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase">Recruiter</p>
-                    <p className="font-medium flex items-center gap-2 text-gray-900 dark:text-white"><UserCircle className="h-4 w-4 text-blue-600" /> {interview.recruiterName}</p>
-                  </div>
-                  <div className="col-span-2">
+                  <div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 uppercase mb-1">Meeting Link</p>
                     {interview.meetingLink ? (
                       <a href={interview.meetingLink} target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-900/30">
@@ -611,10 +808,6 @@ function NewInterviewModal({ form, errors, onChange, onCandidateSelect, onGenera
                 <option>L5 Interview</option>
                 <option>Technical Round</option>
                 <option>HR Round</option>
-                <option>Shortlisted</option>
-                <option>Rejected</option>
-                <option>Submitted</option>
-                <option>Hold</option>
               </select>
             </div>
           </div>

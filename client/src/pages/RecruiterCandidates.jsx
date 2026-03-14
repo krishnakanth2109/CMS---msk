@@ -129,6 +129,7 @@ export default function RecruiterCandidates() {
   const [importResult, setImportResult] = useState(null);
 
   const [errors, setErrors] = useState({});
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
 
   // Refs for Top and Bottom Scrollbars
   const topScrollRef = useRef(null);
@@ -155,8 +156,11 @@ export default function RecruiterCandidates() {
 
   const [isCustomSource, setIsCustomSource] = useState(false);
 
+  // Today in YYYY-MM-DD — used as max for DOB & dateAdded inputs
+  const todayStr = new Date().toISOString().split('T')[0];
+
   const initialFormState = {
-    name: '', email: '', contact: '', dateOfBirth: '', gender: '', linkedin: '',
+    firstName: '', lastName: '', email: '', contact: '', dateOfBirth: '', gender: '', linkedin: '',
     currentLocation: '', preferredLocation: '',
     position: '', client: '', industry: '', currentCompany: '', skills: '',
     totalExperience: '', relevantExperience: '',
@@ -174,12 +178,38 @@ export default function RecruiterCandidates() {
     source: 'Portal',
     status: ['Submitted'],
     rating: '0', assignedJobId: '',
-    dateAdded: new Date().toISOString().split('T')[0],
+    dateAdded: todayStr,
     notes: '', remarks: '',
     active: true
   };
 
   const [formData, setFormData] = useState(initialFormState);
+
+  // ── Email duplicate check (called onBlur on email field) ───────────────────
+  const checkEmailDuplicate = async (email) => {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return;
+    setIsCheckingEmail(true);
+    try {
+      const authH = await authHeaders();
+      // On edit, pass excludeId so the candidate being edited doesn't flag itself
+      const excludeParam = selectedCandidateId ? `&excludeId=${selectedCandidateId}` : '';
+      const res = await fetch(`${API_URL}/candidates/check-email?email=${encodeURIComponent(email.trim())}${excludeParam}`, {
+        headers: { ...authH },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.exists) {
+        setErrors(prev => ({
+          ...prev,
+          email: `A candidate with this email already exists (ID: ${data.candidateId}${data.name ? ' — ' + data.name : ''})`,
+        }));
+      }
+    } catch (_) {
+      // silently ignore network errors during check
+    } finally {
+      setIsCheckingEmail(false);
+    }
+  };
 
   const handleResumeUpload = async (event) => {
     const file = event.target.files?.[0];
@@ -222,9 +252,14 @@ export default function RecruiterCandidates() {
         const cleanContact = result.data.contact ? result.data.contact.replace(/\D/g, '').slice(0, 10) : '';
         const cleanTotalExp = result.data.totalExperience ? String(result.data.totalExperience).replace(/[^0-9.]/g, '') : '';
 
+        const parsedName = result.data.name || '';
+        const nameParts = parsedName.trim().split(/\s+/);
+        const parsedFirst = nameParts[0] || '';
+        const parsedLast = nameParts.slice(1).join(' ') || '';
         setFormData(prev => ({
           ...prev,
-          name: prev.name || result.data.name || '',
+          firstName: prev.firstName || parsedFirst,
+          lastName: prev.lastName || parsedLast,
           email: prev.email || result.data.email || '',
           contact: prev.contact || cleanContact || '',
           linkedin: prev.linkedin || result.data.linkedin || '',
@@ -306,8 +341,8 @@ export default function RecruiterCandidates() {
     // Strict typing rules
     if (key === 'contact') {
       newValue = value.replace(/\D/g, '').slice(0, 10);
-    } else if (key === 'name') {
-      newValue = value.replace(/[^a-zA-Z\s]/g, '');
+    } else if (key === 'firstName' || key === 'lastName') {
+      newValue = value.replace(/[^a-zA-Z\s'\-]/g, '');
     } else if (key === 'totalExperience' || key === 'relevantExperience') {
       // Allow only digits and a single decimal point
       newValue = value.replace(/[^0-9.]/g, '');
@@ -343,13 +378,37 @@ export default function RecruiterCandidates() {
     const data = formData;
 
     // 1. Personal Info
-    const name = trimStr(data.name);
-    if (!name) newErrors.name = "Name is required";
-    else if (name.length < 2 || name.length > 100) newErrors.name = "Must be between 2 and 100 characters";
+    const firstName = trimStr(data.firstName);
+    if (!firstName) newErrors.firstName = "First Name is required";
+    else if (!/^[a-zA-Z\s'\-]{2,50}$/.test(firstName)) newErrors.firstName = "Must be 2–50 letters only";
+
+    const lastName = trimStr(data.lastName);
+    if (!lastName) newErrors.lastName = "Last Name is required";
+    else if (!/^[a-zA-Z\s'\-]{1,50}$/.test(lastName)) newErrors.lastName = "Must be letters only";
+
+    // DOB: optional but must be past date, age 18–80
+    if (data.dateOfBirth) {
+      // Compare date strings to avoid UTC/local timezone mismatch
+      const todayDateStr = new Date().toLocaleDateString('en-CA');
+      if (data.dateOfBirth >= todayDateStr) {
+        newErrors.dateOfBirth = 'Date of Birth must be in the past (not today or future)';
+      } else {
+        // Age check: safe to use Date math here since we already confirmed it's in the past
+        const dob = new Date(data.dateOfBirth);
+        const now = new Date();
+        const ageYears = (now - dob) / (1000 * 60 * 60 * 24 * 365.25);
+        if (ageYears < 18) newErrors.dateOfBirth = 'Candidate must be at least 18 years old';
+        else if (ageYears > 80) newErrors.dateOfBirth = 'Please enter a valid Date of Birth';
+      }
+    }
 
     const email = trimStr(data.email);
     if (!email) newErrors.email = "Email is required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) newErrors.email = "Invalid email format";
+    else if (errors.email && errors.email.includes('already exists')) {
+      // Preserve duplicate-email error set by checkEmailDuplicate onBlur
+      newErrors.email = errors.email;
+    }
 
     const contact = trimStr(data.contact);
     if (!contact) newErrors.contact = "Phone is required";
@@ -405,7 +464,16 @@ export default function RecruiterCandidates() {
     // 4. Recruitment Info
     if (isCustomSource && !trimStr(data.source)) newErrors.source = "Source is required";
     if (!data.status || data.status.length === 0) newErrors.status = "At least one status is required";
-    if (!data.dateAdded) newErrors.dateAdded = "Date Added is required";
+    if (!data.dateAdded) {
+      newErrors.dateAdded = "Date Added is required";
+    } else {
+      // Compare as YYYY-MM-DD strings to avoid UTC vs local timezone mismatch
+      // e.g. new Date("2025-03-14") parses as UTC 00:00 which is "future" in IST
+      const todayDateStr = new Date().toLocaleDateString('en-CA'); // en-CA gives YYYY-MM-DD in local time
+      if (data.dateAdded > todayDateStr) {
+        newErrors.dateAdded = "Date Added cannot be a future date — only today or earlier";
+      }
+    }
     if (data.remarks && trimStr(data.remarks).length > 1000) newErrors.remarks = "Max 1000 characters allowed";
 
     setErrors(newErrors);
@@ -486,7 +554,9 @@ export default function RecruiterCandidates() {
     const isStandard = standardSources.includes(c.source || 'Portal');
     setIsCustomSource(!isStandard);
     setFormData({
-      name: c.name || '', email: c.email || '', contact: c.contact || '',
+      firstName: c.firstName || '',
+      lastName: c.lastName || '',
+      email: c.email || '', contact: c.contact || '',
       dateOfBirth: c.dateOfBirth ? new Date(c.dateOfBirth).toISOString().split('T')[0] : '',
       gender: c.gender || '', linkedin: c.linkedin || '',
       currentLocation: c.currentLocation || '', preferredLocation: c.preferredLocation || '',
@@ -514,6 +584,24 @@ export default function RecruiterCandidates() {
   };
 
   const handleSave = async (isEdit) => {
+    // ── Pre-submit duplicate email hard block ─────────────────────────────────
+    if (formData.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      try {
+        const dupH = await authHeaders();
+        const excludeParam = isEdit && selectedCandidateId ? `&excludeId=${selectedCandidateId}` : '';
+        const dupRes = await fetch(`${API_URL}/candidates/check-email?email=${encodeURIComponent(formData.email.trim())}${excludeParam}`, { headers: { ...dupH } });
+        if (dupRes.ok) {
+          const dupData = await dupRes.json();
+          if (dupData.exists) {
+            const dupMsg = `A candidate with this email already exists (ID: ${dupData.candidateId}${dupData.name ? ' — ' + dupData.name : ''})`;
+            setErrors(prev => ({ ...prev, email: dupMsg }));
+            toast({ title: "Duplicate Email", description: "This email is already registered to another candidate.", variant: "destructive" });
+            return; // hard stop
+          }
+        }
+      } catch (_) { /* ignore, fall through */ }
+    }
+
     if (!validateForm()) { toast({ title: "Validation Error", description: "Please fix the highlighted errors", variant: "destructive" }); return; }
     setIsSubmitting(true);
     try {
@@ -521,15 +609,13 @@ export default function RecruiterCandidates() {
       const headers = { ...authH, 'Content-Type': 'application/json' };
 
       // Clean Payload
-      const nameParts = (formData.name || '').trim().split(/\s+/);
-      const firstName = nameParts[0] || formData.name || '';
-      const lastName = nameParts.slice(1).join(' ') || nameParts[0] || '';
+      const builtName = `${formData.firstName || ''} ${formData.lastName || ''}`.trim();
 
       const payload = {
         ...formData,
-        firstName,
-        lastName,
-        name: formData.name.trim(),
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        name: builtName,
         email: formData.email.trim(),
         contact: formData.contact.trim(),
         linkedin: formData.linkedin.trim(),
@@ -566,7 +652,13 @@ export default function RecruiterCandidates() {
         throw new Error(data.message || 'Operation failed');
       }
     } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: error.message || "Operation failed" });
+      const msg = error.message || '';
+      if (msg.toLowerCase().includes('email') || msg.toLowerCase().includes('duplicate') || msg.toLowerCase().includes('e11000')) {
+        setErrors(prev => ({ ...prev, email: 'A candidate with this email already exists in the database.' }));
+        toast({ variant: "destructive", title: "Duplicate Email", description: "This email is already registered to another candidate." });
+      } else {
+        toast({ variant: "destructive", title: "Error", description: error.message || "Operation failed" });
+      }
     } finally { setIsSubmitting(false); }
   };
 
@@ -643,12 +735,17 @@ export default function RecruiterCandidates() {
       <div className="md:col-span-3 font-semibold border-b pb-1 text-slate-500 flex items-center gap-2"><UserCircle className="h-4 w-4" /> Personal Information</div>
 
       <div className="space-y-1">
-        <Label className={errors.name ? "text-red-500" : ""}>Full Name *</Label>
-        <Input value={formData.name} onChange={e => handleInputChange('name', e.target.value)} className={errors.name ? "border-red-500" : ""} placeholder="Letters only" />
-        {errors.name && <span className="text-xs text-red-500">{errors.name}</span>}
+        <Label className={errors.firstName ? "text-red-500" : ""}>First Name *</Label>
+        <Input value={formData.firstName} onChange={e => handleInputChange('firstName', e.target.value)} className={errors.firstName ? "border-red-500" : ""} placeholder="e.g. Rahul" />
+        {errors.firstName && <span className="text-xs text-red-500">{errors.firstName}</span>}
       </div>
       <div className="space-y-1">
-        <Label className={errors.email ? "text-red-500" : ""}>Email *</Label><br />
+        <Label className={errors.lastName ? "text-red-500" : ""}>Last Name *</Label>
+        <Input value={formData.lastName} onChange={e => handleInputChange('lastName', e.target.value)} className={errors.lastName ? "border-red-500" : ""} placeholder="e.g. Sharma" />
+        {errors.lastName && <span className="text-xs text-red-500">{errors.lastName}</span>}
+      </div>
+      <div className="space-y-1">
+        <Label className={errors.email ? "text-red-500" : ""}>Email *</Label>
         <Input value={formData.email} onChange={e => handleInputChange('email', e.target.value)} className={errors.email ? "border-red-500" : ""} placeholder="user@domain.com" />
         {errors.email && <span className="text-xs text-red-500">{errors.email}</span>}
       </div>
@@ -659,7 +756,13 @@ export default function RecruiterCandidates() {
       </div>
       <div className="space-y-1">
         <Label className={errors.dateOfBirth ? "text-red-500" : ""}>Date of Birth</Label>
-        <Input type="date" value={formData.dateOfBirth} onChange={e => handleInputChange('dateOfBirth', e.target.value)} className={errors.dateOfBirth ? "border-red-500" : ""} />
+        <Input
+          type="date"
+          value={formData.dateOfBirth}
+          onChange={e => handleInputChange('dateOfBirth', e.target.value)}
+          max={new Date(Date.now() - 86400000).toISOString().split('T')[0]}
+          className={errors.dateOfBirth ? "border-red-500" : ""}
+        />
         {errors.dateOfBirth && <span className="text-xs text-red-500">{errors.dateOfBirth}</span>}
       </div>
       <div className="space-y-1">
@@ -853,7 +956,14 @@ export default function RecruiterCandidates() {
       </div>
       <div className="space-y-1">
         <Label className={errors.dateAdded ? "text-red-500" : ""}>Date Added *</Label>
-        <Input type="date" value={formData.dateAdded} onChange={e => handleInputChange('dateAdded', e.target.value)} className={errors.dateAdded ? "border-red-500" : ""} />
+        <Input
+          type="date"
+          value={formData.dateAdded}
+          onChange={e => handleInputChange('dateAdded', e.target.value)}
+          max={todayStr}
+          className={errors.dateAdded ? "border-red-500" : ""}
+        />
+        <p className="text-xs text-slate-400 mt-0.5">Cannot be a future date. Defaults to today.</p>
         {errors.dateAdded && <span className="text-xs text-red-500">{errors.dateAdded}</span>}
       </div>
       <div className="md:col-span-3 space-y-1 mt-2">
