@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   Users, UserCheck, TrendingUp, PauseCircle, UserX, User, 
-  ClipboardList, Briefcase, X, Calendar
+  ClipboardList, Briefcase, FileText
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -58,16 +58,20 @@ const PrimaryStatCard = ({ title, value, trend, icon: Icon, onClick }) => (
         <span className="bg-green-500 text-white px-2 py-0.5 rounded text-[10px] font-bold">+{trend}%</span>
         <span className="text-[10px] opacity-70">vs last month</span>
       </div>
+      {/* Progress Bar */}
       <div className="h-1.5 w-full bg-black/20 rounded-full overflow-hidden">
         <div className="h-full bg-blue-400 rounded-full w-2/5"></div>
       </div>
     </div>
+    {/* Decorative background shape */}
     <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10 pointer-events-none" />
   </div>
 );
 
 // 2. Bubble Stat Card (Bubble Background + Progress Bar)
 const BubbleStatCard = ({ title, value, trend, icon: Icon, theme = 'blue', onClick }) => {
+  
+  // Theme Configuration
   const themes = {
     green: { bubble: 'bg-[#e8f5e9]', iconBg: 'bg-[#e8f5e9]', iconText: 'text-green-600', badge: 'bg-green-500', bar: 'bg-green-500' },
     blue:  { bubble: 'bg-[#e3f2fd]',  iconBg: 'bg-[#e3f2fd]',  iconText: 'text-blue-600',  badge: 'bg-blue-500', bar: 'bg-blue-500' },
@@ -75,6 +79,7 @@ const BubbleStatCard = ({ title, value, trend, icon: Icon, theme = 'blue', onCli
     orange:{ bubble: 'bg-[#fff3e0]', iconBg: 'bg-[#fff3e0]', iconText: 'text-orange-500', badge: 'bg-orange-400', bar: 'bg-orange-400' },
     red:   { bubble: 'bg-[#ffebee]', iconBg: 'bg-[#ffebee]', iconText: 'text-red-500',    badge: 'bg-red-500',    bar: 'bg-red-500' },
   };
+
   const t = themes[theme] || themes.blue;
 
   return (
@@ -82,7 +87,10 @@ const BubbleStatCard = ({ title, value, trend, icon: Icon, theme = 'blue', onCli
       onClick={onClick}
       className="relative bg-white rounded-[1.5rem] p-6 shadow-sm border border-gray-100 h-44 flex flex-col justify-between cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02] overflow-hidden"
     >
+      {/* THE BUBBLE EFFECT */}
       <div className={clsx("absolute -top-6 -left-6 w-36 h-36 rounded-full opacity-100 pointer-events-none", t.bubble)}></div>
+
+      {/* Content */}
       <div className="relative z-10 flex justify-between items-start">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">{title}</p>
@@ -92,11 +100,13 @@ const BubbleStatCard = ({ title, value, trend, icon: Icon, theme = 'blue', onCli
           <Icon className={clsx("w-6 h-6", t.iconText)} />
         </div>
       </div>
+
       <div className="relative z-10 mt-auto">
         <div className="flex items-center gap-2 mb-2">
           <span className={clsx("px-2 py-0.5 rounded text-[10px] font-bold text-white", t.badge)}>+{trend}%</span>
           <span className="text-[10px] text-gray-400">vs last month</span>
         </div>
+        {/* Progress Bar */}
         <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
           <div className={clsx("h-full rounded-full w-2/5", t.bar)}></div>
         </div>
@@ -119,14 +129,6 @@ export default function AdminDashboard() {
   const [jobs,       setJobs      ] = useState([]);
   const [loading,    setLoading   ] = useState(true);
 
-  // ─── NEW STATE FOR MODAL ───
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalData, setModalData] = useState([]);
-  const [modalLoading, setModalLoading] = useState(false);
-  // Default filter date to today (YYYY-MM-DD)
-  const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
-
-  // Initial Data Fetch
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -143,25 +145,7 @@ export default function AdminDashboard() {
       } finally { setLoading(false); }
     };
     fetchData();
-  }, [toast]);
-
-  // Fetch specific date data when modal is open or date changes
-  useEffect(() => {
-    if (isModalOpen) {
-      const fetchDateSubmissions = async () => {
-        setModalLoading(true);
-        try {
-          const data = await apiFetch(`/candidates?date=${filterDate}`);
-          setModalData(data);
-        } catch (error) {
-          toast({ title: 'Error', description: 'Failed to fetch day submissions', variant: 'destructive' });
-        } finally {
-          setModalLoading(false);
-        }
-      };
-      fetchDateSubmissions();
-    }
-  }, [isModalOpen, filterDate, toast]);
+  }, []);
 
   // Safe Status Helper
   const getSafeStatus = (s) => {
@@ -180,27 +164,18 @@ export default function AdminDashboard() {
     const hold = candidates.filter(c => getSafeStatus(c.status) === 'hold').length;
     const rejected = candidates.filter(c => getSafeStatus(c.status) === 'rejected').length;
 
-    // Calculate Today's Submissions across all recruiters for the main dashboard card
-    const today = new Date();
-    const todaySubmissions = candidates.filter(c => {
-      const candDate = c.dateAdded ? new Date(c.dateAdded) : new Date(c.createdAt);
-      return candDate.getDate() === today.getDate() &&
-             candDate.getMonth() === today.getMonth() &&
-             candDate.getFullYear() === today.getFullYear();
-    }).length;
-
-    return { total, submitted, joined, hold, rejected, todaySubmissions };
+    return { total, submitted, joined, hold, rejected };
   }, [candidates]);
 
   const recruiterStats = useMemo(() => {
     return recruiters
-      .filter(r => r._id || r.id) 
+      .filter(r => r._id || r.id) // Filter out null/undefined IDs
       .map(r => {
         const cands = candidates.filter(c => (c.recruiterId?._id || c.recruiterId) === (r._id || r.id));
         const name = r.name || `${r.firstName || ''} ${r.lastName || ''}`.trim();
         
         return {
-          fullName: name,
+          fullName: name, // This might be empty string if names are missing
           submissions: cands.length,
           joined: cands.filter(c => getSafeStatus(c.status) === 'joined').length,
           pending: cands.filter(c => ['submitted', 'pending'].includes(getSafeStatus(c.status))).length,
@@ -208,12 +183,12 @@ export default function AdminDashboard() {
           rejected: cands.filter(c => getSafeStatus(c.status) === 'rejected').length,
         };
       })
-      .filter(r => r.fullName !== "") 
+      .filter(r => r.fullName !== "") // Filter out recruiters with empty names
       .sort((a,b) => b.submissions - a.submissions);
   }, [candidates, recruiters]);
 
   const barData = recruiterStats.slice(0, 6).map(r => ({ 
-    name: r.fullName.split(' ')[0], 
+    name: r.fullName.split(' ')[0], // Use first name for chart
     value: r.submissions 
   }));
 
@@ -226,12 +201,12 @@ export default function AdminDashboard() {
   const formattedDate = format(new Date(), 'dd MMM, yyyy').toUpperCase();
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-8 relative">
+    <div className="max-w-[1600px] mx-auto space-y-8">
       
       {/* ── Header ── */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-[#283086]">Admin Dashboard</h1>
+          <h1 className="text-3xl font-bold text-[#283086]">Manager Dashboard</h1>
           <p className="text-gray-500 text-sm font-medium mt-1">
             Welcome back {currentUser?.firstName || 'kkanth'}, Have a nice day..!
           </p>
@@ -270,14 +245,13 @@ export default function AdminDashboard() {
           theme="blue"
           onClick={() => navigate('/admin/requirements')}
         />
-        {/* REPLACED TOTAL CLIENTS WITH TODAY SUBMISSIONS -> OPENS MODAL */}
         <BubbleStatCard 
-          title="Today Submissions" 
-          value={stats.todaySubmissions} 
-          trend={14} 
-          icon={ClipboardList} 
+          title="Total Clients" 
+          value={clients.length} 
+          trend={3} 
+          icon={FileText} 
           theme="purple"
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => navigate('/admin/clients')}
         />
       </div>
 
@@ -319,6 +293,7 @@ export default function AdminDashboard() {
 
       {/* ── Row 3: Middle Large Cards ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Average Time of Hire */}
         <div className="bg-white p-8 rounded-[1.5rem] shadow-sm border border-gray-100 flex items-center justify-between">
           <div className="flex-1">
             <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Avg. Time of Hire</p>
@@ -332,6 +307,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* Joining Pipeline */}
         <div className="bg-white p-8 rounded-[1.5rem] shadow-sm border border-gray-100 flex items-center justify-between">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Joining Pipeline</p>
@@ -421,114 +397,6 @@ export default function AdminDashboard() {
           </table>
         </div>
       </div>
-
-      {/* ── MODAL: DAY SUBMISSIONS ── */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-[#f8faff]">
-              <div>
-                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                  <ClipboardList className="w-5 h-5 text-purple-600" />
-                  Day Submissions
-                </h2>
-                <p className="text-xs text-gray-500 font-medium mt-1">
-                  Viewing candidates submitted by all recruiters
-                </p>
-              </div>
-
-              <div className="flex items-center gap-4">
-                {/* Calendar Filter */}
-                <div className="relative flex items-center">
-                  <Calendar className="absolute left-3 w-4 h-4 text-gray-400" />
-                  <input 
-                    type="date" 
-                    value={filterDate}
-                    max={new Date().toISOString().split('T')[0]} // Max date is today
-                    onChange={(e) => setFilterDate(e.target.value)}
-                    className="pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg text-slate-700 font-medium focus:ring-2 focus:ring-[#283086] focus:outline-none"
-                  />
-                </div>
-                {/* Close Button */}
-                <button 
-                  onClick={() => setIsModalOpen(false)}
-                  className="p-2 bg-gray-100 hover:bg-red-50 hover:text-red-500 rounded-full transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto bg-white p-0">
-              {modalLoading ? (
-                <div className="flex flex-col h-64 items-center justify-center gap-3">
-                  <div className="animate-spin h-8 w-8 border-4 border-purple-500 border-t-transparent rounded-full" />
-                  <p className="text-sm text-gray-500 font-medium tracking-wide">Fetching Submissions...</p>
-                </div>
-              ) : modalData.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-64 text-center">
-                  <div className="bg-gray-50 p-4 rounded-full mb-3">
-                    <ClipboardList className="w-8 h-8 text-gray-400" />
-                  </div>
-                  <h3 className="text-slate-800 font-bold">No submissions found</h3>
-                  <p className="text-sm text-gray-500 mt-1">No candidates were added on {filterDate}</p>
-                </div>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead className="bg-[#f8faff] text-gray-500 font-bold uppercase text-[10px] tracking-widest border-b border-gray-100 sticky top-0 z-10 shadow-sm">
-                    <tr>
-                      <th className="px-6 py-4 text-left">Candidate ID</th>
-                      <th className="px-6 py-4 text-left">Candidate Name</th>
-                      <th className="px-6 py-4 text-left">Recruiter</th>
-                      <th className="px-6 py-4 text-left">Position</th>
-                      <th className="px-6 py-4 text-center">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {modalData.map((c) => {
-                      const recruiterName = c.recruiterId?.firstName 
-                        ? `${c.recruiterId.firstName} ${c.recruiterId.lastName || ''}`.trim() 
-                        : (c.recruiterId?.name || c.recruiterName || 'Unknown');
-                      
-                      const cStatus = Array.isArray(c.status) ? c.status[0] : c.status;
-
-                      return (
-                        <tr key={c._id} className="hover:bg-purple-50/30 transition-colors">
-                          <td className="px-6 py-4 font-bold text-[#283086]">{c.candidateId || 'N/A'}</td>
-                          <td className="px-6 py-4 font-semibold text-slate-800">{c.name || `${c.firstName} ${c.lastName}`}</td>
-                          <td className="px-6 py-4 font-medium text-gray-600">{recruiterName}</td>
-                          <td className="px-6 py-4 text-gray-500">{c.position || '-'}</td>
-                          <td className="px-6 py-4 text-center">
-                            <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                              {cStatus || 'SUBMITTED'}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            {!modalLoading && modalData.length > 0 && (
-              <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 flex justify-between items-center text-xs font-medium text-gray-500">
-                <p>Showing {modalData.length} submission(s) for the selected date.</p>
-                <button 
-                  onClick={() => setIsModalOpen(false)}
-                  className="text-slate-700 hover:text-[#283086] font-bold uppercase tracking-wider"
-                >
-                  Close Window
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
     </div>
   );

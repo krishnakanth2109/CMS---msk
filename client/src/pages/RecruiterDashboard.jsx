@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Users, Briefcase, ClipboardList, Calendar, TrendingUp, 
   CheckCircle2, ArrowUpRight, ArrowDownRight, UserCheck, 
-  X, Mail, XCircle, Clock
+  X, Mail, XCircle, Clock, UserPlus, UserMinus
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -206,10 +206,18 @@ export default function RecruiterDashboard() {
     const rejected = filteredCandidates.filter(c => hasStatus(c.status, ['Rejected'])).length;
     const selected = filteredCandidates.filter(c => hasStatus(c.status, ['Selected'])).length;
     const hold = filteredCandidates.filter(c => hasStatus(c.status, ['Hold'])).length;
+    const backout = filteredCandidates.filter(c => hasStatus(c.status, ['Backout'])).length;
+
+    // Today Submissions
+    const todayStr = new Date().toDateString();
+    const todaySubmissions = filteredCandidates.filter(c => {
+      if (!c.createdAt) return false;
+      return new Date(c.createdAt).toDateString() === todayStr;
+    }).length;
 
     const successRate = total > 0 ? ((joined / total) * 100).toFixed(1) : '12.0'; // Defaulting to 12.0 as per PDF if 0
 
-    return { total, submitted, interview, offer, joined, rejected, selected, hold, successRate };
+    return { total, submitted, interview, offer, joined, rejected, selected, hold, backout, todaySubmissions, successRate };
   }, [filteredCandidates]);
 
   const interviewStats = useMemo(() => {
@@ -223,7 +231,7 @@ export default function RecruiterDashboard() {
   const chartData = useMemo(() => [
     { name: 'Submitted', value: candidateStats.submitted, fill: '#3B82F6' }, // Blue
     { name: 'Interview', value: candidateStats.interview, fill: '#F59E0B' }, // Orange/Yellow
-    { name: 'Offer', value: candidateStats.offer, fill: '#8B5CF6' },      // Purple
+    { name: 'Offer', value: candidateStats.offer, fill: '#8B5CF6' },         // Purple
     { name: 'Rejected', value: candidateStats.rejected, fill: '#EF4444' },   // Red
     { name: 'Joined', value: candidateStats.joined, fill: '#10B981' },       // Green
   ], [candidateStats]);
@@ -283,8 +291,8 @@ export default function RecruiterDashboard() {
           </div>
         </div>
 
-        {/* Stats Grid - 2 Rows of 4 */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Stats Grid - 2 Rows of 5 */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           
           {/* Row 1 */}
           <ProfessionalStatCard 
@@ -296,11 +304,19 @@ export default function RecruiterDashboard() {
             onClick={() => handleNavigateToCandidates()} 
           />
           <ProfessionalStatCard 
+            title="TODAY SUBMISSIONS" 
+            value={candidateStats.todaySubmissions} 
+            icon={UserPlus} 
+            trend={2} 
+            bgColor="bg-blue-100" textColor="text-blue-600"
+            onClick={() => handleNavigateToCandidates()} 
+          />
+          <ProfessionalStatCard 
             title="ASSIGNED JOBS" 
             value={jobStats.totalAssignedJobs} 
             icon={Briefcase} 
             trend={8} 
-            bgColor="bg-blue-100" textColor="text-blue-600"
+            bgColor="bg-cyan-100" textColor="text-cyan-600"
             onClick={handleNavigateToAssignments} 
           />
           <ProfessionalStatCard 
@@ -308,7 +324,7 @@ export default function RecruiterDashboard() {
             value={interviewStats.totalInterviews} 
             icon={ClipboardList} 
             trend={3} 
-            bgColor="bg-purple-100" textColor="text-purple-600"
+            bgColor="bg-indigo-100" textColor="text-indigo-600"
             onClick={handleNavigateToSchedules} 
           />
           <ProfessionalStatCard 
@@ -316,7 +332,7 @@ export default function RecruiterDashboard() {
             value={`${candidateStats.successRate}%`} 
             icon={TrendingUp} 
             trend={0} 
-            bgColor="bg-indigo-100" textColor="text-indigo-600"
+            bgColor="bg-fuchsia-100" textColor="text-fuchsia-600"
           />
 
           {/* Row 2 */}
@@ -345,6 +361,14 @@ export default function RecruiterDashboard() {
             onClick={() => handleNavigateToCandidates('Hold')} 
           />
           <ProfessionalStatCard 
+            title="BACKOUTS" 
+            value={candidateStats.backout} 
+            icon={UserMinus} 
+            trend={-1} 
+            bgColor="bg-rose-100" textColor="text-rose-600"
+            onClick={() => handleNavigateToCandidates('Backout')} 
+          />
+          <ProfessionalStatCard 
             title="JOINED" 
             value={candidateStats.joined} 
             icon={Users} 
@@ -357,7 +381,7 @@ export default function RecruiterDashboard() {
         {/* Chart Section - Full Width */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6">
-            Candidate Piepline( Overall Analysis )
+            Candidate Pipeline (Overall Analysis)
           </h3>
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -423,7 +447,7 @@ export default function RecruiterDashboard() {
                     <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">{c.name}</td>
                     <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{c.position}</td>
                     <td className="px-6 py-4 font-medium text-blue-600 dark:text-blue-400">
-                      {c.status || 'Submited'}
+                      {c.status || 'Submitted'}
                     </td>
                     <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{c.client}</td>
                   </tr>

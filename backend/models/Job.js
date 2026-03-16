@@ -9,18 +9,18 @@ const jobSchema = mongoose.Schema({
   experience: { type: String, default: '' },
   relevantExperience: { type: String, default: '' },
   qualification: { type: String, default: '' },
-  salaryBudget: { type: String, default: '' }, // Maximum Salary Range
-  monthlySalary: { type: String, default: '' }, // NEW: Monthly Salary
+  salaryBudget: { type: String, default: '' }, 
+  monthlySalary: { type: String, default: '' }, 
   gender: { type: String, enum: ['Any', 'Male', 'Female'], default: 'Any' },
   noticePeriod: { type: String, default: '' },
+  tatTime: { type: Date }, // Date of Expiry (TAT)
   primaryRecruiter: { type: String, default: '' },
   secondaryRecruiter: { type: String, default: '' },
   skills: { type: String, default: '' },
   jdLink: { type: String, default: '' },
 
-  // Legacy fields kept for backward database compatibility (hidden from UI)
+  // Legacy fields kept for backward database compatibility
   interviewMode: { type: String, default: 'Virtual' },
-  tatTime: { type: Date },
   languages: { type: String, default: '' },
   comments: { type: String, default: '' },
 

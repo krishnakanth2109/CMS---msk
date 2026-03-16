@@ -80,13 +80,35 @@ router.post('/parse-resume', upload.single('resume'), async (req, res) => {
   }
 });
 
-// GET ALL
+// GET ALL (WITH DATE FILTERING SUPPORT)
 router.get('/', async (req, res) => {
   try {
     let query = {};
+    
     // Allow Managers to see all candidates (bypass recruiter lock)
     if (req.user && req.user.role !== 'admin' && req.user.role !== 'manager') {
       query.recruiterId = req.user._id;
+    }
+    
+    // ✅ NEW: Apply date filtering if a specific date is passed from the frontend
+    if (req.query.date) {
+      const startOfDay = new Date(req.query.date);
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const endOfDay = new Date(req.query.date);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      // Filter MongoDB by dates between start and end of day
+      query.createdAt = { $gte: startOfDay, $lte: endOfDay };
+    } 
+    // ✅ NEW: Also supporting date range just in case you need it later
+    else if (req.query.startDate && req.query.endDate) {
+      const start = new Date(req.query.startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(req.query.endDate);
+      end.setHours(23, 59, 59, 999);
+      
+      query.createdAt = { $gte: start, $lte: end };
     }
     
     // 🔴 FIXED: Populating firstName, lastName, and email to pass to the frontend table
@@ -101,8 +123,6 @@ router.get('/', async (req, res) => {
 });
 
 // CHECK EMAIL DUPLICATE
-// GET /api/candidates/check-email?email=xxx&excludeId=yyy
-// excludeId is passed on edit so the candidate being edited does not flag itself
 router.get('/check-email', async (req, res) => {
   try {
     const { email, excludeId } = req.query;
@@ -123,8 +143,6 @@ router.get('/check-email', async (req, res) => {
 });
 
 // CHECK PHONE DUPLICATE
-// GET /api/candidates/check-phone?phone=xxx&excludeId=yyy
-// excludeId is passed on edit so the candidate being edited does not flag itself
 router.get('/check-phone', async (req, res) => {
   try {
     const { phone, excludeId } = req.query;
@@ -212,7 +230,6 @@ router.post('/', upload.single('resume'), async (req, res) => {
 });
 
 // BULK ASSIGN — assign multiple candidates to any user (admin/manager only)
-// POST /api/candidates/bulk-assign
 router.put('/bulk-assign', async (req, res) => {
   try {
     // Only admin and manager can bulk-assign
@@ -229,7 +246,7 @@ router.put('/bulk-assign', async (req, res) => {
       return res.status(400).json({ message: 'Please provide a recruiter/user ID to assign to' });
     }
 
-    // ✅ Resolve the target user's display name (no .name field in User schema)
+    // ✅ Resolve the target user's display name
     const targetUser = await User.findById(recruiterId);
     if (!targetUser) {
       return res.status(404).json({ message: 'Target user not found' });

@@ -75,6 +75,7 @@ const JobDetailCard = ({ job, onClose }) => {
                     <p className="flex justify-between"><span className="text-zinc-500">Max Salary Range:</span> <span className="font-medium">{job.salaryBudget || "-"}</span></p>
                     <p className="flex justify-between"><span className="text-zinc-500">Monthly Salary:</span> <span className="font-medium">{job.monthlySalary || "-"}</span></p>
                     <p className="flex justify-between"><span className="text-zinc-500">Notice Period:</span> <span className="font-medium">{job.noticePeriod || "-"}</span></p>
+                    <p className="flex justify-between"><span className="text-zinc-500">Date of Expiry (TAT):</span> <span className="font-medium">{job.tatTime ? new Date(job.tatTime).toLocaleDateString() : "-"}</span></p>
                     <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700 mt-2">
                       <p className="flex justify-between mt-2"><span className="text-zinc-500">Primary Recruiter:</span> <span className="font-medium">{job.primaryRecruiter || 'Unassigned'}</span></p>
                       <p className="flex justify-between mt-1"><span className="text-zinc-500">Secondary Recruiter:</span> <span className="font-medium">{job.secondaryRecruiter || 'Unassigned'}</span></p>
@@ -121,6 +122,7 @@ export default function AdminRequirements() {
     jobCode: "", clientName: "", position: "", location: "",
     experience: "", relevantExperience: "", qualification: "",
     salaryBudget: "", monthlySalary: "", gender: "Any", noticePeriod: "",
+    tatTime: "", // New Field
     primaryRecruiter: "", secondaryRecruiter: "", skills: "", jdLink: "",
     active: true,
   };
@@ -302,6 +304,7 @@ export default function AdminRequirements() {
       salaryBudget: form.salaryBudget?.trim() || "",
       monthlySalary: form.monthlySalary?.trim() || "",
       noticePeriod: form.noticePeriod?.trim() || "",
+      tatTime: form.tatTime || null,
       skills: form.skills.trim(),
       jdLink: form.jdLink?.trim() || ""
     };
@@ -332,7 +335,8 @@ export default function AdminRequirements() {
     setErrors({});
     setForm({
       ...initialFormState,
-      ...job
+      ...job,
+      tatTime: job.tatTime ? new Date(job.tatTime).toISOString().substring(0, 10) : ""
     });
     setShowForm(true);
   };
@@ -497,9 +501,21 @@ export default function AdminRequirements() {
                   <input name="noticePeriod" placeholder="E.g. 15 Days" value={form.noticePeriod} onChange={handleChange} className={inputCls} />
                 </div>
 
-                {/* 12. Primary Recruiter */}
+                {/* 12. Date of Expiry (TAT) */}
                 <div className="md:col-span-1">
-                  <label className="block text-xs font-medium text-zinc-500 mb-1">12. Primary Recruiter</label>
+                  <label className="block text-xs font-medium text-zinc-500 mb-1">12. Date of Expiry (TAT)</label>
+                  <input 
+                    type="date" 
+                    name="tatTime" 
+                    value={form.tatTime} 
+                    onChange={handleChange} 
+                    className={inputCls} 
+                  />
+                </div>
+
+                {/* 13. Primary Recruiter */}
+                <div className="md:col-span-1">
+                  <label className="block text-xs font-medium text-zinc-500 mb-1">13. Primary Recruiter</label>
                   <select name="primaryRecruiter" value={form.primaryRecruiter} onChange={handleChange} className={`${inputCls} ${errors.primaryRecruiter ? "border-red-500 focus:ring-red-500" : ""}`}>
                     <option value="">Select Recruiter</option>
                     {recruiters.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
@@ -507,9 +523,9 @@ export default function AdminRequirements() {
                   {errors.primaryRecruiter && <p className="text-xs text-red-500 mt-1">{errors.primaryRecruiter}</p>}
                 </div>
 
-                {/* 13. Secondary Recruiter */}
+                {/* 14. Secondary Recruiter */}
                 <div className="md:col-span-1">
-                  <label className="block text-xs font-medium text-zinc-500 mb-1">13. Secondary Recruiter</label>
+                  <label className="block text-xs font-medium text-zinc-500 mb-1">14. Secondary Recruiter</label>
                   <select name="secondaryRecruiter" value={form.secondaryRecruiter} onChange={handleChange} className={`${inputCls} ${errors.secondaryRecruiter ? "border-red-500 focus:ring-red-500" : ""}`}>
                     <option value="">Select Recruiter</option>
                     {recruiters.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
@@ -517,16 +533,16 @@ export default function AdminRequirements() {
                   {errors.secondaryRecruiter && <p className="text-xs text-red-500 mt-1">{errors.secondaryRecruiter}</p>}
                 </div>
 
-                {/* 14. Skills */}
-                <div className="md:col-span-3">
-                  <label className="block text-xs font-medium text-zinc-500 mb-1">14. Skills *</label>
+                {/* 15. Skills */}
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-zinc-500 mb-1">15. Skills *</label>
                   <input name="skills" placeholder="React, Node.js, etc." value={form.skills} onChange={handleChange} className={`${inputCls} ${errors.skills ? "border-red-500 focus:ring-red-500" : ""}`} />
                   {errors.skills && <p className="text-xs text-red-500 mt-1">{errors.skills}</p>}
                 </div>
 
-                {/* 15. JD Link (Optional) */}
+                {/* 16. JD Link (Optional) */}
                 <div className="md:col-span-4">
-                  <label className="block text-xs font-medium text-zinc-500 mb-1">15. JD Link (Optional)</label>
+                  <label className="block text-xs font-medium text-zinc-500 mb-1">16. JD Link (Optional)</label>
                   <input name="jdLink" placeholder="https://..." value={form.jdLink} onChange={handleChange} className={`${inputCls} ${errors.jdLink ? "border-red-500 focus:ring-red-500" : ""}`} />
                   {errors.jdLink && <p className="text-xs text-red-500 mt-1">{errors.jdLink}</p>}
                 </div>
@@ -615,7 +631,7 @@ export default function AdminRequirements() {
                       <th className="px-6 py-4 bg-zinc-50 dark:bg-zinc-900">Location</th>
                       <th className="px-6 py-4 bg-zinc-50 dark:bg-zinc-900">Primary Recruiter</th>
                       <th className="px-6 py-4 bg-zinc-50 dark:bg-zinc-900">Secondary Recruiter</th>
-                      <th className="px-6 py-4 bg-zinc-50 dark:bg-zinc-900">Date Added</th>
+                      <th className="px-6 py-4 bg-zinc-50 dark:bg-zinc-900">Expiry (TAT)</th>
                       <th className="px-6 py-4 bg-zinc-50 dark:bg-zinc-900 text-center">Status</th>
                       <th className="px-6 py-4 bg-zinc-50 dark:bg-zinc-900 text-right">Actions</th>
                     </tr>
@@ -687,15 +703,18 @@ export default function AdminRequirements() {
                           )}
                         </td>
 
-                        {/* Date Added */}
+                        {/* Expiry (TAT) */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-500 dark:text-zinc-400">
                           <div className="flex items-center gap-1.5">
                             <CalendarIcon className="w-4 h-4" />
-                            {job.createdAt || job.dateAdded 
-                              ? new Date(job.createdAt || job.dateAdded).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) 
-                              : 'N/A'
+                            {job.tatTime 
+                              ? new Date(job.tatTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) 
+                              : 'No TAT'
                             }
                           </div>
+                          {job.tatTime && new Date(job.tatTime).setHours(0,0,0,0) < new Date().setHours(0,0,0,0) && (
+                            <span className="text-[10px] text-red-500 font-medium block mt-0.5">Expired</span>
+                          )}
                         </td>
 
                         {/* Status */}

@@ -43,8 +43,12 @@ export const createJob = async (req, res) => {
       createdBy: req.user._id
     };
 
+    // Prevent Mongoose CastError if frontend sends an empty string for date
+    if (jobData.tatTime === "") {
+      jobData.tatTime = null;
+    }
+
     // --- AUTO-GENERATE JOB CODE (REQ0001 format) ---
-    // Fetch all jobs that match the REQ + numbers pattern
     const allReqJobs = await Job.find({ jobCode: /^REQ\d+$/ }, 'jobCode');
     
     let maxNum = 0;
@@ -53,7 +57,6 @@ export const createJob = async (req, res) => {
       if (num > maxNum) maxNum = num;
     });
     
-    // Increment the highest found sequence
     const nextSequence = maxNum + 1;
     jobData.jobCode = `REQ${String(nextSequence).padStart(4, '0')}`;
     // ----------------------------------------------
@@ -73,7 +76,14 @@ export const updateJob = async (req, res) => {
     const job = await Job.findById(req.params.id);
     if (!job) return res.status(404).json({ message: 'Job not found' });
 
-    const updatedJob = await Job.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const updateData = { ...req.body };
+    
+    // Prevent Mongoose CastError if frontend sends an empty string for date
+    if (updateData.tatTime === "") {
+      updateData.tatTime = null;
+    }
+
+    const updatedJob = await Job.findByIdAndUpdate(req.params.id, updateData, { new: true });
     res.json(updatedJob);
   } catch (error) {
     res.status(400).json({ message: error.message });

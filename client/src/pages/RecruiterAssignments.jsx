@@ -21,10 +21,29 @@ const Badge = ({ children, className = '' }) => (
 
 const getTatBadge = (tatTime) => {
   if (!tatTime) return <Badge className="bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">N/A</Badge>;
-  const diffDays = Math.ceil((new Date(tatTime).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
+  
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const target = new Date(tatTime);
+  target.setHours(0,0,0,0);
+  
+  const diffDays = Math.round((target - today) / (1000 * 3600 * 24));
+
   if (diffDays < 0) return <Badge className="bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/30">Expired</Badge>;
+  if (diffDays === 0) return <Badge className="bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/30">Expires Today</Badge>;
   if (diffDays <= 3) return <Badge className="bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-900/30">Due: {diffDays}d</Badge>;
   return <Badge className="bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/30">{diffDays} days left</Badge>;
+};
+
+// Helper to format Date
+const formatDate = (dateString) => {
+  if (!dateString) return "N/A";
+  const date = new Date(dateString);
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 };
 
 // Modal component
@@ -159,7 +178,7 @@ export default function RecruiterAssignments() {
       experience: job.experience || '',
       gender: job.gender || 'Any',
       interviewMode: job.interviewMode || 'Virtual',
-      tatTime: job.tatTime ? new Date(job.tatTime).toISOString().split('T')[0] : '',
+      tatTime: job.tatTime ? new Date(job.tatTime).toISOString().substring(0, 10) : '',
       jdLink: job.jdLink || '',
       comments: job.comments || '',
       primaryRecruiter: job.primaryRecruiter || '',
@@ -171,7 +190,6 @@ export default function RecruiterAssignments() {
   };
 
   const handleCreateJob = async () => {
-    // Removed jobCode validation because it's auto-generated in the backend
     if (!jobForm.position.trim()) return toast({ title: "Validation", description: "Position is required", variant: "destructive" });
     if (!jobForm.clientName) return toast({ title: "Validation", description: "Client is required", variant: "destructive" });
     
@@ -278,30 +296,36 @@ export default function RecruiterAssignments() {
             </div>
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredJobs.map(job => (
-                <div key={job.id} className="bg-white dark:bg-zinc-900 p-6 rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 hover:shadow-md transition-all relative group">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <span className="text-[10px] font-mono font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700">{job.jobCode}</span>
-                      <h3 className="text-lg font-bold mt-2.5 text-zinc-900 dark:text-white truncate max-w-[200px]" title={job.position}>{job.position}</h3>
-                      <p className="text-sm text-zinc-500 flex items-center gap-1.5 mt-1"><BuildingOfficeIcon className="w-4 h-4"/> {job.clientName}</p>
+              {filteredJobs.map(job => {
+                // Determine if Job is explicitly EXPIRED (TAT passed)
+                const isExpired = job.tatTime && (new Date(job.tatTime).setHours(0,0,0,0) < new Date().setHours(0,0,0,0));
+
+                return (
+                  <div key={job.id} className={`p-6 rounded-xl shadow-sm border transition-all relative group bg-white dark:bg-zinc-900 ${isExpired ? 'border-red-200 dark:border-red-900/50 bg-red-50/20 dark:bg-red-950/20 opacity-80' : 'border-zinc-200 dark:border-zinc-800 hover:shadow-md'}`}>
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <span className="text-[10px] font-mono font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700">{job.jobCode}</span>
+                        <h3 className={`text-lg font-bold mt-2.5 truncate max-w-[200px] ${isExpired ? 'text-red-900 dark:text-red-400' : 'text-zinc-900 dark:text-white'}`} title={job.position}>{job.position}</h3>
+                        <p className="text-sm text-zinc-500 flex items-center gap-1.5 mt-1"><BuildingOfficeIcon className="w-4 h-4"/> {job.clientName}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2 text-sm mb-4 bg-zinc-50 dark:bg-zinc-950 p-4 rounded-lg border border-zinc-100 dark:border-zinc-800/50">
+                      <div className="flex justify-between items-center"><span className="text-zinc-500">Location:</span> <span className="font-medium text-zinc-900 dark:text-zinc-100">{job.location || 'Remote'}</span></div>
+                      {/* ✅ Added Assigned Date to Grid */}
+                      <div className="flex justify-between items-center"><span className="text-zinc-500">Assigned Date:</span> <span className="font-medium text-zinc-900 dark:text-zinc-100">{formatDate(job.createdAt)}</span></div>
+                      <div className="flex justify-between items-center"><span className="text-zinc-500">Date of Expiry:</span> {getTatBadge(job.tatTime)}</div>
+                    </div>
+                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                      <button className="h-8 w-8 flex items-center justify-center text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 rounded-lg transition-colors" onClick={() => openViewModal(job)}>
+                        <EyeIcon className="w-4 h-4"/>
+                      </button>
+                      <button className="h-8 w-8 flex items-center justify-center text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" onClick={() => { setJobToDelete(job); setDeleteDialogOpen(true); }}>
+                        <TrashIcon className="w-4 h-4"/>
+                      </button>
                     </div>
                   </div>
-                  <div className="space-y-2 text-sm mb-4 bg-zinc-50 dark:bg-zinc-950 p-4 rounded-lg border border-zinc-100 dark:border-zinc-800/50">
-                    <div className="flex justify-between items-center"><span className="text-zinc-500">Location:</span> <span className="font-medium text-zinc-900 dark:text-zinc-100">{job.location || 'Remote'}</span></div>
-                    <div className="flex justify-between items-center"><span className="text-zinc-500">Target Date:</span> {getTatBadge(job.tatTime)}</div>
-                  </div>
-                  <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                    <button className="h-8 w-8 flex items-center justify-center text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 rounded-lg transition-colors" onClick={() => openViewModal(job)}>
-                      <EyeIcon className="w-4 h-4"/>
-                    </button>
-                    {/* Only show delete if user created it or has permission */}
-                    <button className="h-8 w-8 flex items-center justify-center text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" onClick={() => { setJobToDelete(job); setDeleteDialogOpen(true); }}>
-                      <TrashIcon className="w-4 h-4"/>
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm">
@@ -312,24 +336,31 @@ export default function RecruiterAssignments() {
                     <th className="p-4 font-semibold">Position</th>
                     <th className="p-4 font-semibold">Client</th>
                     <th className="p-4 font-semibold">Location</th>
-                    <th className="p-4 font-semibold">TAT</th>
+                    {/* ✅ Added Assigned Date to Table Header */}
+                    <th className="p-4 font-semibold">Assigned Date</th>
+                    <th className="p-4 font-semibold">Expiry (TAT)</th>
                     <th className="p-4 font-semibold text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                  {filteredJobs.map(job => (
-                    <tr key={job.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors">
-                      <td className="p-4 font-mono text-xs text-zinc-600 dark:text-zinc-400">{job.jobCode}</td>
-                      <td className="p-4 font-medium text-zinc-900 dark:text-white">{job.position}</td>
-                      <td className="p-4 text-zinc-600 dark:text-zinc-400">{job.clientName}</td>
-                      <td className="p-4 text-zinc-600 dark:text-zinc-400">{job.location}</td>
-                      <td className="p-4">{getTatBadge(job.tatTime)}</td>
-                      <td className="p-4 flex gap-2 justify-end">
-                        <button className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors" onClick={() => openViewModal(job)}><EyeIcon className="w-4 h-4"/></button>
-                        <button className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-500 transition-colors" onClick={() => { setJobToDelete(job); setDeleteDialogOpen(true); }}><TrashIcon className="w-4 h-4"/></button>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredJobs.map(job => {
+                    const isExpired = job.tatTime && (new Date(job.tatTime).setHours(0,0,0,0) < new Date().setHours(0,0,0,0));
+                    return (
+                      <tr key={job.id} className={`transition-colors ${isExpired ? 'bg-red-50/20 dark:bg-red-900/10' : 'hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20'}`}>
+                        <td className="p-4 font-mono text-xs text-zinc-600 dark:text-zinc-400">{job.jobCode}</td>
+                        <td className={`p-4 font-medium ${isExpired ? 'text-red-900 dark:text-red-400' : 'text-zinc-900 dark:text-white'}`}>{job.position}</td>
+                        <td className="p-4 text-zinc-600 dark:text-zinc-400">{job.clientName}</td>
+                        <td className="p-4 text-zinc-600 dark:text-zinc-400">{job.location}</td>
+                        {/* ✅ Added Assigned Date to Table Row */}
+                        <td className="p-4 text-zinc-600 dark:text-zinc-400">{formatDate(job.createdAt)}</td>
+                        <td className="p-4">{getTatBadge(job.tatTime)}</td>
+                        <td className="p-4 flex gap-2 justify-end">
+                          <button className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors" onClick={() => openViewModal(job)}><EyeIcon className="w-4 h-4"/></button>
+                          <button className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-500 transition-colors" onClick={() => { setJobToDelete(job); setDeleteDialogOpen(true); }}><TrashIcon className="w-4 h-4"/></button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -378,7 +409,7 @@ export default function RecruiterAssignments() {
               <Input id="experience" placeholder="e.g. 0.6 - 2" value={jobForm.experience} onChange={e => setJobForm({...jobForm, experience: e.target.value})} disabled={isEditMode}/>
             </div>
             <div>
-              <Label htmlFor="tatTime">Target Date (TAT)</Label>
+              <Label htmlFor="tatTime">Date of Expiry (TAT)</Label>
               <Input id="tatTime" type="date" value={jobForm.tatTime} onChange={e => setJobForm({...jobForm, tatTime: e.target.value})} disabled={isEditMode}/>
             </div>
             <div>

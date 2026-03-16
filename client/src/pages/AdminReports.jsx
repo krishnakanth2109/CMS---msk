@@ -4,7 +4,7 @@ import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
-import { Download, TrendingUp, Calendar, Loader2 } from 'lucide-react';
+import { Download, TrendingUp, Calendar, Loader2, Users, ClipboardList, X } from 'lucide-react';
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -21,6 +21,16 @@ export default function AdminReports() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("month");
   
+  // Specific Date Filter State for the main view
+  const [selectedDate, setSelectedDate] = useState("");
+  
+  // ✅ NEW STATES: For Today's Candidates Card & Modal
+  const [todayCandidatesCount, setTodayCandidatesCount] = useState(0);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalData, setModalData] = useState([]);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalDate, setModalDate] = useState(new Date().toISOString().split('T')[0]);
+  
   // Export states
   const [exportMonth, setExportMonth] = useState('current');
   const [isExporting, setIsExporting] = useState(false);
@@ -36,16 +46,32 @@ export default function AdminReports() {
     return { 'Content-Type': 'application/json', ...ah };
   };
 
+  // 1. Fetch Main Report Data & Today's Initial Count
   useEffect(() => {
     const fetchReports = async () => {
       setLoading(true);
       try {
         const headers = await getAuthHeader();
-        const res = await fetch(`${API_URL}/reports?filter=${filter}`, { headers });
         
-        if (res.ok) {
+        // Build dynamic query string supporting the specific date
+        const queryParams = new URLSearchParams({ filter });
+        if (selectedDate && filter === 'custom') {
+          queryParams.append('date', selectedDate);
+        }
+
+        // Fetch Main Report Data
+        const res = await fetch(`${API_URL}/reports?${queryParams.toString()}`, { headers });
+        
+        // Fetch Today's Candidates count for the 4th card
+        const todayDateStr = new Date().toISOString().split('T')[0];
+        const todayRes = await fetch(`${API_URL}/candidates?date=${todayDateStr}`, { headers });
+        
+        if (res.ok && todayRes.ok) {
           const data = await res.json();
+          const todayData = await todayRes.json();
+          
           setReportData(data);
+          setTodayCandidatesCount(todayData.length);
         } else {
           throw new Error("Failed to fetch reports data");
         }
@@ -58,7 +84,31 @@ export default function AdminReports() {
     };
     
     fetchReports();
-  }, [filter, toast]);
+  }, [filter, selectedDate, toast]);
+
+  // 2. Fetch Detailed Data when the Modal opens or the Modal Date changes
+  useEffect(() => {
+    if (isModalOpen) {
+      const fetchDateSubmissions = async () => {
+        setModalLoading(true);
+        try {
+          const headers = await getAuthHeader();
+          const res = await fetch(`${API_URL}/candidates?date=${modalDate}`, { headers });
+          if (res.ok) {
+            const data = await res.json();
+            setModalData(data);
+          } else {
+            throw new Error('Failed to fetch day submissions');
+          }
+        } catch (error) {
+          toast({ title: 'Error', description: 'Failed to fetch day submissions', variant: 'destructive' });
+        } finally {
+          setModalLoading(false);
+        }
+      };
+      fetchDateSubmissions();
+    }
+  }, [isModalOpen, modalDate, toast]);
 
   // Handle Export accurately based on the selected month
   const handleExport = async (format) => {
@@ -67,7 +117,6 @@ export default function AdminReports() {
       let dataToExport = reportData.recruiterPerformance;
       let titleSuffix = filter;
 
-      // If a specific month is selected, fetch all candidates and calculate accurate stats for that month
       if (exportMonth !== 'current') {
         const headers = await getAuthHeader();
         const res = await fetch(`${API_URL}/candidates`, { headers });
@@ -79,12 +128,10 @@ export default function AdminReports() {
         const now = new Date();
         let targetYear = now.getFullYear();
         
-        // Smart Year mapping: If selected month is in the future (e.g. selecting Dec in Jan), pull from last year
         if (targetMonth > now.getMonth()) {
           targetYear -= 1;
         }
         
-        // Filter candidates exactly matching the chosen month and year
         const filteredCandidates = allCandidates.filter(c => {
           if (!c.createdAt) return false;
           const d = new Date(c.createdAt);
@@ -115,8 +162,6 @@ export default function AdminReports() {
           const row = rMap.get(key);
           row.Submissions += 1;
           
-          // ACCURATE FUNNEL CALCULATION:
-          // If a candidate is Joined, they logically must have been Selected and Turned up.
           const currentStatus = c.status || '';
           const hasJoined = currentStatus === 'Joined';
           const hasSelected = hasJoined || currentStatus === 'Offer' || currentStatus === 'Shortlisted';
@@ -138,14 +183,12 @@ export default function AdminReports() {
         return;
       }
 
-      // Execute EXCEL Export
       if (format === 'excel') {
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Recruiter Report");
         XLSX.writeFile(workbook, `Recruiter_Report_${titleSuffix}.xlsx`);
       } 
-      // Execute PDF Export
       else if (format === 'pdf') {
         const doc = new jsPDF();
         doc.text(`Recruiter Performance Report (${titleSuffix.replace('_', ' ')})`, 14, 16);
@@ -182,7 +225,7 @@ export default function AdminReports() {
   );
 
   return (
-    <div className="flex-1 p-8 overflow-y-auto bg-slate-50 min-h-screen">
+    <div className="flex-1 p-8 overflow-y-auto bg-slate-50 min-h-screen relative">
       <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
 
         {/* Header */}
@@ -193,24 +236,48 @@ export default function AdminReports() {
           </div>
           
           <div className="flex flex-col items-end gap-3">
-            {/* View Filter Toggle */}
-            <div className="bg-slate-200 p-1 flex border border-slate-300 self-start md:self-end">
-              {['day', 'week', 'month', 'all'].map(f => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  className={`px-3 py-1.5 text-sm font-medium capitalize transition ${
-                    filter === f 
-                      ? 'bg-white shadow text-slate-900' 
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            {/* Filter Toggle AND Specific Date Picker side-by-side */}
+            <div className="flex items-center gap-2 self-start md:self-end">
+              <div className="bg-slate-200 p-1 flex border border-slate-300">
+                {['day', 'week', 'month', 'all'].map(f => (
+                  <button
+                    key={f}
+                    onClick={() => {
+                      setFilter(f);
+                      setSelectedDate(""); 
+                    }}
+                    className={`px-3 py-1.5 text-sm font-medium capitalize transition ${
+                      filter === f 
+                        ? 'bg-white shadow text-slate-900' 
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    {f.charAt(0).toUpperCase() + f.slice(1)}
+                  </button>
+                ))}
+              </div>
+
+              {/* Specific Date Picker Input */}
+              <div className="relative">
+                <Calendar className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 ${selectedDate && filter === 'custom' ? 'text-blue-500' : 'text-slate-500'}`} />
+                <input 
+                  type="date"
+                  value={selectedDate}
+                  max={new Date().toISOString().split('T')[0]}
+                  onChange={(e) => {
+                    setSelectedDate(e.target.value);
+                    if (e.target.value) setFilter('custom');
+                  }}
+                  className={`pl-8 pr-3 py-1.5 h-[34px] text-sm font-medium border focus:outline-none transition-all ${
+                    selectedDate && filter === 'custom'
+                      ? 'bg-white border-blue-500 text-slate-900 shadow-sm'
+                      : 'bg-slate-200 border-slate-300 text-slate-600 hover:bg-slate-300 hover:text-slate-900'
                   }`}
-                >
-                  {f.charAt(0).toUpperCase() + f.slice(1)}
-                </button>
-              ))}
+                />
+              </div>
             </div>
 
-            {/* Export Section with Month Selector */}
+            {/* Export Section */}
             <div className="flex flex-wrap items-center gap-2">
               <select 
                 value={exportMonth} 
@@ -260,20 +327,21 @@ export default function AdminReports() {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              
               <div className="border border-slate-200 bg-white shadow-sm p-6">
                 <div className="flex items-center justify-between pb-2">
                   <span className="text-sm font-medium text-slate-500">Total Candidates</span>
                   <TrendingUp className="h-4 w-4 text-blue-500" />
                 </div>
                 <div className="text-2xl font-bold text-slate-900">{reportData.overview.totalCandidates}</div>
-                <p className="text-xs text-slate-400 mt-1">Filtered by {filter}</p>
+                <p className="text-xs text-slate-400 mt-1">Filtered by {filter === 'custom' && selectedDate ? selectedDate : filter}</p>
               </div>
 
               <div className="border border-slate-200 bg-white shadow-sm p-6">
                 <div className="flex items-center justify-between pb-2">
                   <span className="text-sm font-medium text-slate-500">Active Recruiters</span>
-                  <TrendingUp className="h-4 w-4 text-purple-500" />
+                  <Users className="h-4 w-4 text-purple-500" />
                 </div>
                 <div className="text-2xl font-bold text-slate-900">{reportData.overview.activeRecruiters}</div>
                 <p className="text-xs text-slate-400 mt-1">Total registered</p>
@@ -287,13 +355,29 @@ export default function AdminReports() {
                 <div className="text-2xl font-bold text-slate-900">{reportData.overview.conversionRate}</div>
                 <p className="text-xs text-slate-400 mt-1">Selected → Joined</p>
               </div>
+
+              {/* ✅ NEW: 4th Card filling the empty space, Clickable to open Modal */}
+              <div 
+                onClick={() => setIsModalOpen(true)}
+                className="border border-slate-200 bg-white shadow-sm p-6 cursor-pointer hover:shadow-md transition-shadow group"
+              >
+                <div className="flex items-center justify-between pb-2">
+                  <span className="text-sm font-medium text-slate-500 group-hover:text-[#283086] transition-colors">Today's Submissions</span>
+                  <ClipboardList className="h-4 w-4 text-orange-500" />
+                </div>
+                <div className="text-2xl font-bold text-slate-900">{todayCandidatesCount}</div>
+                <p className="text-xs text-slate-400 mt-1">Added today (Click to view)</p>
+              </div>
+
             </div>
           </TabsContent>
 
           {/* Recruiter Performance Tab */}
           <TabsContent value="recruiters">
             <div className="border border-slate-200 bg-white shadow-sm p-6">
-              <h3 className="font-semibold text-slate-900 mb-6">Recruiter Performance Comparison ({filter})</h3>
+              <h3 className="font-semibold text-slate-900 mb-6">
+                Recruiter Performance Comparison ({filter === 'custom' && selectedDate ? selectedDate : filter})
+              </h3>
               <div className="h-[500px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={reportData.recruiterPerformance}>
@@ -333,6 +417,115 @@ export default function AdminReports() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* ── MODAL: DAY SUBMISSIONS ── */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-[#f8faff]">
+              <div>
+                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <ClipboardList className="w-5 h-5 text-purple-600" />
+                  Day Submissions
+                </h2>
+                <p className="text-xs text-gray-500 font-medium mt-1">
+                  Viewing candidates submitted by all recruiters
+                </p>
+              </div>
+
+              <div className="flex items-center gap-4">
+                {/* Calendar Filter INSIDE modal */}
+                <div className="relative flex items-center bg-white">
+                  <Calendar className="absolute left-3 w-4 h-4 text-gray-400" />
+                  <input 
+                    type="date" 
+                    value={modalDate}
+                    max={new Date().toISOString().split('T')[0]} 
+                    onChange={(e) => setModalDate(e.target.value)}
+                    className="pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg text-slate-700 font-medium focus:ring-2 focus:ring-[#283086] focus:outline-none"
+                  />
+                </div>
+                {/* Close Button */}
+                <button 
+                  onClick={() => setIsModalOpen(false)}
+                  className="p-2 bg-gray-100 hover:bg-red-50 hover:text-red-500 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto bg-white p-0 min-h-[300px]">
+              {modalLoading ? (
+                <div className="flex flex-col h-full min-h-[300px] items-center justify-center gap-3">
+                  <div className="animate-spin h-8 w-8 border-4 border-purple-500 border-t-transparent rounded-full" />
+                  <p className="text-sm text-gray-500 font-medium tracking-wide">Fetching Submissions...</p>
+                </div>
+              ) : modalData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-center">
+                  <div className="bg-gray-50 p-4 rounded-full mb-3">
+                    <ClipboardList className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-slate-800 font-bold">No submissions found</h3>
+                  <p className="text-sm text-gray-500 mt-1">No candidates were added on {modalDate}</p>
+                </div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="bg-[#f8faff] text-gray-500 font-bold uppercase text-[10px] tracking-widest border-b border-gray-100 sticky top-0 z-10 shadow-sm">
+                    <tr>
+                      <th className="px-6 py-4 text-left">Candidate ID</th>
+                      <th className="px-6 py-4 text-left">Candidate Name</th>
+                      <th className="px-6 py-4 text-left">Recruiter</th>
+                      <th className="px-6 py-4 text-left">Position</th>
+                      <th className="px-6 py-4 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {modalData.map((c) => {
+                      const recruiterName = c.recruiterId?.firstName 
+                        ? `${c.recruiterId.firstName} ${c.recruiterId.lastName || ''}`.trim() 
+                        : (c.recruiterId?.name || c.recruiterName || 'Unknown');
+                      
+                      const cStatus = Array.isArray(c.status) ? c.status[0] : c.status;
+
+                      return (
+                        <tr key={c._id} className="hover:bg-purple-50/30 transition-colors">
+                          <td className="px-6 py-4 font-bold text-[#283086]">{c.candidateId || 'N/A'}</td>
+                          <td className="px-6 py-4 font-semibold text-slate-800">{c.name || `${c.firstName} ${c.lastName}`}</td>
+                          <td className="px-6 py-4 font-medium text-gray-600">{recruiterName}</td>
+                          <td className="px-6 py-4 text-gray-500">{c.position || '-'}</td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                              {cStatus || 'SUBMITTED'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            {!modalLoading && modalData.length > 0 && (
+              <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 flex justify-between items-center text-xs font-medium text-gray-500">
+                <p>Showing {modalData.length} submission(s) for the selected date.</p>
+                <button 
+                  onClick={() => setIsModalOpen(false)}
+                  className="text-slate-700 hover:text-[#283086] font-bold uppercase tracking-wider"
+                >
+                  Close Window
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

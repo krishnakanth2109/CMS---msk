@@ -102,7 +102,6 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
         </div>
 
         {/* --- Navigation Links --- */}
-        {/* ✅ FIX: Added pt-8 and pb-8. Prevents clipping of the top and bottom absolute curves in the overflow container */}
         <div className={clsx("flex-1 overflow-y-auto space-y-1 pt-8 pb-8 pr-0 relative [&::-webkit-scrollbar]:hidden", isOpen ? "pl-6" : "pl-2")}>
           {links.map((link) => (
             <NavLink
@@ -111,7 +110,6 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
               end={link.path === '/admin' || link.path === '/recruiter'}
               className={({ isActive }) =>
                 clsx(
-                  // ✅ FIX: Added outline-none, focus:outline-none, and select-none to remove browser "blue bar" outlines
                   "group flex items-center relative py-4 select-none outline-none focus:outline-none focus:ring-0",
                   isActive
                     ? `${activeBgClass} ${activeTextClass}`
@@ -122,7 +120,6 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
             >
               {({ isActive }) => (
                 <>
-                  {/* ✅ FIX: Strictly render only when active without opacity transitions to prevent the "blue blink" bleed-through effect */}
                   {isActive && isOpen && (
                     <>
                       <div

@@ -22,7 +22,8 @@ import AdminMessages from '@/pages/AdminMessages';
 import AdminReports from '@/pages/AdminReports';
 import AdminSettings from '@/pages/AdminSettings';
 
-// ✅ NEW: Manager Messages page
+// Manager Specific Pages
+import ManagerDashboard from '@/pages/ManagerDashboard'; // ✅ IMPORTED NEW PAGE
 import ManagerMessages from '@/pages/ManagerMessages';
 
 // Recruiter Pages
@@ -63,6 +64,8 @@ function PublicRoute({ children }) {
 }
 
 function AppRoutes() {
+  const { userRole } = useAuth(); // ✅ ADDED THIS TO DETERMINE WHICH DASHBOARD TO SHOW
+
   return (
     <Routes>
       {/* Public Routes */}
@@ -76,7 +79,9 @@ function AppRoutes() {
           <DashboardLayout />
         </ProtectedRoute>
       }>
-        <Route index element={<AdminDashboard />} />
+        {/* ✅ DIFFERENT DASHBOARD DEPENDING ON ROLE */}
+        <Route index element={userRole === 'manager' ? <ManagerDashboard /> : <AdminDashboard />} />
+        
         <Route path="add-candidate" element={<AddCandidate />} />
         <Route path="my-candidates" element={<RecruiterCandidates />} />
         <Route path="recruiters" element={<AdminRecruiters />} />
