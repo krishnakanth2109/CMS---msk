@@ -169,7 +169,7 @@ export function AuthProvider({ children }) {
       if (!firebaseRes.ok) {
         const code  = firebaseData?.error?.message || 'UNKNOWN_ERROR';
         const error = new Error(code);
-        error.firebaseCode = code;
+        error.code = code; // Login.jsx reads err.code — must match
         throw error;
       }
 

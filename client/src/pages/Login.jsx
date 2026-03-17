@@ -14,14 +14,32 @@ export default function Login() {
   const navigate = useNavigate();
 
   const getFriendlyError = (err) => {
-    const code = err.firebaseCode || err.message || '';
+    // err.code is set by AuthContext for Firebase REST API errors
+    // err.message is used for backend errors (e.g. "User not registered.")
+    const code = err.code || err.message || '';
+
+    // Firebase REST API returns these exact strings as the error message
     if (
-      code.includes('EMAIL_NOT_FOUND') ||
+      code.includes('INVALID_LOGIN_CREDENTIALS') ||
       code.includes('INVALID_PASSWORD') ||
-      code.includes('INVALID_LOGIN_CREDENTIALS')
+      code.includes('EMAIL_NOT_FOUND') ||
+      code.includes('INVALID_EMAIL') ||
+      code.includes('WRONG_PASSWORD')
     ) return 'Invalid email or password.';
-    if (code.includes('TOO_MANY_ATTEMPTS_TRY_LATER')) return 'Too many failed attempts. Please try again later.';
-    if (code.includes('USER_DISABLED')) return 'This account has been disabled. Contact support.';
+
+    if (
+      code.includes('TOO_MANY_ATTEMPTS_TRY_LATER') ||
+      code.includes('TOO_MANY_REQUESTS')
+    ) return 'Too many failed attempts. Please try again later.';
+
+    if (code.includes('USER_DISABLED'))
+      return 'This account has been disabled. Contact support.';
+
+    if (code.includes('NETWORK_REQUEST_FAILED') || code.includes('fetch'))
+      return 'Network error. Please check your connection.';
+
+    // Backend errors (e.g. "User not registered. Contact admin." / "Account deactivated.")
+    // These come through as err.message directly — just show them as-is
     return err.message || 'Something went wrong. Please try again.';
   };
 

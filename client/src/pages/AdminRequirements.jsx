@@ -234,6 +234,9 @@ export default function AdminRequirements() {
     if (type !== 'checkbox') {
       if (name === 'position' || name === 'qualification') {
         newValue = newValue.replace(/[^a-zA-Z\s]/g, '');
+      } else if (name === 'location') {
+        // ✅ Strictly prevent numbers from being accepted in location
+        newValue = newValue.replace(/[0-9]/g, '');
       } else if (name === 'experience' || name === 'relevantExperience') {
         // ✅ Allow numbers, single decimal point, spaces, and hyphens (e.g. "0.6 - 2")
         newValue = newValue.replace(/[^0-9.\- ]/g, '');

@@ -16,7 +16,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 // --- Helpers ---
 function getStatusBadge(status) {
-  const base = "px-3 py-1.5 rounded-full text-sm font-semibold flex items-center gap-1.5";
+  const base = "px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 shadow-sm";
   
   if (!status) return <span className={`${base} bg-gray-100 text-gray-800`}><Calendar className="h-3 w-3" />Unknown</span>;
 
@@ -33,12 +33,6 @@ function getStatusBadge(status) {
   if (status === 'Submitted') return <span className={`${base} bg-sky-100 text-sky-800 border border-sky-200`}><FileText className="h-3 w-3" />{status}</span>;
 
   return <span className={`${base} bg-gray-100 text-gray-800 border border-gray-200`}><Calendar className="h-3 w-3" />{status}</span>;
-}
-
-function getPriorityBadge(priority) {
-  const base = "px-2 py-1 rounded-full text-xs font-medium capitalize border";
-  const colors = { high: "bg-red-100 text-red-800 border-red-200", medium: "bg-yellow-100 text-yellow-800 border-yellow-200", low: "bg-green-100 text-green-800 border-green-200" };
-  return <span className={`${base} ${colors[priority || 'medium']}`}>{priority} Priority</span>;
 }
 
 function getTimeStatus(interviewDate) {
@@ -83,7 +77,6 @@ export default function RecruiterSchedules() {
   const [selectedRecruiterId, setSelectedRecruiterId] = useState("");
   const [viewMode, setViewMode] = useState("grid");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [priorityFilter, setPriorityFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeStatFilter, setActiveStatFilter] = useState(null);
   const [showNewInterviewForm, setShowNewInterviewForm] = useState(false);
@@ -96,7 +89,7 @@ export default function RecruiterSchedules() {
     candidateId: "", candidateName: "", candidateEmail: "", candidatePhone: "", position: "",
     round: "L1 Interview", interviewDate: new Date().toISOString().split('T')[0], interviewTime: "10:00",
     type: "Virtual", location: "Remote", duration: "60", recruiterId: sessionRecruiterId,
-    notes: "", priority: "medium", meetingLink: "", status: "Scheduled"
+    notes: "", meetingLink: "", status: "Scheduled"
   });
   const [formErrors, setFormErrors] = useState({});
 
@@ -144,7 +137,6 @@ export default function RecruiterSchedules() {
             recruiterName: rName,
             clientName: item.jobId?.clientName || "N/A",
             notes: item.notes, 
-            priority: item.priority, 
             meetingLink: item.meetingLink,
           };
         }));
@@ -165,19 +157,17 @@ export default function RecruiterSchedules() {
     let filtered = interviews;
     if (selectedRecruiterId) filtered = filtered.filter(i => i.recruiterId === selectedRecruiterId);
     if (statusFilter !== "all") filtered = filtered.filter(i => i.status === statusFilter);
-    if (priorityFilter !== "all") filtered = filtered.filter(i => i.priority === priorityFilter);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(i => i.candidateName.toLowerCase().includes(q) || (i.interviewId || '').toLowerCase().includes(q));
     }
     const now = new Date();
     if (activeStatFilter === 'upcoming') filtered = filtered.filter(i => new Date(i.interviewDate) >= now);
-    if (activeStatFilter === 'highPriority') filtered = filtered.filter(i => i.priority === 'high');
     if (activeStatFilter === 'completed') filtered = filtered.filter(i => new Date(i.interviewDate) < now);
     if (activeStatFilter === 'today') filtered = filtered.filter(i => new Date(i.interviewDate).toDateString() === now.toDateString());
 
     return filtered.sort((a, b) => new Date(b.interviewDate).getTime() - new Date(a.interviewDate).getTime());
-  }, [interviews, selectedRecruiterId, statusFilter, priorityFilter, searchQuery, activeStatFilter]);
+  }, [interviews, selectedRecruiterId, statusFilter, searchQuery, activeStatFilter]);
 
   const interviewStats = useMemo(() => {
     const now = new Date();
@@ -185,7 +175,6 @@ export default function RecruiterSchedules() {
       total: interviews.length,
       upcoming: interviews.filter(i => new Date(i.interviewDate) >= now).length,
       completed: interviews.filter(i => new Date(i.interviewDate) < now).length,
-      highPriority: interviews.filter(i => i.priority === "high").length,
       today: interviews.filter(i => new Date(i.interviewDate).toDateString() === now.toDateString()).length,
       virtual: interviews.filter(i => i.interviewType === "Virtual").length
     };
@@ -209,22 +198,14 @@ export default function RecruiterSchedules() {
 
   const validateForm = () => {
     const errors = {};
-    
-    // Validate Candidate Selection
-    if (!newInterviewForm.candidateId) {
-      errors.candidateId = "Please select a candidate first.";
-    }
+    if (!newInterviewForm.candidateId) errors.candidateId = "Please select a candidate first.";
 
-    // Validate Date (Ensure it ignores timezones making 'today' look like 'yesterday')
     if (newInterviewForm.interviewDate) {
       const today = new Date(); 
       today.setHours(0,0,0,0); 
       const [year, month, day] = newInterviewForm.interviewDate.split('-');
       const datePart = new Date(year, month - 1, day);
-      
-      if (datePart < today) {
-        errors.interviewDate = "Date cannot be in the past.";
-      }
+      if (datePart < today) errors.interviewDate = "Date cannot be in the past.";
     } else {
       errors.interviewDate = "Date is required.";
     }
@@ -236,7 +217,6 @@ export default function RecruiterSchedules() {
   const handleNewInterviewChange = (e) => {
     const { name, value } = e.target;
     setNewInterviewForm(prev => ({ ...prev, [name]: value }));
-    // Clear error for the field being typed in
     if (formErrors[name]) setFormErrors(prev => ({ ...prev, [name]: '' }));
   };
 
@@ -256,7 +236,7 @@ export default function RecruiterSchedules() {
         candidatePhone: candidate.contact || candidate.phone || "",
         position: candidate.position || ""
       }));
-      setFormErrors(prev => ({ ...prev, candidateId: '' })); // Clear error
+      setFormErrors(prev => ({ ...prev, candidateId: '' }));
     }
   };
 
@@ -345,12 +325,11 @@ export default function RecruiterSchedules() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard title="Total" value={interviewStats.total} icon={<Calendar />} gradient="bg-purple-600" onClick={() => setActiveStatFilter('total')} />
           <StatCard title="Today" value={interviewStats.today} icon={<CalendarIcon />} gradient="bg-orange-600" onClick={() => setActiveStatFilter('today')} />
           <StatCard title="Upcoming" value={interviewStats.upcoming} icon={<Clock />} gradient="bg-green-600" onClick={() => setActiveStatFilter('upcoming')} />
           <StatCard title="Completed" value={interviewStats.completed} icon={<CheckCircle2 />} gradient="bg-blue-600" onClick={() => setActiveStatFilter('completed')} />
-          <StatCard title="Hold" value={interviewStats.virtual} icon={<Video />} gradient="bg-indigo-600" onClick={() => setActiveStatFilter('Hold')} />
         </div>
 
         {/* Filter Bar */}
@@ -366,10 +345,7 @@ export default function RecruiterSchedules() {
               />
             </div>
             <div className="flex gap-3 items-center w-full md:w-auto">
-              <select className="p-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500" value={selectedRecruiterId} onChange={(e) => setSelectedRecruiterId(e.target.value)}>
-                <option value="">All Recruiters</option>
-                {recruiters.map(r => <option key={r._id || r.id} value={r._id || r.id}>{r.firstName ? `${r.firstName} ${r.lastName}` : r.name}</option>)}
-              </select>
+             
               <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
                 <button onClick={() => setViewMode("grid")} className={`p-2 rounded transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-gray-700 shadow' : ''}`}><Grid className="h-4 w-4" /></button>
                 <button onClick={() => setViewMode("list")} className={`p-2 rounded transition-all ${viewMode === 'list' ? 'bg-white dark:bg-gray-700 shadow' : ''}`}><List className="h-4 w-4" /></button>
@@ -442,36 +418,98 @@ export default function RecruiterSchedules() {
 
 function InterviewGridCard({ interview, onView, onEdit, onDelete }) {
   const timeStatus = getTimeStatus(interview.interviewDate);
+  const interviewDate = new Date(interview.interviewDate);
+
   return (
-    <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-lg transition-shadow cursor-pointer border-l-4" style={{ borderLeftColor: timeStatus.status === 'urgent' ? '#ef4444' : '#3b82f6' }}>
-      <div className="p-6 space-y-4">
-        <div className="flex justify-between items-start">
-          <div className="flex gap-3">
-            <Avatar className="h-10 w-10"><AvatarFallback>{interview.candidateName.substring(0, 2).toUpperCase()}</AvatarFallback></Avatar>
-            <div>
-              <h3 className="font-bold text-lg text-gray-900 dark:text-white truncate max-w-[150px]">{interview.candidateName}</h3>
-              <p className="text-sm text-gray-500">{interview.position}</p>
+    <div className="relative overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-xl transition-all duration-300 group">
+      
+      {/* Top Accent Line */}
+      <div className={`absolute top-0 left-0 w-full h-1.5 ${timeStatus.status === 'urgent' ? 'bg-red-500' : 'bg-blue-600'}`} />
+      
+      <div className="p-5 space-y-5 mt-1">
+        {/* Header: Avatar + Name + Status */}
+        <div className="flex justify-between items-start gap-3">
+          <div className="flex gap-3 min-w-0 items-center">
+            <Avatar className="h-12 w-12 border border-gray-100 dark:border-gray-800 shadow-sm shrink-0">
+              <AvatarFallback className="bg-blue-50 text-blue-700 font-bold text-lg">
+                {interview.candidateName.substring(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <h3 className="font-bold text-gray-900 dark:text-white truncate text-base leading-tight" title={interview.candidateName}>
+                {interview.candidateName}
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-0.5 font-medium">
+                {interview.position}
+              </p>
             </div>
           </div>
-          {getStatusBadge(interview.status)}
-        </div>
-        <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-          <div className="flex items-center gap-2"><Calendar className="h-4 w-4 text-gray-400" /> {new Date(interview.interviewDate).toLocaleString()}</div>
-          <div className="flex items-center gap-2"><UserCircle className="h-4 w-4 text-gray-400" /> {interview.recruiterName}</div>
-          <div className="flex items-center gap-2"><Building className="h-4 w-4 text-gray-400" /> {interview.clientName}</div>
-        </div>
-        <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center">
-          {getPriorityBadge(interview.priority)}
-          <div className="flex gap-2">
-            <button onClick={() => onEdit(interview)} className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-orange-50 hover:text-orange-600 dark:hover:bg-gray-800 transition" title="Edit Interview">
-              <Pencil className="h-4 w-4" />
-            </button>
-            <button onClick={() => onDelete(interview.id)} className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-red-50 hover:text-red-600 dark:hover:bg-gray-800 transition" title="Delete Interview">
-              <Trash2 className="h-4 w-4" />
-            </button>
-            <button onClick={onView} className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-gray-800 dark:hover:text-blue-400 transition">View Details</button>
+          <div className="shrink-0">
+            {getStatusBadge(interview.status)}
           </div>
         </div>
+
+        {/* Body: Details Box */}
+        <div className="grid grid-cols-1 gap-2.5 text-sm text-gray-700 dark:text-gray-300 bg-gray-50/80 dark:bg-gray-800/50 p-3.5 rounded-xl border border-gray-100 dark:border-gray-800">
+          
+          <div className="flex items-center gap-3">
+            <Calendar className="h-4 w-4 text-blue-500 shrink-0" /> 
+            <span className="font-semibold">
+              {interviewDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+            </span>
+            <span className="text-gray-400">•</span>
+            <span className="font-semibold text-gray-900 dark:text-white">
+              {interviewDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <UserCircle className="h-4 w-4 text-indigo-500 shrink-0" /> 
+            <span className="truncate">{interview.recruiterName}</span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {interview.interviewType === 'Virtual' ? <Video className="h-4 w-4 text-emerald-500 shrink-0" /> : 
+             interview.interviewType === 'Phone' ? <Phone className="h-4 w-4 text-emerald-500 shrink-0" /> : 
+             <MapPin className="h-4 w-4 text-emerald-500 shrink-0" />}
+            <span className="truncate">{interview.interviewType} Interview</span>
+            {interview.clientName && interview.clientName !== "N/A" && (
+               <>
+                 <span className="text-gray-400">•</span>
+                 <span className="truncate text-gray-500">{interview.clientName}</span>
+               </>
+            )}
+          </div>
+
+        </div>
+
+        {/* Footer: Actions */}
+        <div className="flex justify-between items-center gap-3 pt-1">
+          <button 
+            onClick={onView} 
+            className="flex-1 px-4 py-2.5 text-sm font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 dark:text-blue-400 rounded-xl transition-colors flex items-center justify-center gap-2"
+          >
+            <Eye className="w-4 h-4" /> View Details
+          </button>
+          
+          <div className="flex gap-2 shrink-0">
+            <button 
+              onClick={() => onEdit(interview)} 
+              className="p-2.5 text-gray-500 hover:text-orange-600 bg-gray-50 hover:bg-orange-50 dark:bg-gray-800 dark:hover:bg-orange-900/30 rounded-xl transition-colors" 
+              title="Edit Interview"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+            <button 
+              onClick={() => onDelete(interview.id)} 
+              className="p-2.5 text-gray-500 hover:text-red-600 bg-gray-50 hover:bg-red-50 dark:bg-gray-800 dark:hover:bg-red-900/30 rounded-xl transition-colors" 
+              title="Delete Interview"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
   );
@@ -536,14 +574,16 @@ function EditInterviewModal({ interview, onClose, onSave }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
-      <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full">
-        <div className="p-5 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900 rounded-t-xl">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 pb-24 backdrop-blur-sm">
+      <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full flex flex-col max-h-[85vh]">
+        {/* Sticky Header */}
+        <div className="p-5 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900 rounded-t-xl shrink-0">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><Edit className="h-5 w-5 text-blue-600"/> Edit Interview</h3>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"><X className="h-5 w-5" /></button>
         </div>
         
-        <div className="p-6 space-y-4">
+        {/* Scrollable Body */}
+        <div className="p-6 space-y-4 overflow-y-auto flex-1">
           <p className="text-sm text-gray-600 dark:text-gray-400">Editing details for <span className="font-semibold text-gray-900 dark:text-white">{interview.candidateName}</span></p>
           
           <div className="grid grid-cols-2 gap-4">
@@ -604,7 +644,8 @@ function EditInterviewModal({ interview, onClose, onSave }) {
           </div>
         </div>
 
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3 bg-gray-50 dark:bg-gray-900 rounded-b-xl">
+        {/* Sticky Footer */}
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3 bg-gray-50 dark:bg-gray-900 rounded-b-xl shrink-0">
           <button onClick={onClose} className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition text-gray-700 dark:text-gray-200">Cancel</button>
           <button onClick={handleSubmit} disabled={isSaving} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition flex items-center gap-2">
             {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Changes"}
@@ -627,11 +668,11 @@ function InterviewDetailModal({ interview, candidateFull, loading, onClose, onUp
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-      <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto flex flex-col">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pb-24 backdrop-blur-sm">
+      <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[85vh] flex flex-col">
 
         {/* Header */}
-        <div className="p-6 border-b border-white/10 flex justify-between items-start bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-t-2xl">
+        <div className="p-6 border-b border-white/10 flex justify-between items-start bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-t-2xl shrink-0">
           <div className="flex gap-4 items-center">
             <Avatar className="h-16 w-16 border-2 border-white/50">
               <AvatarFallback className="text-blue-700 font-bold text-xl bg-white">{interview.candidateName.substring(0, 2).toUpperCase()}</AvatarFallback>
@@ -782,7 +823,8 @@ function InterviewDetailModal({ interview, candidateFull, loading, onClose, onUp
           )}
         </div>
 
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-b-2xl flex justify-end">
+        {/* Footer */}
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-b-2xl flex justify-end shrink-0">
           <button onClick={onClose} className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition">Close</button>
         </div>
       </motion.div>
@@ -794,13 +836,16 @@ function NewInterviewModal({ form, errors, onChange, onCandidateSelect, onGenera
   const inputCls = (err) => `w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${err ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-      <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-blue-700 flex justify-between items-center bg-blue-600 text-white rounded-t-xl">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pb-24 backdrop-blur-sm">
+      <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[85vh]">
+        {/* Sticky Header */}
+        <div className="p-5 border-b border-blue-700 flex justify-between items-center bg-blue-600 text-white rounded-t-xl shrink-0">
           <h2 className="text-xl font-bold">Schedule Interview</h2>
-          <button onClick={onClose}><X className="h-6 w-6" /></button>
+          <button onClick={onClose} className="hover:bg-blue-700 p-1 rounded-full transition"><X className="h-6 w-6" /></button>
         </div>
-        <div className="p-6 space-y-4">
+        
+        {/* Scrollable Body */}
+        <div className="p-6 space-y-4 overflow-y-auto flex-1">
           <div>
             <label className="text-sm font-medium block mb-1 text-gray-700 dark:text-gray-200">Select Candidate *</label>
             <select className={inputCls(errors.candidateId)} onChange={onCandidateSelect} value={form.candidateId}>
@@ -880,7 +925,9 @@ function NewInterviewModal({ form, errors, onChange, onCandidateSelect, onGenera
             <Textarea name="notes" value={form.notes} onChange={onChange} className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white" />
           </div>
         </div>
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3 bg-gray-50 dark:bg-gray-900 rounded-b-xl">
+
+        {/* Sticky Footer */}
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3 bg-gray-50 dark:bg-gray-900 rounded-b-xl shrink-0">
           <button onClick={onClose} className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 transition">Cancel</button>
           <button onClick={onSubmit} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">Schedule</button>
         </div>

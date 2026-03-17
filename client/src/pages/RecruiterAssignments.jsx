@@ -319,9 +319,7 @@ export default function RecruiterAssignments() {
                       <button className="h-8 w-8 flex items-center justify-center text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 rounded-lg transition-colors" onClick={() => openViewModal(job)}>
                         <EyeIcon className="w-4 h-4"/>
                       </button>
-                      <button className="h-8 w-8 flex items-center justify-center text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" onClick={() => { setJobToDelete(job); setDeleteDialogOpen(true); }}>
-                        <TrashIcon className="w-4 h-4"/>
-                      </button>
+                      
                     </div>
                   </div>
                 );
@@ -356,7 +354,7 @@ export default function RecruiterAssignments() {
                         <td className="p-4">{getTatBadge(job.tatTime)}</td>
                         <td className="p-4 flex gap-2 justify-end">
                           <button className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors" onClick={() => openViewModal(job)}><EyeIcon className="w-4 h-4"/></button>
-                          <button className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-500 transition-colors" onClick={() => { setJobToDelete(job); setDeleteDialogOpen(true); }}><TrashIcon className="w-4 h-4"/></button>
+                   
                         </td>
                       </tr>
                     );
@@ -469,16 +467,7 @@ export default function RecruiterAssignments() {
       </Modal>
 
       {/* Delete Confirm Modal */}
-      <Modal open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-        <ModalHeader>
-          <ModalTitle>Delete Requirement?</ModalTitle>
-          <ModalDesc>This will permanently delete the job. This action cannot be undone.</ModalDesc>
-        </ModalHeader>
-        <ModalFooter>
-          <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-          <Button variant="destructive" onClick={handleDeleteJob}>Delete</Button>
-        </ModalFooter>
-      </Modal>
+
     </>
   );
 }
