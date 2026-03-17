@@ -46,6 +46,7 @@ const StatCard = ({ title, value, colorTheme, active, onClick, hasDot }) => {
     backout: 'bg-rose-100 text-rose-900 border-rose-200 dark:bg-rose-900/60 dark:text-rose-200',
     hold: 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/60 dark:text-orange-200',
     pipeline: 'bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-900/60 dark:text-amber-200',
+    today: 'bg-violet-100 text-violet-800 border-violet-200 dark:bg-violet-900/60 dark:text-violet-200',
   };
   const themeClass = themes[colorTheme] || themes.overall;
 
@@ -63,6 +64,13 @@ const getInitials = (name = '') => name.split(' ').map((n) => n[0]).join('').toU
 const getCandidateId = (c) => c.candidateId || c._id?.substring(c._id.length - 6).toUpperCase();
 const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
 const formatSkills = (skills) => !skills ? 'N/A' : Array.isArray(skills) ? skills.slice(0, 3).join(', ') + (skills.length > 3 ? '...' : '') : skills.length > 50 ? skills.substring(0, 50) + '...' : skills;
+
+// ✅ Robust Date Extractor
+const getSafeDate = (d) => {
+  if (!d) return '';
+  if (typeof d === 'string' && d.length >= 10) return d.substring(0, 10);
+  try { return new Date(d).toISOString().split('T')[0]; } catch(e) { return ''; }
+};
 
 // ✅ Returns firstName only for recruiter column display
 const getRecruiterName = (r) => {
@@ -118,6 +126,9 @@ export default function AdminCandidates() {
   const [selectedCandidateId, setSelectedCandidateId] = useState(null);
   const [viewCandidate, setViewCandidate] = useState(null);
   const [errors, setErrors] = useState({});
+
+  // Today Submissions modal (Admin)
+  const [isTodaySubOpen, setIsTodaySubOpen] = useState(false);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
   const [isCheckingPhone, setIsCheckingPhone] = useState(false);
 
@@ -137,7 +148,7 @@ export default function AdminCandidates() {
     }
   };
 
-  // Today in YYYY-MM-DD — used as max for DOB & dateAdded
+  // Today in YYYY-MM-DD
   const todayStr = new Date().toISOString().split('T')[0];
 
   const initialFormData = {
@@ -148,7 +159,7 @@ export default function AdminCandidates() {
     ctc: '', currentTakeHome: '', ectc: '', expectedTakeHome: '',
     noticePeriod: '', servingNoticePeriod: 'false', lwd: '',
     reasonForChange: '', offersInHand: 'false', offerPackage: '', source: 'Portal',
-    recruiterId: '', status: 'Submitted',
+    recruiterId: '', status: ['Submitted'], // 🔴 Multi-Select Array
     skills: '', remarks: '' 
   };
   const [formData, setFormData] = useState(initialFormData);
@@ -183,7 +194,6 @@ export default function AdminCandidates() {
       }
       if (resJobs.ok) {
         const data = await resJobs.json();
-        // Support both { jobs: [...] } and plain array responses
         setJobs(Array.isArray(data) ? data : data.jobs || []);
       }
     } catch (e) {
@@ -200,13 +210,28 @@ export default function AdminCandidates() {
     if (errors[field]) setErrors((prev) => { const n = { ...prev }; delete n[field]; return n; });
   };
 
+  // ✅ Status Multi-Select Handlers
+  const addStatus = (newStatus) => {
+    if (!newStatus) return;
+    if (newStatus === 'SELECT_ALL') {
+      setFormData(prev => ({ ...prev, status: [...ALL_STATUSES] }));
+    } else if (!formData.status.includes(newStatus)) {
+      setFormData(prev => ({ ...prev, status: [...prev.status, newStatus] }));
+    }
+    if (errors.status) setErrors(prev => { const n = { ...prev }; delete n.status; return n; });
+  };
+
+  const removeStatus = (statusToRemove) => {
+    setFormData(prev => ({ ...prev, status: prev.status.filter(s => s !== statusToRemove) }));
+  };
+
   // ── Email duplicate check (called onBlur) ──────────────────────────────────
   const checkEmailDuplicate = async (email) => {
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) return;
+    // 🔴 Strict TLD regex
+    if (!email || !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email.trim())) return;
     setIsCheckingEmail(true);
     try {
       const headers = getAuthHeader();
-      // On edit mode, pass excludeId so the candidate doesn't flag itself
       const excludeParam = isEditMode && selectedCandidateId ? `&excludeId=${selectedCandidateId}` : '';
       const res = await fetch(`${API_URL}/candidates/check-email?email=${encodeURIComponent(email.trim())}${excludeParam}`, { headers });
       if (!res.ok) return;
@@ -242,7 +267,6 @@ export default function AdminCandidates() {
         }));
       }
     } catch (_) {
-      // silently ignore
     } finally {
       setIsCheckingPhone(false);
     }
@@ -331,42 +355,35 @@ export default function AdminCandidates() {
     const e = {};
     const d = formData;
 
-    // ── First Name: required, letters/spaces/hyphens only, 2-50 chars ─────────
     if (!d.firstName.trim()) {
       e.firstName = 'First Name is required';
     } else if (!/^[a-zA-Z\s'\-]{2,50}$/.test(d.firstName.trim())) {
       e.firstName = 'First Name must be 2–50 characters (letters only)';
     }
 
-    // ── Last Name: required, letters/spaces/hyphens only ──────────────────────
     if (!d.lastName.trim()) {
       e.lastName = 'Last Name is required';
     } else if (!/^[a-zA-Z\s'\-]{1,50}$/.test(d.lastName.trim())) {
       e.lastName = 'Last Name must be letters only';
     }
 
-    // ── Email: required + valid format ────────────────────────────────────────
-    // Also carry forward any duplicate-email error already set by checkEmailDuplicate onBlur
+    // 🔴 Strict Email validation
     if (!d.email.trim()) {
       e.email = 'Email address is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email.trim())) {
-      e.email = 'Enter a valid email (e.g. name@example.com)';
+    } else if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(d.email.trim())) {
+      e.email = 'Enter a valid email ending with .com, .in, etc.';
     } else if (errors.email && errors.email.includes('already exists')) {
-      // Preserve the duplicate error — do not clear it just because format is valid
       e.email = errors.email;
     }
 
-    // ── Contact: required, 10-digit Indian mobile (starts 6-9) ───────────────
     if (!d.contact.trim()) {
       e.contact = 'Contact number is required';
     } else if (!/^[6-9]\d{9}$/.test(d.contact.replace(/[\s\-+]/g, ''))) {
       e.contact = 'Enter a valid 10-digit Indian mobile number (starts with 6–9)';
     } else if (errors.contact && errors.contact.includes('already exists')) {
-      // Preserve duplicate-phone error set by checkPhoneDuplicate onBlur
       e.contact = errors.contact;
     }
 
-    // ── Alternate Number: optional, validate format if filled ─────────────────
     if (d.alternateNumber.trim()) {
       if (!/^[6-9]\d{9}$/.test(d.alternateNumber.replace(/[\s\-+]/g, ''))) {
         e.alternateNumber = 'Enter a valid 10-digit mobile number';
@@ -375,7 +392,6 @@ export default function AdminCandidates() {
       }
     }
 
-    // ── Position: required, min 2 chars ──────────────────────────────────────
     if (!d.position.trim()) {
       e.position = 'Role / Position is required';
     } else if (d.position === 'Other') {
@@ -388,10 +404,8 @@ export default function AdminCandidates() {
       e.position = 'Position must be at least 2 characters';
     }
 
-    // ── Client: required ─────────────────────────────────────────────────────
     if (!d.client.trim()) e.client = 'Please select a Client';
 
-    // ── Total Experience: optional, must be a positive number 0–60 ───────────
     if (d.totalExperience.trim() !== '') {
       const totalExp = Number(d.totalExperience);
       if (isNaN(totalExp) || !/^\d+(\.\d+)?$/.test(d.totalExperience.trim())) {
@@ -401,7 +415,6 @@ export default function AdminCandidates() {
       }
     }
 
-    // ── Relevant Experience: optional, numeric, cannot exceed total ───────────
     if (d.relevantExperience.trim() !== '') {
       const relExp = Number(d.relevantExperience);
       if (isNaN(relExp) || !/^\d+(\.\d+)?$/.test(d.relevantExperience.trim())) {
@@ -417,19 +430,14 @@ export default function AdminCandidates() {
       }
     }
 
-    // ── Conditional: LWD required when serving notice ─────────────────────────
     if (d.servingNoticePeriod === 'true' && !d.lwd) {
       e.lwd = 'Last Working Day is required when serving notice period';
     }
 
-    // ── Conditional: offer package required when offer in hand ────────────────
     if (d.offersInHand === 'true' && !d.offerPackage.trim()) {
       e.offerPackage = 'Please enter the offer package amount';
     }
 
-
-    // ── Date of Birth: optional, must be in the past, person must be at least 18 ──
-    // Compare as YYYY-MM-DD strings to avoid UTC vs local timezone mismatch
     if (d.dateOfBirth) {
       const todayDateStr = new Date().toLocaleDateString('en-CA');
       if (d.dateOfBirth >= todayDateStr) {
@@ -445,8 +453,6 @@ export default function AdminCandidates() {
       }
     }
 
-    // ── Date Added: required, must not be a future date (today is the max) ───────
-    // Compare as YYYY-MM-DD strings to avoid UTC vs local timezone mismatch
     if (!d.dateAdded) {
       e.dateAdded = 'Date Added is required';
     } else {
@@ -456,15 +462,18 @@ export default function AdminCandidates() {
       }
     }
 
+    // 🔴 Validation for Multi-Select Status
+    if (!d.status || d.status.length === 0) {
+      e.status = 'At least one status is required';
+    }
+
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const handleSubmit = async () => {
-    // ── Pre-submit duplicate email check (hard block before any API call) ────
-    // This covers the case where the user never blurred the email field (e.g. autofill)
-    // or the onBlur check was too fast and errors were cleared by a re-render.
-    if (formData.email && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(formData.email.trim())) {
+    // 🔴 Strict validation before submitting
+    if (formData.email && /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(formData.email.trim())) {
       try {
         const dupHeaders = getAuthHeader();
         const excludeParam = isEditMode && selectedCandidateId ? `&excludeId=${selectedCandidateId}` : '';
@@ -475,13 +484,12 @@ export default function AdminCandidates() {
             const dupMsg = `A candidate with this email already exists (ID: ${dupData.candidateId}${dupData.name ? ' — ' + dupData.name : ''})`;
             setErrors(prev => ({ ...prev, email: dupMsg }));
             toast({ title: 'Duplicate Email', description: 'This email is already registered to another candidate.', variant: 'destructive' });
-            return; // ← hard stop, never proceeds to save
+            return;
           }
         }
-      } catch (_) { /* silently ignore — fall through to normal save */ }
+      } catch (_) {}
     }
 
-    // ── Pre-submit duplicate phone check (hard block) ───────────────────────
     if (formData.contact) {
       const digits = formData.contact.replace(/\D/g, '').slice(-10);
       if (digits.length === 10) {
@@ -495,10 +503,10 @@ export default function AdminCandidates() {
               const phMsg = `A candidate with this phone already exists (ID: ${phData.candidateId}${phData.name ? ' — ' + phData.name : ''})`;
               setErrors(prev => ({ ...prev, contact: phMsg }));
               toast({ title: 'Duplicate Phone', description: 'This phone number is already registered to another candidate.', variant: 'destructive' });
-              return; // hard stop
+              return;
             }
           }
-        } catch (_) { /* ignore */ }
+        } catch (_) {}
       }
     }
 
@@ -508,13 +516,7 @@ export default function AdminCandidates() {
       const url = isEditMode ? `${API_URL}/candidates/${selectedCandidateId}` : `${API_URL}/candidates`;
       const method = isEditMode ? 'PUT' : 'POST';
 
-      // ✅ FIX 1: Compute `name` on the frontend before sending.
-      // The backend uses findByIdAndUpdate which bypasses Mongoose pre-save hooks,
-      // so the `name` field (firstName + lastName) is NEVER auto-recomputed on edits.
-      // This is why the table kept showing the old name after an update.
       const computedName = `${formData.firstName || ''} ${formData.lastName || ''}`.trim();
-
-      // Resolve final position: if "Other" was selected, use the manually typed value
       const resolvedPosition = formData.position === 'Other'
         ? formData.positionOther.trim()
         : formData.position;
@@ -525,12 +527,10 @@ export default function AdminCandidates() {
         position: resolvedPosition,
         offersInHand: formData.offersInHand === 'true',
         servingNoticePeriod: formData.servingNoticePeriod === 'true',
+        status: formData.status // Sending array directly for multi-select
       };
-      delete payload.positionOther; // strip UI-only field before sending
+      delete payload.positionOther; 
 
-      // ✅ FIX 2: Use FormData so Multer on the backend can parse req.body.
-      // Sending JSON with Content-Type: application/json bypasses Multer entirely,
-      // leaving req.body empty — so nothing was ever saved on PUT requests.
       const fd = new FormData();
       Object.entries(payload).forEach(([key, val]) => {
         if (val !== undefined && val !== null && val !== '') {
@@ -538,7 +538,6 @@ export default function AdminCandidates() {
         }
       });
 
-      // Remove Content-Type so browser sets multipart/form-data boundary automatically
       const headers = getAuthHeader();
       delete headers['Content-Type'];
 
@@ -547,8 +546,6 @@ export default function AdminCandidates() {
 
       const savedCandidate = await res.json();
 
-      // ✅ FIX 3: Optimistically update local state immediately from the server
-      // response so the table reflects changes without waiting for fetchData().
       if (isEditMode) {
         setCandidates(prev =>
           prev.map(c => c._id === selectedCandidateId ? { ...c, ...savedCandidate } : c)
@@ -557,7 +554,7 @@ export default function AdminCandidates() {
 
       toast({ title: 'Success', description: `Candidate ${isEditMode ? 'updated' : 'added'}` });
       setIsDialogOpen(false);
-      fetchData(); // full re-fetch to sync populated fields (e.g. recruiterId object)
+      fetchData(); 
     } catch (err) {
       const msg = err.message || '';
       if (msg.toLowerCase().includes('email') || msg.toLowerCase().includes('duplicate') || msg.toLowerCase().includes('e11000')) {
@@ -595,7 +592,6 @@ export default function AdminCandidates() {
     setIsEditMode(true);
     setSelectedCandidateId(c._id);
 
-    // Determine if the saved position matches a known job title, or is "Other"
     const savedPosition = c.position || '';
     const jobTitles = jobs.map(j => j.title || j.jobTitle || j.position || '').filter(Boolean);
     const isKnownJob = jobTitles.includes(savedPosition);
@@ -628,11 +624,11 @@ export default function AdminCandidates() {
       offersInHand: c.offersInHand ? 'true' : 'false',
       offerPackage: c.offerPackage || '',
       source: c.source || 'Portal',
-      status: Array.isArray(c.status) ? c.status[0] : c.status || 'Submitted',
+      // 🔴 Array for Multi-select
+      status: Array.isArray(c.status) ? c.status : [c.status || 'Submitted'],
       recruiterId: typeof c.recruiterId === 'object' ? c.recruiterId?._id : c.recruiterId || '',
       skills: Array.isArray(c.skills) ? c.skills.join(', ') : c.skills || '',
       remarks: c.remarks || '',
-      // ✅ FIX: Preserve original dateAdded so it never gets reset on edit
       dateAdded: c.dateAdded ? new Date(c.dateAdded).toISOString().split('T')[0] : '',
     });
     setErrors({});
@@ -683,10 +679,17 @@ export default function AdminCandidates() {
 
   const stats = useMemo(() => {
     const count = (s) => candidates.filter((c) => (Array.isArray(c.status) ? c.status : [c.status || '']).includes(s)).length;
+    const todayDate = getSafeDate(new Date());
+    const todayCount = candidates.filter(c => {
+      const d = c.dateAdded || c.createdAt;
+      return getSafeDate(d) === todayDate;
+    }).length;
+
     return {
       total: candidates.length, turnups: count('Turnups'), noShow: count('No Show'), yetToAttend: count('Yet to attend'),
       selected: count('Selected'), rejected: count('Rejected'), hold: count('Hold'), pipeline: count('Pipeline'),
       joined: count('Joined'), backout: count('Backout'), sharedProfiles: count('Shared Profiles'),
+      todaySubmissions: todayCount,
     };
   }, [candidates]);
 
@@ -744,7 +747,6 @@ export default function AdminCandidates() {
     document.body.removeChild(link);
   };
 
-  // ── Bulk Selection Helpers ──────────────────────────────────────────────────
   const handleSelectAll = (e) => {
     if (e.target.checked) {
       setSelectedIds(filteredCandidates.map(c => c._id));
@@ -800,7 +802,6 @@ export default function AdminCandidates() {
   };
 
   return (
-    // 🔴 FIX: Added 'grid grid-cols-1 min-w-0 w-full overflow-x-hidden' to STOP the page from stretching to 1800px!
     <div className="flex-1 grid grid-cols-1 min-w-0 w-full p-6 pb-48 overflow-y-auto overflow-x-hidden bg-slate-50 dark:bg-slate-950 min-h-screen">
       <div className="w-full max-w-full mx-auto space-y-6">
 
@@ -829,12 +830,13 @@ export default function AdminCandidates() {
           <StatCard title="Selected" value={stats.selected} colorTheme="selected" active={activeStatFilter === 'Selected'} onClick={() => { setActiveStatFilter('Selected'); setStatusFilter('all'); }} />
           <StatCard title="Rejected" value={stats.rejected} colorTheme="rejected" active={activeStatFilter === 'Rejected'} onClick={() => { setActiveStatFilter('Rejected'); setStatusFilter('all'); }} />
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-2">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-2">
           <StatCard title="Hold" value={stats.hold} colorTheme="hold" active={activeStatFilter === 'Hold'} onClick={() => { setActiveStatFilter('Hold'); setStatusFilter('all'); }} />
           <StatCard title="Pipeline" value={stats.pipeline} colorTheme="pipeline" active={activeStatFilter === 'Pipeline'} onClick={() => { setActiveStatFilter('Pipeline'); setStatusFilter('all'); }} />
           <StatCard title="Joined" value={stats.joined} colorTheme="joined" active={activeStatFilter === 'Joined'} onClick={() => { setActiveStatFilter('Joined'); setStatusFilter('all'); }} />
           <StatCard title="Backout" value={stats.backout} colorTheme="backout" active={activeStatFilter === 'Backout'} onClick={() => { setActiveStatFilter('Backout'); setStatusFilter('all'); }} />
           <StatCard title="Shared Profiles" value={stats.sharedProfiles} colorTheme="shared" active={activeStatFilter === 'Shared Profiles'} onClick={() => { setActiveStatFilter('Shared Profiles'); setStatusFilter('all'); }} />
+          <StatCard title="Today Submissions" value={stats.todaySubmissions} colorTheme="today" active={false} onClick={() => setIsTodaySubOpen(true)} />
         </div>
 
         {/* Filters */}
@@ -897,7 +899,6 @@ export default function AdminCandidates() {
           </div>
         )}
 
-        {/* Table Area With Double Horizontal Scroll Bar */}
         <style>{`
           .tbl-scroll::-webkit-scrollbar { height: 10px; }
           .tbl-scroll::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 10px; }
@@ -906,7 +907,6 @@ export default function AdminCandidates() {
           .tbl-scroll { scrollbar-width: thin; scrollbar-color: #475569 #e2e8f0; }
         `}</style>
 
-        {/* 🔴 FIX: w-full overflow-hidden strictly bounds the table wrapper so the scrollbar works INSIDE it */}
         <div className="w-full overflow-hidden border border-slate-200 rounded-xl shadow-sm bg-white flex flex-col">
           {loading ? (
             <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>
@@ -1367,12 +1367,26 @@ export default function AdminCandidates() {
                       {SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1 text-slate-700">Status</label>
-                    <select value={formData.status} onChange={(e) => handleInputChange('status', e.target.value)} className={inputCls(false)}>
-                      {ALL_STATUSES.map((s) => <option key={s}>{s}</option>)}
+
+                  {/* 🔴 Multi-Select Status UI */}
+                  <div className="space-y-1">
+                    <label className="block text-sm font-medium mb-1 text-slate-700">Status (Multi-select) *</label>
+                    <div className={`border rounded-lg p-2 min-h-[42px] flex flex-wrap gap-2 bg-white ${errors.status ? 'border-red-500' : 'border-slate-200 dark:border-slate-700'}`}>
+                      {formData.status.length > 0 ? formData.status.map(status => (
+                        <span key={status} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                          {status}
+                          <X className="h-3 w-3 cursor-pointer hover:text-red-500" onClick={() => removeStatus(status)} />
+                        </span>
+                      )) : <span className="text-sm text-slate-400 p-1">No status selected</span>}
+                    </div>
+                    <select value="" onChange={(e) => addStatus(e.target.value)} className={inputCls(errors.status)}>
+                      <option value="">Add a status...</option>
+                      <option value="SELECT_ALL">✓ Select All</option>
+                      {ALL_STATUSES.map(status => <option key={status} value={status} disabled={formData.status.includes(status)}>{status}</option>)}
                     </select>
+                    {errors.status && <p className="text-xs text-red-500 mt-1">{errors.status}</p>}
                   </div>
+
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium mb-1 text-slate-700">Assign to User</label>
                     <select value={formData.recruiterId} onChange={(e) => handleInputChange('recruiterId', e.target.value)} className={inputCls(false)}>
@@ -1453,6 +1467,180 @@ export default function AdminCandidates() {
           </div>
         </div>
       )}
+
+      {/* Today Submissions Modal — Admin only */}
+      {isTodaySubOpen && (
+        <AdminTodaySubmissionsModal
+          candidates={candidates}
+          recruiters={recruiters}
+          onClose={() => setIsTodaySubOpen(false)}
+          getCandidateId={getCandidateId}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Admin Today Submissions Modal ─────────────────────────────────────────────
+function AdminTodaySubmissionsModal({ candidates, recruiters, onClose, getCandidateId }) {
+  const todayStr = getSafeDate(new Date());
+  const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [recruiterFilter, setRecruiterFilter] = useState('all');
+
+  const filtered = useMemo(() => {
+    return candidates.filter(c => {
+      const d = c.dateAdded || c.createdAt;
+      const dateMatch = getSafeDate(d) === selectedDate;
+      if (!dateMatch) return false;
+      
+      if (recruiterFilter === 'all') return true;
+      const recId = typeof c.recruiterId === 'object' ? c.recruiterId?._id : c.recruiterId;
+      return String(recId) === String(recruiterFilter);
+    });
+  }, [candidates, selectedDate, recruiterFilter]);
+
+  const displayDate = selectedDate
+    ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    : '';
+
+  const getRecruiterDisplayName = (rec) => {
+    if (!rec) return '-';
+    if (typeof rec === 'object') return getRecruiterLabel(rec);
+    const found = recruiters.find(r => r._id === rec || r.id === rec);
+    if (found) return getRecruiterLabel(found);
+    return '-';
+  };
+
+  const selectedRecruiterName = recruiterFilter === 'all'
+    ? 'All Recruiters'
+    : getRecruiterDisplayName(recruiterFilter);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
+        
+        {/* Header */}
+        <div className="flex items-start justify-between px-6 pt-5 pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-violet-500" />
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">Day Submissions</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Viewing candidates submitted by {recruiterFilter === 'all' ? 'all recruiters' : selectedRecruiterName}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Dynamic Recruiter filter dropdown */}
+            <select
+              value={recruiterFilter}
+              onChange={e => setRecruiterFilter(e.target.value)}
+              className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-400 text-slate-700 min-w-[150px]"
+            >
+              <option value="all">All Recruiters</option>
+              {recruiters.map(r => (
+                <option key={r._id || r.id} value={r._id || r.id}>
+                  {getRecruiterLabel(r)}
+                </option>
+              ))}
+            </select>
+            {/* Date picker */}
+            <div className="flex items-center gap-1.5 border border-slate-300 rounded-lg px-3 py-1.5 text-sm text-slate-700 bg-white">
+              <Calendar className="h-3.5 w-3.5 text-slate-400" />
+              <input
+                type="date"
+                value={selectedDate}
+                max={todayStr}
+                onChange={e => setSelectedDate(e.target.value)}
+                className="border-none outline-none bg-transparent text-sm text-slate-700 cursor-pointer"
+              />
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-auto flex-1">
+          {filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+              <Calendar className="h-12 w-12 mb-3 opacity-30" />
+              <p className="text-sm font-medium">No submissions for {displayDate}</p>
+              {recruiterFilter !== 'all' && (
+                <p className="text-xs mt-1 text-slate-400">Try selecting "All Recruiters"</p>
+              )}
+            </div>
+          ) : (
+            <table className="w-full text-sm text-left border-collapse">
+              <thead className="bg-slate-50 text-slate-500 text-xs font-semibold border-b sticky top-0 z-10">
+                <tr>
+                  <th className="px-4 py-3 whitespace-nowrap">CANDIDATE ID</th>
+                  <th className="px-4 py-3 whitespace-nowrap">CANDIDATE NAME</th>
+                  <th className="px-4 py-3 whitespace-nowrap">RECRUITER</th>
+                  <th className="px-4 py-3 whitespace-nowrap">POSITION</th>
+                  <th className="px-4 py-3 whitespace-nowrap">CLIENT</th>
+                  <th className="px-4 py-3 whitespace-nowrap">STATUS</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filtered.map(c => {
+                  const statusArr = Array.isArray(c.status) ? c.status : [c.status || 'Submitted'];
+                  return (
+                    <tr key={c._id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3 font-mono text-xs text-blue-600 font-bold whitespace-nowrap">
+                        {getCandidateId(c)}
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-slate-900 whitespace-nowrap">{c.name}</td>
+                      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                        {getRecruiterDisplayName(c.recruiterId)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{c.position || '-'}</td>
+                      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{c.client || '-'}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="flex flex-wrap gap-1">
+                          {statusArr.map(s => (
+                            <span
+                              key={s}
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                s === 'Selected' || s === 'Joined'
+                                  ? 'bg-green-100 text-green-800'
+                                  : s === 'Rejected' || s === 'No Show' || s === 'Backout'
+                                    ? 'bg-red-100 text-red-700'
+                                    : 'bg-blue-100 text-blue-800'
+                              }`}
+                            >
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+          <p className="text-xs text-slate-500">
+            Showing <span className="font-semibold text-slate-700">{filtered.length}</span> submission{filtered.length !== 1 ? 's' : ''} for {displayDate}
+            {recruiterFilter !== 'all' && <span className="ml-1">· <span className="font-medium text-violet-600">{selectedRecruiterName}</span></span>}
+          </p>
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 border border-slate-300 rounded-lg hover:bg-white transition-colors"
+          >
+            Close Window
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

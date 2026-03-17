@@ -132,7 +132,6 @@ export default function RecruiterCandidates() {
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
   const [isCheckingPhone, setIsCheckingPhone] = useState(false);
 
-  // Refs for Top and Bottom Scrollbars
   const topScrollRef = useRef(null);
   const bottomScrollRef = useRef(null);
 
@@ -157,7 +156,6 @@ export default function RecruiterCandidates() {
 
   const [isCustomSource, setIsCustomSource] = useState(false);
 
-  // Today in YYYY-MM-DD — used as max for DOB & dateAdded inputs
   const todayStr = new Date().toISOString().split('T')[0];
 
   const initialFormState = {
@@ -186,13 +184,12 @@ export default function RecruiterCandidates() {
 
   const [formData, setFormData] = useState(initialFormState);
 
-  // ── Email duplicate check (called onBlur on email field) ───────────────────
   const checkEmailDuplicate = async (email) => {
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return;
+    // 🔴 Updated Regex for valid TLD check
+    if (!email || !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email.trim())) return;
     setIsCheckingEmail(true);
     try {
       const authH = await authHeaders();
-      // On edit, pass excludeId so the candidate being edited doesn't flag itself
       const excludeParam = selectedCandidateId ? `&excludeId=${selectedCandidateId}` : '';
       const res = await fetch(`${API_URL}/candidates/check-email?email=${encodeURIComponent(email.trim())}${excludeParam}`, {
         headers: { ...authH },
@@ -206,13 +203,11 @@ export default function RecruiterCandidates() {
         }));
       }
     } catch (_) {
-      // silently ignore network errors during check
     } finally {
       setIsCheckingEmail(false);
     }
   };
 
-  // ── Phone duplicate check (called onBlur on contact field) ─────────────────
   const checkPhoneDuplicate = async (phone) => {
     const digits = phone ? phone.replace(/\D/g, '').slice(-10) : '';
     if (!digits || digits.length !== 10) return;
@@ -232,7 +227,6 @@ export default function RecruiterCandidates() {
         }));
       }
     } catch (_) {
-      // silently ignore
     } finally {
       setIsCheckingPhone(false);
     }
@@ -361,17 +355,14 @@ export default function RecruiterCandidates() {
     if (status) { setActiveStatFilter(status); setStatusFilter('all'); }
   }, [searchParams]);
 
-  // ✅ REAL-TIME INPUT RESTRICTION
   const handleInputChange = (key, value) => {
     let newValue = value;
     
-    // Strict typing rules
     if (key === 'contact') {
       newValue = value.replace(/\D/g, '').slice(0, 10);
     } else if (key === 'firstName' || key === 'lastName') {
       newValue = value.replace(/[^a-zA-Z\s'\-]/g, '');
     } else if (key === 'totalExperience' || key === 'relevantExperience') {
-      // Allow only digits and a single decimal point
       newValue = value.replace(/[^0-9.]/g, '');
       const parts = newValue.split('.');
       if (parts.length > 2) newValue = parts[0] + '.' + parts.slice(1).join('');
@@ -379,7 +370,6 @@ export default function RecruiterCandidates() {
 
     setFormData(prev => ({ ...prev, [key]: newValue }));
     
-    // Clear error for the field being typed in
     if (errors[key]) {
       setErrors(prev => { const n = { ...prev }; delete n[key]; return n; });
     }
@@ -398,13 +388,11 @@ export default function RecruiterCandidates() {
     setFormData(prev => ({ ...prev, status: prev.status.filter(s => s !== statusToRemove) }));
   };
 
-  // ✅ STRICT SUBMIT VALIDATION
   const validateForm = () => {
     const newErrors = {};
     const trimStr = (val) => (typeof val === 'string' ? val.trim() : val);
     const data = formData;
 
-    // 1. Personal Info
     const firstName = trimStr(data.firstName);
     if (!firstName) newErrors.firstName = "First Name is required";
     else if (!/^[a-zA-Z\s'\-]{2,50}$/.test(firstName)) newErrors.firstName = "Must be 2–50 letters only";
@@ -413,14 +401,11 @@ export default function RecruiterCandidates() {
     if (!lastName) newErrors.lastName = "Last Name is required";
     else if (!/^[a-zA-Z\s'\-]{1,50}$/.test(lastName)) newErrors.lastName = "Must be letters only";
 
-    // DOB: optional but must be past date, age 18–80
     if (data.dateOfBirth) {
-      // Compare date strings to avoid UTC/local timezone mismatch
       const todayDateStr = new Date().toLocaleDateString('en-CA');
       if (data.dateOfBirth >= todayDateStr) {
         newErrors.dateOfBirth = 'Date of Birth must be in the past (not today or future)';
       } else {
-        // Age check: safe to use Date math here since we already confirmed it's in the past
         const dob = new Date(data.dateOfBirth);
         const now = new Date();
         const ageYears = (now - dob) / (1000 * 60 * 60 * 24 * 365.25);
@@ -429,11 +414,11 @@ export default function RecruiterCandidates() {
       }
     }
 
+    // 🔴 Updated Regex for validateForm
     const email = trimStr(data.email);
     if (!email) newErrors.email = "Email is required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) newErrors.email = "Invalid email format";
+    else if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) newErrors.email = "Enter a valid email ending with .com, .in, etc.";
     else if (errors.email && errors.email.includes('already exists')) {
-      // Preserve duplicate-email error set by checkEmailDuplicate onBlur
       newErrors.email = errors.email;
     }
 
@@ -441,7 +426,6 @@ export default function RecruiterCandidates() {
     if (!contact) newErrors.contact = "Phone is required";
     else if (contact.length !== 10) newErrors.contact = "Must be exactly 10 digits";
     else if (errors.contact && errors.contact.includes('already exists')) {
-      // Preserve duplicate-phone error set by checkPhoneDuplicate onBlur
       newErrors.contact = errors.contact;
     }
 
@@ -452,7 +436,6 @@ export default function RecruiterCandidates() {
     if (data.currentLocation && trimStr(data.currentLocation).length > 100) newErrors.currentLocation = "Max 100 characters";
     if (data.preferredLocation && trimStr(data.preferredLocation).length > 100) newErrors.preferredLocation = "Max 100 characters";
 
-    // 2. Professional Info
     const pos = trimStr(data.position);
     if (!pos) newErrors.position = "Position is required";
     else if (pos.length > 100) newErrors.position = "Max 100 characters allowed";
@@ -468,7 +451,6 @@ export default function RecruiterCandidates() {
 
     if (data.education && trimStr(data.education).length > 200) newErrors.education = "Max 200 characters";
 
-    // 3. Financials & Experience
     const totExp = trimStr(data.totalExperience);
     if (totExp && isNaN(Number(totExp))) newErrors.totalExperience = "Must be a valid number";
     
@@ -492,15 +474,12 @@ export default function RecruiterCandidates() {
       else if (trimStr(data.offerPackage).length > 50) newErrors.offerPackage = "Max 50 characters";
     }
 
-    // 4. Recruitment Info
     if (isCustomSource && !trimStr(data.source)) newErrors.source = "Source is required";
     if (!data.status || data.status.length === 0) newErrors.status = "At least one status is required";
     if (!data.dateAdded) {
       newErrors.dateAdded = "Date Added is required";
     } else {
-      // Compare as YYYY-MM-DD strings to avoid UTC vs local timezone mismatch
-      // e.g. new Date("2025-03-14") parses as UTC 00:00 which is "future" in IST
-      const todayDateStr = new Date().toLocaleDateString('en-CA'); // en-CA gives YYYY-MM-DD in local time
+      const todayDateStr = new Date().toLocaleDateString('en-CA'); 
       if (data.dateAdded > todayDateStr) {
         newErrors.dateAdded = "Date Added cannot be a future date — only today or earlier";
       }
@@ -515,6 +494,14 @@ export default function RecruiterCandidates() {
     const countStatus = (s) => candidates.filter(c =>
       Array.isArray(c.status) ? c.status.includes(s) : c.status === s
     ).length;
+
+    const todayStr2 = new Date().toLocaleDateString('en-CA');
+    const todayCount = candidates.filter(c => {
+      const d = c.dateAdded || c.createdAt;
+      if (!d) return false;
+      return new Date(d).toLocaleDateString('en-CA') === todayStr2;
+    }).length;
+
     return {
       total: candidates.length,
       turnups: countStatus('Turnups'),
@@ -527,10 +514,12 @@ export default function RecruiterCandidates() {
       pipeline: countStatus('Pipeline'),
       backout: countStatus('Backout'),
       sharedProfiles: countStatus('Shared Profiles'),
+      todaySubmissions: todayCount,
     };
   }, [candidates]);
 
   const getFilteredCandidates = useMemo(() => {
+    const todayLocal = new Date().toLocaleDateString('en-CA');
     return candidates.filter(c => {
       const searchMatch =
         c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -538,8 +527,15 @@ export default function RecruiterCandidates() {
         c.candidateId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (Array.isArray(c.skills) && c.skills.some(skill => skill.toLowerCase().includes(searchTerm.toLowerCase())));
       const currentStatusArr = Array.isArray(c.status) ? c.status : [c.status || ''];
+      
       let statCardMatch = true;
-      if (activeStatFilter) statCardMatch = currentStatusArr.includes(activeStatFilter);
+      if (activeStatFilter === 'Today') {
+        const d = c.dateAdded || c.createdAt;
+        statCardMatch = d ? new Date(d).toLocaleDateString('en-CA') === todayLocal : false;
+      } else if (activeStatFilter) {
+        statCardMatch = currentStatusArr.includes(activeStatFilter);
+      }
+      
       const statusDropdownMatch = statusFilter === 'all' || currentStatusArr.includes(statusFilter);
       return searchMatch && statusDropdownMatch && statCardMatch;
     });
@@ -615,8 +611,8 @@ export default function RecruiterCandidates() {
   };
 
   const handleSave = async (isEdit) => {
-    // ── Pre-submit duplicate email hard block ─────────────────────────────────
-    if (formData.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+    // 🔴 Updated Regex for Hard Block validation
+    if (formData.email && /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(formData.email.trim())) {
       try {
         const dupH = await authHeaders();
         const excludeParam = isEdit && selectedCandidateId ? `&excludeId=${selectedCandidateId}` : '';
@@ -627,13 +623,12 @@ export default function RecruiterCandidates() {
             const dupMsg = `A candidate with this email already exists (ID: ${dupData.candidateId}${dupData.name ? ' — ' + dupData.name : ''})`;
             setErrors(prev => ({ ...prev, email: dupMsg }));
             toast({ title: "Duplicate Email", description: "This email is already registered to another candidate.", variant: "destructive" });
-            return; // hard stop
+            return; 
           }
         }
-      } catch (_) { /* ignore, fall through */ }
+      } catch (_) { }
     }
 
-    // ── Pre-submit duplicate phone check (hard block) ───────────────────────
     if (formData.contact) {
       const digits = formData.contact.replace(/\D/g, '').slice(-10);
       if (digits.length === 10) {
@@ -647,10 +642,10 @@ export default function RecruiterCandidates() {
               const phMsg = `A candidate with this phone already exists (ID: ${phData.candidateId}${phData.name ? ' — ' + phData.name : ''})`;
               setErrors(prev => ({ ...prev, contact: phMsg }));
               toast({ title: "Duplicate Phone", description: "This phone number is already registered to another candidate.", variant: "destructive" });
-              return; // hard stop
+              return; 
             }
           }
-        } catch (_) { /* ignore */ }
+        } catch (_) { }
       }
     }
 
@@ -660,7 +655,6 @@ export default function RecruiterCandidates() {
       const authH = await authHeaders();
       const headers = { ...authH, 'Content-Type': 'application/json' };
 
-      // Clean Payload
       const builtName = `${formData.firstName || ''} ${formData.lastName || ''}`.trim();
 
       const payload = {
@@ -690,7 +684,8 @@ export default function RecruiterCandidates() {
         skills: typeof formData.skills === 'string' ? formData.skills.split(',').map((s) => s.trim()).filter(Boolean) : formData.skills,
         rating: parseInt(formData.rating) || 0,
         servingNoticePeriod: formData.servingNoticePeriod === 'true',
-        offersInHand: formData.offersInHand === 'true'
+        offersInHand: formData.offersInHand === 'true',
+        status: formData.status
       };
       const url = isEdit ? `${API_URL}/candidates/${selectedCandidateId}` : `${API_URL}/candidates`;
       const method = isEdit ? 'PUT' : 'POST';
@@ -780,10 +775,8 @@ export default function RecruiterCandidates() {
 
   if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>;
 
-  // ── Render Form function instead of Component to avoid cursor jump ──
   const renderCandidateForm = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 py-4">
-      {/* ── Section 1: Personal ── */}
       <div className="md:col-span-3 font-semibold border-b pb-1 text-slate-500 flex items-center gap-2"><UserCircle className="h-4 w-4" /> Personal Information</div>
 
       <div className="space-y-1">
@@ -860,7 +853,6 @@ export default function RecruiterCandidates() {
         {errors.preferredLocation && <span className="text-xs text-red-500">{errors.preferredLocation}</span>}
       </div>
 
-      {/* ── Section 2: Professional ── */}
       <div className="md:col-span-3 font-semibold border-b pb-1 text-slate-500 mt-4 flex items-center gap-2"><Briefcase className="h-4 w-4" /> Professional Information</div>
 
       <div className="space-y-1">
@@ -899,7 +891,6 @@ export default function RecruiterCandidates() {
         {errors.education && <span className="text-xs text-red-500">{errors.education}</span>}
       </div>
 
-      {/* ── Section 3: Financial & Availability ── */}
       <div className="md:col-span-3 font-semibold text-slate-500 border-b pb-1 mt-4 flex items-center gap-2"><IndianRupee className="h-4 w-4" /> Experience & Availability</div>
 
       <div className="space-y-1">
@@ -981,7 +972,6 @@ export default function RecruiterCandidates() {
         </div>
       )}
 
-      {/* ── Section 4: Recruitment Status ── */}
       <div className="md:col-span-3 font-semibold text-slate-500 border-b pb-1 mt-4 flex items-center gap-2"><Target className="h-4 w-4" /> Recruitment Details</div>
 
       <div className="space-y-1">
@@ -1039,12 +1029,9 @@ export default function RecruiterCandidates() {
     </div>
   );
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-
   return (
     <>
       <style>{`
-        /* Custom sleek horizontal scrollbar */
         .sleek-scrollbar::-webkit-scrollbar {
           height: 10px;
         }
@@ -1061,17 +1048,13 @@ export default function RecruiterCandidates() {
         }
       `}</style>
 
-      {/* ✨ CRITICAL FIX 1: Added grid-cols-1, min-w-0, and overflow-x-hidden here to lock width */}
       <main className="flex-1 grid grid-cols-1 min-w-0 w-full p-6 overflow-y-auto overflow-x-hidden pb-48">
         
-        {/* ✨ CRITICAL FIX 2: Set width bounds strictly */}
         <div className="w-full max-w-full mx-auto space-y-6">
-          {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <h1 className="text-3xl font-bold">
-                {/* Dynamically Show correct title */}
-                {(userRole === 'admin' || userRole === 'manager') ? 'My Candidates' : 'My Candidates'}
+                My Candidates
               </h1>
               <p className="text-slate-500">Manage pipeline</p>
             </div>
@@ -1091,9 +1074,9 @@ export default function RecruiterCandidates() {
             </div>
           </div>
 
-          {/* Stat Cards */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <StatCard title="Overall Submissions" value={stats.total} color="blue" active={activeStatFilter === null} onClick={() => { setActiveStatFilter(null); setStatusFilter('all'); }} />
+            <StatCard title="Today Submissions" value={stats.todaySubmissions} color="purple" active={activeStatFilter === 'Today'} onClick={() => { setActiveStatFilter('Today'); setStatusFilter('all'); }} />
             <StatCard title="Turnups" value={stats.turnups} color="cyan" active={activeStatFilter === 'Turnups'} onClick={() => { setActiveStatFilter('Turnups'); setStatusFilter('all'); }} />
             <StatCard title="No Show" value={stats.noShow} color="indigo" active={activeStatFilter === 'No Show'} onClick={() => { setActiveStatFilter('No Show'); setStatusFilter('all'); }} />
             <StatCard title="Yet to attend" value={stats.yetToAttend} color="purple" active={activeStatFilter === 'Yet to attend'} onClick={() => { setActiveStatFilter('Yet to attend'); setStatusFilter('all'); }} />
@@ -1106,7 +1089,6 @@ export default function RecruiterCandidates() {
             <StatCard title="Shared Profiles" value={stats.sharedProfiles} color="cyan" active={activeStatFilter === 'Shared Profiles'} onClick={() => { setActiveStatFilter('Shared Profiles'); setStatusFilter('all'); }} />
           </div>
 
-          {/* Filters */}
           <div className="p-4 border border-slate-200 rounded-xl bg-white shadow-sm">
             <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
               <div className="relative w-full md:max-w-md">
@@ -1126,13 +1108,8 @@ export default function RecruiterCandidates() {
             </div>
           </div>
 
-          {/* Table View With Double Custom Scrollbar */}
           {viewMode === 'table' ? (
-            
-            // ✨ CRITICAL FIX 3: Boxed in the wrapper so it doesn't leak size
             <div className="w-full overflow-hidden border border-slate-200 rounded-xl shadow-sm bg-white flex flex-col">
-              
-              {/* TOP SCROLLBAR (Sleek) */}
               <div 
                 ref={topScrollRef} 
                 onScroll={handleTopScroll} 
@@ -1142,7 +1119,6 @@ export default function RecruiterCandidates() {
                 <div style={{ width: '1600px', height: '1px' }}></div>
               </div>
 
-              {/* TABLE CONTAINER */}
               <div ref={bottomScrollRef} onScroll={handleBottomScroll} className="w-full overflow-x-auto sleek-scrollbar rounded-b-xl">
                 <table className="w-full text-sm text-left border-collapse min-w-[1600px]">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b">

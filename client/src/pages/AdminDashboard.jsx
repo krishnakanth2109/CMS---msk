@@ -125,6 +125,10 @@ export default function AdminDashboard() {
   const [modalLoading, setModalLoading] = useState(false);
   // Default filter date to today (YYYY-MM-DD)
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
+  // Recruiter filter for Day Submissions modal
+  const [recruiterFilter, setRecruiterFilter] = useState('All');
+
+  const RECRUITER_NAMES = ['All', 'Varun', 'Lahithya', 'Akhila', 'Hema', 'Nainika'];
 
   // Initial Data Fetch
   useEffect(() => {
@@ -216,6 +220,21 @@ export default function AdminDashboard() {
     name: r.fullName.split(' ')[0], 
     value: r.submissions 
   }));
+
+  // Filter modal data by selected recruiter — must be before any early return
+  const filteredModalData = useMemo(() => {
+    if (recruiterFilter === 'All') return modalData;
+    return modalData.filter(c => {
+      const rec = c.recruiterId;
+      if (!rec) return false;
+      const firstName = (
+        typeof rec === 'object'
+          ? (rec.firstName || rec.name?.split(' ')[0] || rec.username || '')
+          : ''
+      ).toLowerCase();
+      return firstName === recruiterFilter.toLowerCase();
+    });
+  }, [modalData, recruiterFilter]);
 
   if (loading) return (
     <div className="flex h-screen w-full items-center justify-center bg-[#f3f6fd]">
@@ -435,18 +454,31 @@ export default function AdminDashboard() {
                   Day Submissions
                 </h2>
                 <p className="text-xs text-gray-500 font-medium mt-1">
-                  Viewing candidates submitted by all recruiters
+                  Viewing candidates submitted by {recruiterFilter === 'All' ? 'all recruiters' : recruiterFilter}
                 </p>
               </div>
 
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
+                {/* Recruiter Filter Dropdown */}
+                <select
+                  value={recruiterFilter}
+                  onChange={(e) => setRecruiterFilter(e.target.value)}
+                  className="pl-3 pr-8 py-2 text-sm border border-gray-200 rounded-lg text-slate-700 font-medium focus:ring-2 focus:ring-[#283086] focus:outline-none bg-white appearance-none cursor-pointer"
+                >
+                  {RECRUITER_NAMES.map(name => (
+                    <option key={name} value={name}>
+                      {name === 'All' ? 'All Recruiters' : name}
+                    </option>
+                  ))}
+                </select>
+
                 {/* Calendar Filter */}
                 <div className="relative flex items-center">
                   <Calendar className="absolute left-3 w-4 h-4 text-gray-400" />
                   <input 
                     type="date" 
                     value={filterDate}
-                    max={new Date().toISOString().split('T')[0]} // Max date is today
+                    max={new Date().toISOString().split('T')[0]}
                     onChange={(e) => setFilterDate(e.target.value)}
                     className="pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg text-slate-700 font-medium focus:ring-2 focus:ring-[#283086] focus:outline-none"
                   />
@@ -468,13 +500,17 @@ export default function AdminDashboard() {
                   <div className="animate-spin h-8 w-8 border-4 border-purple-500 border-t-transparent rounded-full" />
                   <p className="text-sm text-gray-500 font-medium tracking-wide">Fetching Submissions...</p>
                 </div>
-              ) : modalData.length === 0 ? (
+              ) : filteredModalData.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-64 text-center">
                   <div className="bg-gray-50 p-4 rounded-full mb-3">
                     <ClipboardList className="w-8 h-8 text-gray-400" />
                   </div>
                   <h3 className="text-slate-800 font-bold">No submissions found</h3>
-                  <p className="text-sm text-gray-500 mt-1">No candidates were added on {filterDate}</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {recruiterFilter !== 'All'
+                      ? `No candidates submitted by ${recruiterFilter} on ${filterDate}`
+                      : `No candidates were added on ${filterDate}`}
+                  </p>
                 </div>
               ) : (
                 <table className="w-full text-sm">
@@ -484,11 +520,12 @@ export default function AdminDashboard() {
                       <th className="px-6 py-4 text-left">Candidate Name</th>
                       <th className="px-6 py-4 text-left">Recruiter</th>
                       <th className="px-6 py-4 text-left">Position</th>
+                      <th className="px-6 py-4 text-left">Client</th>
                       <th className="px-6 py-4 text-center">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {modalData.map((c) => {
+                    {filteredModalData.map((c) => {
                       const recruiterName = c.recruiterId?.firstName 
                         ? `${c.recruiterId.firstName} ${c.recruiterId.lastName || ''}`.trim() 
                         : (c.recruiterId?.name || c.recruiterName || 'Unknown');
@@ -501,6 +538,7 @@ export default function AdminDashboard() {
                           <td className="px-6 py-4 font-semibold text-slate-800">{c.name || `${c.firstName} ${c.lastName}`}</td>
                           <td className="px-6 py-4 font-medium text-gray-600">{recruiterName}</td>
                           <td className="px-6 py-4 text-gray-500">{c.position || '-'}</td>
+                          <td className="px-6 py-4 text-gray-500">{c.client || '-'}</td>
                           <td className="px-6 py-4 text-center">
                             <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
                               {cStatus || 'SUBMITTED'}
@@ -515,9 +553,12 @@ export default function AdminDashboard() {
             </div>
 
             {/* Modal Footer */}
-            {!modalLoading && modalData.length > 0 && (
+            {!modalLoading && filteredModalData.length > 0 && (
               <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 flex justify-between items-center text-xs font-medium text-gray-500">
-                <p>Showing {modalData.length} submission(s) for the selected date.</p>
+                <p>
+                  Showing {filteredModalData.length} submission(s) for the selected date
+                  {recruiterFilter !== 'All' && <span> · <span className="text-purple-600 font-semibold">{recruiterFilter}</span></span>}
+                </p>
                 <button 
                   onClick={() => setIsModalOpen(false)}
                   className="text-slate-700 hover:text-[#283086] font-bold uppercase tracking-wider"

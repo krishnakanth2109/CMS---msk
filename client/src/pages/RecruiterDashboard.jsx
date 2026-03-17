@@ -39,7 +39,6 @@ function ProfessionalStatCard({
         h-36 border border-gray-100 dark:border-gray-700
       `}
     >
-      {/* Top Row: Title and Icon */}
       <div className="flex justify-between items-start">
         <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
           {title}
@@ -49,14 +48,12 @@ function ProfessionalStatCard({
         </div>
       </div>
 
-      {/* Middle: Value */}
       <div className="mt-2">
         <h3 className="text-3xl font-bold text-blue-900 dark:text-blue-100">
           {value}
         </h3>
       </div>
 
-      {/* Bottom: Trend Pill */}
       <div className="mt-auto pt-2">
         {trend !== 0 && (
           <span className={`
@@ -79,7 +76,6 @@ export default function RecruiterDashboard() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Data State
   const [candidates, setCandidates] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [interviews, setInterviews] = useState([]);
@@ -90,7 +86,6 @@ export default function RecruiterDashboard() {
     return { 'Content-Type': 'application/json', ...h };
   };
 
-  // Fetch Data
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -181,11 +176,9 @@ export default function RecruiterDashboard() {
     if (user) fetchData();
   }, [user, toast]);
 
-  // --- Filtering Logic ---
   const filteredCandidates = useMemo(() => candidates, [candidates]);
   const filteredJobs = useMemo(() => jobs, [jobs]);
   
-  // --- Stats Calculation ---
   const candidateStats = useMemo(() => {
     const total = filteredCandidates.length;
 
@@ -208,14 +201,14 @@ export default function RecruiterDashboard() {
     const hold = filteredCandidates.filter(c => hasStatus(c.status, ['Hold'])).length;
     const backout = filteredCandidates.filter(c => hasStatus(c.status, ['Backout'])).length;
 
-    // Today Submissions
+    // Calculate Today's Submissions specifically
     const todayStr = new Date().toDateString();
     const todaySubmissions = filteredCandidates.filter(c => {
       if (!c.createdAt) return false;
       return new Date(c.createdAt).toDateString() === todayStr;
     }).length;
 
-    const successRate = total > 0 ? ((joined / total) * 100).toFixed(1) : '12.0'; // Defaulting to 12.0 as per PDF if 0
+    const successRate = total > 0 ? ((joined / total) * 100).toFixed(1) : '12.0'; 
 
     return { total, submitted, interview, offer, joined, rejected, selected, hold, backout, todaySubmissions, successRate };
   }, [filteredCandidates]);
@@ -227,16 +220,14 @@ export default function RecruiterDashboard() {
 
   const jobStats = useMemo(() => ({ totalAssignedJobs: filteredJobs.length }), [filteredJobs]);
 
-  // --- Chart Data Transformation (To match PDF visuals) ---
   const chartData = useMemo(() => [
-    { name: 'Submitted', value: candidateStats.submitted, fill: '#3B82F6' }, // Blue
-    { name: 'Interview', value: candidateStats.interview, fill: '#F59E0B' }, // Orange/Yellow
-    { name: 'Offer', value: candidateStats.offer, fill: '#8B5CF6' },         // Purple
-    { name: 'Rejected', value: candidateStats.rejected, fill: '#EF4444' },   // Red
-    { name: 'Joined', value: candidateStats.joined, fill: '#10B981' },       // Green
+    { name: 'Submitted', value: candidateStats.submitted, fill: '#3B82F6' },
+    { name: 'Interview', value: candidateStats.interview, fill: '#F59E0B' },
+    { name: 'Offer', value: candidateStats.offer, fill: '#8B5CF6' },        
+    { name: 'Rejected', value: candidateStats.rejected, fill: '#EF4444' },  
+    { name: 'Joined', value: candidateStats.joined, fill: '#10B981' },      
   ], [candidateStats]);
 
-  // Navigation
   const handleNavigateToCandidates = (status) => {
     if (status) {
       navigate(`/recruiter/candidates?status=${status}`);
@@ -276,7 +267,6 @@ export default function RecruiterDashboard() {
     <main className="flex-1 overflow-y-auto p-4 bg-gray-50/50 dark:bg-gray-900">
       <div className="max-w-[1600px] mx-auto space-y-6">
         
-        {/* Header Section */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
           <div>
             <h1 className="text-2xl font-bold text-blue-700 dark:text-blue-400">
@@ -291,10 +281,7 @@ export default function RecruiterDashboard() {
           </div>
         </div>
 
-        {/* Stats Grid - 2 Rows of 5 */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          
-          {/* Row 1 */}
           <ProfessionalStatCard 
             title="TOTAL CANDIDATES" 
             value={candidateStats.total} 
@@ -303,13 +290,14 @@ export default function RecruiterDashboard() {
             bgColor="bg-teal-100" textColor="text-teal-600"
             onClick={() => handleNavigateToCandidates()} 
           />
+          {/* ✅ UPDATED ROUTING TO TODAY IN CANDIDATES */}
           <ProfessionalStatCard 
             title="TODAY SUBMISSIONS" 
             value={candidateStats.todaySubmissions} 
             icon={UserPlus} 
             trend={2} 
             bgColor="bg-blue-100" textColor="text-blue-600"
-            onClick={() => handleNavigateToCandidates()} 
+            onClick={() => handleNavigateToCandidates('Today')} 
           />
           <ProfessionalStatCard 
             title="ASSIGNED JOBS" 
@@ -335,7 +323,6 @@ export default function RecruiterDashboard() {
             bgColor="bg-fuchsia-100" textColor="text-fuchsia-600"
           />
 
-          {/* Row 2 */}
           <ProfessionalStatCard 
             title="SELECTED" 
             value={candidateStats.selected} 
@@ -378,7 +365,6 @@ export default function RecruiterDashboard() {
           />
         </div>
 
-        {/* Chart Section - Full Width */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6">
             Candidate Pipeline (Overall Analysis)
@@ -408,7 +394,6 @@ export default function RecruiterDashboard() {
               </BarChart>
             </ResponsiveContainer>
           </div>
-          {/* Legend manually constructed to match PDF look */}
           <div className="flex flex-wrap justify-center gap-6 mt-4">
              {chartData.map((item) => (
                <div key={item.name} className="flex items-center gap-2">
@@ -419,7 +404,6 @@ export default function RecruiterDashboard() {
           </div>
         </div>
 
-        {/* Candidates Table */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div className="p-4 md:px-6 md:py-4 flex justify-between items-center border-b border-gray-100 dark:border-gray-700">
             <h3 className="text-lg font-bold text-gray-800 dark:text-white">Recruiter Candidates</h3>
@@ -460,7 +444,6 @@ export default function RecruiterDashboard() {
           </div>
         </div>
 
-        {/* Bottom Navigation Buttons (Colored) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <button 
             onClick={() => handleNavigateToCandidates()} 
