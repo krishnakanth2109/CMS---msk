@@ -2,7 +2,6 @@ import Message from '../models/Message.js';
 import User from '../models/User.js';
 
 // Batch resolve display names for a list of from/to values
-// Instead of 1 DB query per message (N+1), do 1 query total
 const batchResolveNames = async (values) => {
   const unique = [...new Set(values.filter(Boolean))];
   const objectIds = unique.filter(v => /^[a-f\d]{24}$/i.test(v));
@@ -37,7 +36,6 @@ export const getMessages = async (req, res) => {
     let query;
 
     if (role === 'admin') {
-      // Admin sees all messages to/from admin + broadcasts
       query = {
         $or: [
           { to: 'admin' },
@@ -46,7 +44,6 @@ export const getMessages = async (req, res) => {
         ]
       };
     } else {
-      // Manager OR Recruiter: match by their MongoDB id, username, or broadcasts
       query = {
         $or: [
           { to: id },
@@ -60,7 +57,6 @@ export const getMessages = async (req, res) => {
 
     const messages = await Message.find(query).sort({ createdAt: -1 }).lean();
 
-    // Batch resolve all from/to names in ONE query instead of N queries
     const allValues = messages.flatMap(m => [m.from, m.to]);
     const resolve = await batchResolveNames(allValues);
 
@@ -83,7 +79,6 @@ export const sendMessage = async (req, res) => {
     const { to, subject, content } = req.body;
     const { role, id } = req.user;
 
-    // Admin sends as 'admin', everyone else sends as their MongoDB id
     const from = role === 'admin' ? 'admin' : id;
 
     const message = await Message.create({ from, to, subject, content });
@@ -95,19 +90,35 @@ export const sendMessage = async (req, res) => {
   }
 };
 
-// @desc    Update a message
+// @desc    Update a message (subject, content, and/or read status)
 // @route   PUT /api/messages/:id
 export const updateMessage = async (req, res) => {
   try {
     const message = await Message.findById(req.params.id);
     if (!message) return res.status(404).json({ message: 'Message not found' });
 
-    if (req.user.role !== 'admin' && message.from !== req.user.id) {
+    // Allow the recipient to mark as read, or the sender/admin to edit content
+    const isAdmin   = req.user.role === 'admin';
+    const isSender  = message.from === req.user.id || (isAdmin && message.from === 'admin');
+    const isRecipient =
+      message.to === req.user.id ||
+      message.to === req.user.username ||
+      (isAdmin && (message.to === 'admin' || message.to === 'all'));
+
+    if (!isAdmin && !isSender && !isRecipient) {
       return res.status(401).json({ message: 'Not authorized' });
     }
 
-    message.subject = req.body.subject || message.subject;
-    message.content = req.body.content || message.content;
+    // Allow recipients to mark as read
+    if (typeof req.body.read === 'boolean' && isRecipient) {
+      message.read = req.body.read;
+    }
+
+    // Allow sender/admin to edit content fields
+    if (isSender || isAdmin) {
+      if (req.body.subject !== undefined) message.subject = req.body.subject || message.subject;
+      if (req.body.content !== undefined) message.content = req.body.content || message.content;
+    }
 
     const updatedMessage = await message.save();
     res.json(updatedMessage);
