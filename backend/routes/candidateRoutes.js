@@ -112,8 +112,16 @@ router.get('/', async (req, res) => {
   try {
     const query = {};
 
+    // Recruiters always see only their own candidates (enforced server-side)
     if (req.user && req.user.role !== 'admin' && req.user.role !== 'manager') {
       query.recruiterId = req.user._id;
+    }
+
+    // Admin/manager can pass ?recruiterId=<id> to filter to a specific recruiter's candidates.
+    // This is used when an admin is on the RecruiterCandidates page (their own personal view)
+    // so they only see candidates they personally added, not the entire database.
+    if (req.query.recruiterId && (req.user.role === 'admin' || req.user.role === 'manager')) {
+      query.recruiterId = req.query.recruiterId;
     }
 
     if (req.query.date) {

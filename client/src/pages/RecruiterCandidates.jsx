@@ -309,10 +309,17 @@ export default function RecruiterCandidates() {
       const authH = await authHeaders();
       const headers = { ...authH };
 
-      // Backend already filters candidates by recruiterId for non-admin/manager roles
-      // No need to fetch all and filter client-side
+      // For recruiter: backend already filters by recruiterId automatically.
+      // For admin/manager on THIS page (RecruiterCandidates — their personal view):
+      // pass their own _id as ?recruiterId= so the backend only returns their candidates,
+      // not all candidates in the entire database.
+      const isAdminOrManager = currentUser?.role === 'admin' || currentUser?.role === 'manager';
+      const candidateUrl = isAdminOrManager && currentUser?._id
+        ? `${API_URL}/candidates?recruiterId=${currentUser._id}`
+        : `${API_URL}/candidates`;
+
       const [candRes, jobRes, clientRes] = await Promise.all([
-        fetch(`${API_URL}/candidates`, { headers }),
+        fetch(candidateUrl, { headers }),
         fetch(`${API_URL}/jobs`, { headers }),
         fetch(`${API_URL}/clients`, { headers })
       ]);
