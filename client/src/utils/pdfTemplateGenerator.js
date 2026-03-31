@@ -20,28 +20,22 @@ export const generatePdfWithTemplate = async (htmlContent, templateUrl = '/Arah_
         // ── Template-specific configurations ──────────────────────────
         const TEMPLATE_CONFIG = {
             '/Arah_Template.pdf': {
-                pageW: 612, pageH: 792, marginTop: 111, marginBottom: 57, marginLR: 50,
-                watermark: 'ARAH INFOTECH'
+                pageW: 612, pageH: 792, marginTop: 111, marginBottom: 57, marginLR: 50
             },
             '/Arah_Template.jpg': {
-                pageW: 612, pageH: 792, marginTop: 111, marginBottom: 57, marginLR: 50,
-                watermark: 'ARAH INFOTECH'
+                pageW: 612, pageH: 792, marginTop: 111, marginBottom: 57, marginLR: 50
             },
             '/Vagerious.pdf': {
-                pageW: 595, pageH: 842, marginTop: 140, marginBottom: 104, marginLR: 50,
-                watermark: 'VAGARIOUS'
+                pageW: 595, pageH: 842, marginTop: 140, marginBottom: 104, marginLR: 50
             },
             '/UPlife.pdf': {
-                pageW: 596, pageH: 842, marginTop: 99, marginBottom: 78, marginLR: 50,
-                watermark: 'UP LIFE INDIA'
+                pageW: 596, pageH: 842, marginTop: 99, marginBottom: 78, marginLR: 50
             },
             '/Zero7_A4.pdf': {
-                pageW: 595, pageH: 842, marginTop: 140, marginBottom: 101, marginLR: 50,
-                watermark: 'ZERO7'
+                pageW: 595, pageH: 842, marginTop: 140, marginBottom: 101, marginLR: 50
             },
             '/Zero7_A4.jpg': {
-                pageW: 595, pageH: 842, marginTop: 140, marginBottom: 101, marginLR: 50,
-                watermark: 'ZERO7'
+                pageW: 595, pageH: 842, marginTop: 140, marginBottom: 101, marginLR: 50
             },
         };
 
@@ -58,7 +52,7 @@ export const generatePdfWithTemplate = async (htmlContent, templateUrl = '/Arah_
         const CONTENT_H = PAGE_H - MARGIN_TOP - MARGIN_BOTTOM;
 
         const CONTAINER_W = Math.round(CONTENT_W);
-        const SCALE = 2;
+        const SCALE = 3;
 
         console.log(`[PDF GEN] Template: ${templateUrl}`);
         console.log(`[PDF GEN] Page: ${PAGE_W}×${PAGE_H}, Content: ${CONTENT_W}×${CONTENT_H}, Container: ${CONTAINER_W}px`);
@@ -130,17 +124,12 @@ export const generatePdfWithTemplate = async (htmlContent, templateUrl = '/Arah_
                 font-size: ${isDense ? '10px' : '11px'} !important;
                 margin: 8px 0 !important;
             }
-            .pdfgen td, .pdfgen th { padding: 4px !important; }
+            .pdfgen table:not(.signature-table) td, .pdfgen table:not(.signature-table) th { padding: 4px; }
             .pdfgen table:not([style*="border: none"]) td,
             .pdfgen table:not([style*="border: none"]) th {
                 border: 1px solid #000 !important;
             }
-            .pdfgen ul, .pdfgen ol {
-                padding-left: 18px !important;
-                margin-top: 2px !important;
-                margin-bottom: 5px !important;
-            }
-            .pdfgen li { margin-bottom: 2px !important; }
+            /* Lists are transformed to tables dynamically inside JS */
             .pdfgen .section-block {
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
@@ -174,14 +163,48 @@ export const generatePdfWithTemplate = async (htmlContent, templateUrl = '/Arah_
 
         container.innerHTML = cleanHtml;
 
+        // CRITICAL FIX: Convert all native lists to layout tables to prevent html2canvas word wrap tearing
+        container.querySelectorAll('li').forEach(li => {
+            let content = li.innerHTML;
+            if (content.trim().startsWith('*')) { content = content.replace('*', '').trim(); }
+            let align = li.style.textAlign || 'justify';
+            
+            const table = document.createElement('table');
+            table.style.width = '100%';
+            table.style.border = 'none';
+            table.style.margin = '0 0 6px 0';
+            table.style.padding = '0';
+            table.style.borderCollapse = 'collapse';
+            table.innerHTML = `
+                <tr>
+                    <td style="width: 25px; min-width: 25px; max-width: 25px; vertical-align: top; padding: 0 5px 0 5px; text-align: center; border: none; font-size: ${fontSize}; font-family: Arial, Helvetica, sans-serif;">&bull;</td>
+                    <td style="text-align: ${align}; vertical-align: top; padding: 0; border: none; line-height: 1.6;">${content}</td>
+                </tr>
+            `;
+            li.replaceWith(table);
+        });
+
+        // Strip the ul container entirely as tables now manage the structure
+        container.querySelectorAll('ul, ol').forEach(ul => {
+            const div = document.createElement('div');
+            div.style.margin = '6px 0 15px 10px';
+            div.innerHTML = ul.innerHTML;
+            ul.replaceWith(div);
+        });
+
         wrapper.appendChild(styleTag);
         wrapper.appendChild(container);
         document.body.appendChild(wrapper);
 
-        // Force solid black text on every element
+        // Force solid black text on every element, except those with specific inline color
         container.querySelectorAll('*').forEach(el => {
-            el.style.color = '#000000';
-            el.style.webkitTextFillColor = '#000000';
+            const inlineColor = el.style.color;
+            if (!inlineColor || inlineColor === '' || inlineColor === 'rgb(0, 0, 0)' || inlineColor === '#000000') {
+                el.style.color = '#000000';
+                el.style.webkitTextFillColor = '#000000';
+            } else {
+                el.style.webkitTextFillColor = inlineColor;
+            }
             if (['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'STRONG', 'B', 'TH'].includes(el.tagName)) {
                 el.style.fontWeight = 'bold';
             }
