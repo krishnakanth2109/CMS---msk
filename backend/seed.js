@@ -11,7 +11,7 @@ dotenv.config();
 // ============ CONFIGURATION ============
 const MONGODB_URI = process.env.MONGO_URL || 'mongodb://localhost:27017/your-database';
 const EXCEL_FILE_PATH = './Submissions.xlsx';
-const RECRUITER_EMAIL = 'varun.vagarioussolutions@gmail.com';
+const RECRUITER_EMAIL = 'kkanth355@gmail.com';
 
 // ============ CONNECT TO DATABASE ============
 const connectDB = async () => {
@@ -121,10 +121,17 @@ const mapExcelDataToCandidate = (data, recruiterInfo) => {
       .filter(s => s.length > 0);
   };
 
+  const rawName = getValue('NAME') || getValue('Name') || getValue('name') || 'Unknown';
+  const nameParts = rawName.trim().split(/\s+/);
+  const firstName = nameParts[0];
+  const lastName = nameParts.slice(1).join(' ') || 'Unknown';
+
   // Map Excel fields to candidate schema
   const candidateData = {
     // Personal Info
-    name: getValue('NAME') || getValue('Name') || getValue('name') || 'Unknown',
+    firstName: firstName,
+    lastName: lastName,
+    name: rawName,
     email: getValue('EMAIL') || getValue('Email') || getValue('email') || `unknown${Date.now()}@example.com`,
     contact: getValue('CONTACT') || getValue('Contact') || getValue('contact') || getValue('PHONE') || getValue('Phone') || 'N/A',
     

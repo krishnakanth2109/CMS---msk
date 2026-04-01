@@ -120,7 +120,7 @@ export default function AdminRecruiters() {
       const candidateData = await rc.json();
 
       const allUsers = recruiterData
-        .filter((user) => ['recruiter', 'admin'].includes(user.role))
+        .filter((user) => ['recruiter', 'admin', 'manager'].includes(user.role))
         .map((r) => ({ ...r, id: r._id }));
 
       setRecruiters(allUsers);

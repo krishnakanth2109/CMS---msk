@@ -23,6 +23,7 @@ import AdminMessages from '@/pages/AdminMessages';
 import AdminReports from '@/pages/AdminReports';
 import AdminSettings from '@/pages/AdminSettings';
 import AgreementGenerator from '@/pages/AgreementGenerator';
+import MockInterviewsDashboard from '@/pages/MockInterviewsDashboard';
 
 // Manager Specific Pages
 import ManagerDashboard from '@/pages/ManagerDashboard'; // ✅ IMPORTED NEW PAGE
@@ -98,6 +99,7 @@ function AppRoutes() {
         } />
 
         <Route path="reports" element={<AdminReports />} />
+        <Route path="mock" element={<MockInterviewsDashboard />} />
         <Route path="settings" element={<AdminSettings />} />
         <Route path="agreements" element={<AgreementGenerator />} />
       </Route>
@@ -114,6 +116,7 @@ function AppRoutes() {
         <Route path="schedules" element={<RecruiterSchedules />} />
         <Route path="messages" element={<MessagesRecruiters />} />
         <Route path="reports" element={<RecruiterReports />} />
+        <Route path="mock" element={<MockInterviewsDashboard />} />
         <Route path="profile" element={<RecruiterProfile />} />
         <Route path="settings" element={<RecruiterSettings />} />
       </Route>

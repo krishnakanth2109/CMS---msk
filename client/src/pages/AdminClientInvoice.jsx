@@ -283,14 +283,14 @@ const AdminClientInvoice = () => {
       }
 
       if (selectedClient?.contactPerson) {
-        drawText(selectedClient.contactPerson, 68, 170, 10);
-        addressLines.forEach((line, i) => drawText(line, 68, 185 + i * 13, 10));
+        drawText(selectedClient.contactPerson, 68, 170, 10, true);
+        addressLines.forEach((line, i) => drawText(line, 68, 185 + i * 13, 10, true));
         const gstY = 185 + addressLines.length * 13;
-        if (selectedClient?.gstNumber) drawText(`GST : ${selectedClient.gstNumber}`, 68, gstY, 10);
+        if (selectedClient?.gstNumber) drawText(`GST : ${selectedClient.gstNumber}`, 68, gstY, 10, true);
       } else {
-        addressLines.forEach((line, i) => drawText(line, 68, 170 + i * 13, 10));
+        addressLines.forEach((line, i) => drawText(line, 68, 170 + i * 13, 10, true));
         const gstY = 170 + addressLines.length * 13;
-        if (selectedClient?.gstNumber) drawText(`GST : ${selectedClient.gstNumber}`, 68, gstY, 10);
+        if (selectedClient?.gstNumber) drawText(`GST : ${selectedClient.gstNumber}`, 68, gstY, 10, true);
       }
 
       // -- Erase background "Date:" from template: RIGHT SIDE ONLY (X=370+) --
