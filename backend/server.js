@@ -189,6 +189,9 @@ app.use('/messages',   messageRoutes);
 app.use('/channels',   channelRoutes);
 app.use('/ai-mock',    aiMockRoutes);
 
+// Mount AI mock routes at root so index.html can call /start-session-interview etc. directly
+app.use('/',           aiMockRoutes);
+
 // ── Serve AI Mock Static Files ────────────────────────────────────────────────
 // Already served from root above
 

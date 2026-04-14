@@ -56,3 +56,4 @@ backend/error*.log
 client/build-error.log
 app.js
 check_db.js
+.env

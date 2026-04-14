@@ -207,10 +207,41 @@ router.post("/generate-next-question", async (req, res) => {
     return;
   }
 
-  try {
-    const newQuestion = await generateFollowupQuestion(answerText, ensureString(interview.profile_text), Number(currentQuestionId));
-    const currentIndex = interview.questions.findIndex((question) => Number(question.id) === Number(currentQuestionId));
+  const MAX_AI_QUESTIONS = 100; // Increased to 100 limit
+  const currentCount = interview.questions.length;
 
+  try {
+    let nextQuestion;
+    
+    // Issue 2: If we hit the limit, provide fixed fallback questions
+    if (currentCount >= MAX_AI_QUESTIONS) {
+      const fallbackQuestions = [
+        { question: "Can you tell me more about yourself and your background?", type: "Self Intro", difficulty: "Easy", category: "General" },
+        { question: "What are your greatest professional strengths and weaknesses?", type: "HR", difficulty: "Medium", category: "Behavioral" },
+        { question: "Can you describe a significant project you worked on recently?", type: "Project", difficulty: "Hard", category: "Technical" },
+        { question: "Where do you see yourself in the next five years?", type: "HR", difficulty: "Medium", category: "Career Goals" }
+      ];
+      
+      const index = (currentCount - MAX_AI_QUESTIONS) % fallbackQuestions.length;
+      const base = fallbackQuestions[index];
+      nextQuestion = { ...base, id: Number(currentQuestionId) + 1 };
+    } else {
+      // Use AI as normal
+      try {
+        nextQuestion = await generateFollowupQuestion(answerText, ensureString(interview.profile_text), Number(currentQuestionId));
+      } catch (err) {
+        console.error("AI Followup Generation Failed:", err.message);
+        nextQuestion = {
+          id: Number(currentQuestionId) + 1,
+          question: "Could you elaborate on your experience with this topic in a real-world scenario?",
+          type: "Recovery",
+          difficulty: "Medium",
+          category: "Experience"
+        };
+      }
+    }
+
+    const currentIndex = interview.questions.findIndex((question) => Number(question.id) === Number(currentQuestionId));
     if (currentIndex === -1) {
       res.status(400).json({ detail: "Current question ID not found" });
       return;
@@ -219,13 +250,14 @@ router.post("/generate-next-question", async (req, res) => {
     const shifted = interview.questions.map((question, index) =>
       index > currentIndex ? { ...question, id: Number(question.id) + 1 } : question
     );
-    shifted.splice(currentIndex + 1, 0, newQuestion);
+    shifted.splice(currentIndex + 1, 0, nextQuestion);
     interview.questions = shifted;
 
     await persistInterview(interview);
-    res.json(newQuestion);
+    res.json(nextQuestion);
   } catch (error) {
-    res.status(503).json({ detail: "AI generation failed" });
+    console.error("AI Followup Endpoint Failed:", error.message);
+    res.status(500).json({ detail: "Failed to process question." });
   }
 });
 
@@ -482,6 +514,7 @@ router.get("/admin/interview/:linkId", async (req, res) => {
       total_face_alerts: totalFaceAlerts,
       total_time_minutes: Number((totalTime / 60).toFixed(1))
     },
+    record_video: session.record_video || false, // Issue 3: Video recorded flag
     answers: results
   });
 });
@@ -677,6 +710,7 @@ router.post("/admin/create-session", async (req, res) => {
     expires_at: expiresAt,
     scheduled_time: req.body.scheduled_time || null,
     interview_duration: Number(req.body.interview_duration || 30),
+    record_video: req.body.record_video === true || req.body.record_video === 'true', // Issue 3
     status: "pending"
   });
 
@@ -705,6 +739,60 @@ router.post("/admin/create-session", async (req, res) => {
   });
 });
 
+// Issue 1: Bulk Create Sessions
+router.post("/admin/bulk-create-sessions", async (req, res) => {
+  const { interviewSessions } = getCollections();
+  const candidates = req.body.candidates || [];
+  const adminId = req.body.admin_id;
+  const adminName = req.body.admin_name || 'Admin';
+  const duration = Number(req.body.interview_duration || 30);
+  const recordVideo = req.body.record_video === true;
+
+  const results = [];
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+  for (const cand of candidates) {
+    const linkId = uuidv4();
+    const session = {
+      link_id: linkId,
+      candidate_name: cand.name,
+      candidate_email: cand.email,
+      resume_text: cand.resume_text || req.body.global_resume_text || "",
+      job_description: cand.job_description || req.body.global_job_description || "",
+      created_by: adminId,
+      created_by_name: adminName,
+      created_at: nowIso(),
+      expires_at: expiresAt,
+      scheduled_time: req.body.scheduled_time || null,
+      interview_duration: duration,
+      record_video: recordVideo,
+      status: "pending"
+    };
+
+    await interviewSessions.insertOne(session);
+    
+    const linkUrl = `/index.html?session_id=${linkId}`;
+    
+    // Async email
+    sendInterviewEmail({
+      candidateEmail: cand.email,
+      candidateName: cand.name,
+      linkUrl,
+      duration,
+      jobDescription: session.job_description,
+      resumeText: session.resume_text
+    }).catch(err => console.error(`[BulkEmail] Fallo for ${cand.email}:`, err.message));
+
+    results.push({ email: cand.email, status: 'success', link_id: linkId });
+  }
+
+  res.json({
+    status: "success",
+    processed: candidates.length,
+    results
+  });
+});
+
 router.get("/session/:linkId", async (req, res) => {
   const { interviewSessions } = getCollections();
   const session = await interviewSessions.findOne({ link_id: req.params.linkId });
@@ -721,6 +809,7 @@ router.get("/session/:linkId", async (req, res) => {
     job_description: session.job_description,
     session_status: session.status,
     interview_duration: session.interview_duration || 30,
+    record_video: session.record_video || false, // Issue 3
     is_expired: (session.expires_at && new Date() > new Date(session.expires_at)) || ["started", "completed"].includes(session.status)
   });
 });
@@ -763,7 +852,8 @@ router.get("/admin/sessions", async (req, res) => {
         decision: session.decision,
         decision_by: session.decision_by,
         created_by: session.created_by,
-        created_by_name: session.created_by_name
+        created_by_name: session.created_by_name,
+        record_video: session.record_video || false // Issue 3
       }))
     });
   } catch (err) {
@@ -937,17 +1027,51 @@ router.delete("/admin/delete-session/:linkId", async (req, res) => {
   }
 });
 
+router.post("/admin/delete-sessions", async (req, res) => {
+  try {
+    const { link_ids } = req.body;
+    if (!Array.isArray(link_ids) || link_ids.length === 0) {
+      return res.status(400).json({ detail: "No sessions to delete" });
+    }
+
+    const { interviewSessions, interviews: interviewsColl, answers } = getCollections();
+    
+    // Find sessions to get their interview_ids for cleanup
+    const sessions = await interviewSessions.find({ link_id: { $in: link_ids } }).toArray();
+    const interviewIds = sessions.map(s => s.interview_id).filter(Boolean);
+
+    // Delete the sessions
+    await interviewSessions.deleteMany({ link_id: { $in: link_ids } });
+
+    // Cleanup associated data
+    if (interviewIds.length > 0) {
+      await interviewsColl.deleteMany({ id: { $in: interviewIds } });
+      await answers.deleteMany({ interview_id: { $in: interviewIds } });
+    }
+
+    res.json({ status: "success", message: `${link_ids.length} sessions deleted successfully.` });
+  } catch (error) {
+    res.status(500).json({ detail: error.message });
+  }
+});
+
 async function triggerAISummary(linkId) {
   try {
-    const { answers, interviewSessions } = getCollections();
+    const { answers, interviewSessions, interviews } = getCollections();
     const session = await interviewSessions.findOne({ link_id: linkId });
     if (!session || !session.interview_id) return;
+
+    const interview = await interviews.findOne({ id: session.interview_id });
+    const totalQuestions = interview && interview.questions ? interview.questions.length : 1;
 
     const rows = await answers.find({ interview_id: session.interview_id }).sort({ question_id: 1 }).toArray();
     if (rows.length === 0) return;
 
     const scores = rows.map(r => r.ai_score).filter(s => s !== null && s !== undefined);
-    const avg = scores.length > 0 ? Number((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)) : 0;
+    // Issue 3: Calculate out of 100 based on all interview questions mapped
+    const totalScoreEarned = scores.reduce((a, b) => a + b, 0);
+    const overallPercentage = totalQuestions > 0 ? Number(((totalScoreEarned / (totalQuestions * 100)) * 100).toFixed(1)) : 0;
+    const avg = overallPercentage;
 
     const summary = await generateInterviewSummary(session.candidate_name || "Candidate", rows.map(r => ({
       question_text: r.question_text,
@@ -990,6 +1114,34 @@ router.post("/transcribe", upload.single("audio"), async (req, res) => {
 
   const text = await transcribeAudio(req.file.buffer, req.file.originalname);
   res.json({ text });
+});
+
+router.post("/save-recording", upload.single("video"), async (req, res) => {
+  const { session_id: sessionId } = req.body;
+  if (!req.file || !sessionId) {
+    return res.status(400).json({ status: "error", message: "Missing file or session_id" });
+  }
+
+  const { interviewSessions } = getCollections();
+  const session = await interviewSessions.findOne({ link_id: sessionId });
+  if (!session) return res.status(404).json({ status: "error", message: "Session not found" });
+
+  const fileName = `recording_${sessionId}_${Date.now()}.webm`;
+  const filePath = path.join(ROOT_DIR, "uploads", fileName);
+
+  try {
+    fs.writeFileSync(filePath, req.file.buffer);
+    const recordingUrl = `/uploads/${fileName}`;
+    
+    await interviewSessions.updateOne(
+      { link_id: sessionId },
+      { $set: { recording_url: recordingUrl } }
+    );
+
+    res.json({ status: "success", recording_url: recordingUrl });
+  } catch (err) {
+    res.status(500).json({ status: "error", message: err.message });
+  }
 });
 
 router.use(express.static(FRONTEND_DIR));

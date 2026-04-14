@@ -6,7 +6,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
-
+import * as XLSX from 'xlsx';
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 // Adjust for API format
 const API_URL = BASE_URL.endsWith('/api') ? BASE_URL : `${BASE_URL}/api`;
@@ -137,11 +137,11 @@ export default function MockInterviewsDashboard() {
     }
   };
 
-  // Form State
-  const [candidateName, setCandidateName] = useState('');
-  const [candidateEmail, setCandidateEmail] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [duration, setDuration] = useState('30');
+  const [recordVideo, setRecordVideo] = useState(false); // Issue 3
+  const [creationMode, setCreationMode] = useState('single'); // Issue 1: single or bulk
+  const [bulkCandidates, setBulkCandidates] = useState([]); // Issue 1: list from excel
 
   // Default to current local time for scheduling
   const initialDate = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -153,10 +153,14 @@ export default function MockInterviewsDashboard() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allCandidates, setAllCandidates] = useState([]);
   const [selectedCandidateId, setSelectedCandidateId] = useState('');
+  const [candidateName, setCandidateName] = useState('');
+  const [candidateEmail, setCandidateEmail] = useState('');
   const [recruiters, setRecruiters] = useState([]);
   const [selectedRecruiterId, setSelectedRecruiterId] = useState('all');
   const [selectedSessions, setSelectedSessions] = useState([]);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const role = String(userRole || '').toLowerCase();
   const adminId = (role === 'admin' || role === 'manager') ? 'all' : (currentUser?._id || currentUser?.id || 'admin_user');
 
@@ -179,7 +183,11 @@ export default function MockInterviewsDashboard() {
   const fetchSessions = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await apiFetch(`/admin/sessions?admin_id=${adminId}`);
+      let url = `/admin/sessions?admin_id=${adminId}`;
+      if (startDate) url += `&start_date=${startDate}`;
+      if (endDate) url += `&end_date=${endDate}`;
+      
+      const data = await apiFetch(url);
       if (data.status === 'success') {
         setSessions(data.sessions || []);
         setSelectedSessions([]); // Reset on refresh
@@ -189,7 +197,7 @@ export default function MockInterviewsDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [adminId, toast]);
+  }, [adminId, toast, startDate, endDate]);
 
   const fetchRecruiters = useCallback(async () => {
     try {
@@ -239,6 +247,48 @@ export default function MockInterviewsDashboard() {
     }
   };
 
+  // Issue 1: Excel Import Logic
+  const handleExcelImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+        
+        // Map columns (loose match)
+        const mapped = data.map(row => ({
+          name: row.Name || row.name || row['Candidate Name'] || row.FullName || '',
+          email: row.Email || row.email || row['Email ID'] || row.EmailAddress || '',
+          resume_text: row.ResumeText || '', // Optional individual resume text
+        })).filter(c => c.name && c.email);
+
+        setBulkCandidates(mapped);
+        toast({ title: 'Imported', description: `Successfully parsed ${mapped.length} candidates.` });
+      } catch (err) {
+        toast({ title: 'Import Failed', description: 'Make sure you uploaded a valid Excel file.', variant: 'destructive' });
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  // Issue 1: Download Template
+  const downloadTemplate = () => {
+    const templateData = [
+      { "Name": "John Doe", "Email": "john@example.com" },
+      { "Name": "Jane Smith", "Email": "jane@example.com" }
+    ];
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Candidates");
+    XLSX.writeFile(wb, "Interview_Bulk_Template.xlsx");
+  };
+
   const [isUpdatingDecision, setIsUpdatingDecision] = useState(false);
 
   const handleDecision = async (linkId, decision) => {
@@ -282,16 +332,25 @@ export default function MockInterviewsDashboard() {
 
   const handleCreateSession = async (e) => {
     e.preventDefault();
+    
+    if (creationMode === 'bulk' && bulkCandidates.length === 0) {
+      toast({ title: 'Validation Error', description: 'Please import candidates via Excel for bulk mode.', variant: 'destructive' });
+      return;
+    }
+
+    if (creationMode === 'single' && !candidateName) {
+      toast({ title: 'Validation Error', description: 'Candidate name is required.', variant: 'destructive' });
+      return;
+    }
+
     if (!jobDescription && !resumeFile) {
       toast({ title: 'Validation Error', description: 'Please provide either a Job Description or upload a context file (PDF).', variant: 'destructive' });
       return;
     }
 
     setIsSubmitting(true);
-    let parsedResumeText = '';
-    let finalName = candidateName;
-    let finalEmail = candidateEmail;
-
+    let parsedGlobalResumeText = '';
+    
     try {
       if (resumeFile) {
         const formData = new FormData();
@@ -304,49 +363,69 @@ export default function MockInterviewsDashboard() {
         });
         if (!uploadRes.ok) throw new Error('Failed to parse file');
         const uploadData = await uploadRes.json();
-        parsedResumeText = uploadData.text;
+        parsedGlobalResumeText = uploadData.text;
 
-        if (!finalName && uploadData.name) {
-          finalName = uploadData.name;
-          setCandidateName(uploadData.name);
-        }
-        if (!finalEmail && uploadData.email) {
-          finalEmail = uploadData.email;
-          setCandidateEmail(uploadData.email);
+        if (creationMode === 'single') {
+          if (!candidateName && uploadData.name) setCandidateName(uploadData.name);
+          if (!candidateEmail && uploadData.email) setCandidateEmail(uploadData.email);
         }
       }
 
-      if (!finalName || !finalEmail) {
-        throw new Error('Candidate Name and Email are still required. Please fill them manually or ensure the file contains them.');
-      }
+      if (creationMode === 'bulk') {
+        // Issue 1: Bulk creation
+        const data = await apiFetch('/admin/bulk-create-sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            candidates: bulkCandidates,
+            global_job_description: jobDescription || 'JD provided via attached file',
+            global_resume_text: parsedGlobalResumeText,
+            admin_id: currentUser?._id || currentUser?.id || 'admin_user',
+            admin_name: currentUser?.name || 'Admin',
+            interview_duration: parseInt(duration),
+            record_video: recordVideo,
+            scheduled_time: `${scheduledDate}T${scheduledTime}:00`
+          })
+        });
 
-      const data = await apiFetch('/admin/create-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          candidate_name: finalName,
-          candidate_email: finalEmail,
-          job_description: jobDescription || 'JD provided via attached file',
-          admin_id: currentUser?._id || currentUser?.id || 'admin_user',
-          admin_name: currentUser?.name || 'Admin',
-          interview_duration: parseInt(duration),
-          resume_text: parsedResumeText,
-          scheduled_time: `${scheduledDate}T${scheduledTime}:00`
-        })
-      });
-
-      if (data.status === 'success') {
-        toast({ title: 'Success', description: 'Interview link created successfully.' });
-        setCandidateName('');
-        setCandidateEmail('');
-        setJobDescription('');
-        setDuration('30');
-        setScheduledTime(new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10));
-        setResumeFile(null);
-        setActiveTab('overview');
-        fetchSessions();
+        if (data.status === 'success') {
+          toast({ title: 'Bulk Success', description: `Dispatched ${data.processed} interview invites.` });
+          setBulkCandidates([]);
+          setActiveTab('overview');
+          fetchSessions();
+        } else {
+          throw new Error(data.detail || 'Bulk creation failed');
+        }
       } else {
-        throw new Error(data.detail || 'Creation failed');
+        // Single creation
+        const data = await apiFetch('/admin/create-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            candidate_name: candidateName,
+            candidate_email: candidateEmail,
+            job_description: jobDescription || 'JD provided via attached file',
+            admin_id: currentUser?._id || currentUser?.id || 'admin_user',
+            admin_name: currentUser?.name || 'Admin',
+            interview_duration: parseInt(duration),
+            resume_text: parsedGlobalResumeText,
+            record_video: recordVideo, // Issue 3
+            scheduled_time: `${scheduledDate}T${scheduledTime}:00`
+          })
+        });
+
+        if (data.status === 'success') {
+          toast({ title: 'Success', description: 'Interview link created successfully.' });
+          setCandidateName('');
+          setCandidateEmail('');
+          setJobDescription('');
+          setDuration('30');
+          setResumeFile(null);
+          setActiveTab('overview');
+          fetchSessions();
+        } else {
+          throw new Error(data.detail || 'Creation failed');
+        }
       }
     } catch (error) {
       toast({ title: 'Failed', description: error.message, variant: 'destructive' });
@@ -598,6 +677,20 @@ export default function MockInterviewsDashboard() {
                   </div>
                 </div>
 
+                {/* Issue 3: Video Recording Player */}
+                {sessionResults.recording_url && (
+                  <div className="bg-black rounded-[2rem] overflow-hidden shadow-2xl border-4 border-slate-900 group relative">
+                    <video 
+                      src={`${API_URL}/ai-mock${sessionResults.recording_url}`} 
+                      controls 
+                      className="w-full h-auto aspect-video"
+                    />
+                    <div className="absolute top-4 left-4 bg-rose-500 text-white text-[10px] font-black px-3 py-1 rounded-full animate-pulse shadow-lg uppercase tracking-widest">
+                      Live Recording
+                    </div>
+                  </div>
+                )}
+
                 {/* Question Details */}
                 <div className="space-y-6">
                   <h3 className="text-xl font-black text-slate-800 px-2 flex items-center gap-2">
@@ -712,7 +805,36 @@ export default function MockInterviewsDashboard() {
 
 
             <div className="flex justify-between items-center mb-6 px-2">
-              <h2 className="text-xl font-bold text-slate-800 tracking-tight">Interview Pipeline</h2>
+              <div className="flex items-center gap-4">
+                <h2 className="text-xl font-bold text-slate-800 tracking-tight">Interview Pipeline</h2>
+                
+                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">From</span>
+                  <input
+                    type="date"
+                    className="text-sm font-semibold text-slate-700 bg-transparent outline-none cursor-pointer"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                  <div className="w-px h-4 bg-gray-200 mx-1"></div>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">To</span>
+                  <input
+                    type="date"
+                    className="text-sm font-semibold text-slate-700 bg-transparent outline-none cursor-pointer"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                  {(startDate || endDate) && (
+                    <button
+                      onClick={() => { setStartDate(''); setEndDate(''); }}
+                      className="ml-2 text-[10px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600 bg-rose-50 px-2 py-1 rounded"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
@@ -820,8 +942,11 @@ export default function MockInterviewsDashboard() {
                               )}
                             </div>
                             <div className="flex items-center gap-1.5 text-slate-400 mt-1">
-                              <Video className="w-3.5 h-3.5 text-blue-400" />
+                              <Video className={`w-3.5 h-3.5 ${s.record_video ? 'text-indigo-500 animate-pulse' : 'text-blue-400'}`} />
                               <span className="text-xs font-semibold">{s.interview_duration || 30} min interview</span>
+                              {s.record_video && (
+                                <span className="bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded text-[8px] font-black border border-indigo-100 uppercase ml-2">Video Enabled</span>
+                              )}
                             </div>
                             {s.decision && s.decision !== 'pending' && (
                               <p className={`text-[9px] font-black uppercase mt-2 opacity-90 ${s.decision === 'Selected' ? 'text-green-500' : 'text-rose-500'}`}>
@@ -922,39 +1047,108 @@ export default function MockInterviewsDashboard() {
             <div className="text-center mb-12">
               <h2 className="text-3xl font-black text-slate-800 mb-2">Configure Session</h2>
               <p className="text-gray-500 font-medium text-sm max-w-md mx-auto">Provide candidate details and context for the AI engine to generate dynamic questions.</p>
+              
+              {/* Issue 1: Method Selector */}
+              <div className="flex justify-center mt-8 gap-4">
+                <button 
+                  onClick={() => setCreationMode('single')}
+                  className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 border shadow-sm ${creationMode === 'single' ? 'bg-[#584ED3] text-white border-transparent' : 'bg-white text-slate-400 border-gray-100 hover:text-slate-600'}`}
+                >
+                  <User className="w-4 h-4" /> Single Candidate
+                </button>
+                <button 
+                  onClick={() => setCreationMode('bulk')}
+                  className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 border shadow-sm ${creationMode === 'bulk' ? 'bg-[#584ED3] text-white border-transparent' : 'bg-white text-slate-400 border-gray-100 hover:text-slate-600'}`}
+                >
+                  <Users className="w-4 h-4" /> Bulk Method
+                </button>
+              </div>
             </div>
 
             <form onSubmit={handleCreateSession} className="space-y-6">
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Select Existing Candidate (Optional)</label>
-                <select
-                  value={selectedCandidateId}
-                  onChange={(e) => handleSelectCandidate(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 focus:bg-white border border-gray-200 focus:border-indigo-500 rounded-xl text-sm font-medium transition-all appearance-none cursor-pointer"
-                >
-                  <option value="">-- Select Candidate --</option>
-                  {(allCandidates || []).map(c => (
-                    <option key={c._id || c.id} value={c._id || c.id}>{c.name} ({c.email})</option>
-                  ))}
-                </select>
-              </div>
+              {creationMode === 'bulk' ? (
+                <div className="bg-indigo-50/30 p-8 rounded-3xl border border-indigo-100/50 space-y-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-xs font-black text-indigo-500 uppercase tracking-widest">Excel Import Source</label>
+                    <button 
+                      type="button" 
+                      onClick={downloadTemplate}
+                      className="text-[10px] font-black text-indigo-600 hover:underline flex items-center gap-1"
+                    >
+                      <Download className="w-3 h-3" /> EXCEL TEMPLATE
+                    </button>
+                  </div>
+                  <div className="relative group border-2 border-dashed border-indigo-200 rounded-2xl p-6 bg-white hover:border-indigo-400 transition-all text-center">
+                    <input 
+                      type="file" 
+                      accept=".xlsx, .xls, .csv" 
+                      onChange={handleExcelImport}
+                      className="absolute inset-0 opacity-0 cursor-pointer z-10" 
+                    />
+                    <div className="flex flex-col items-center gap-2">
+                      <Download className="w-8 h-8 text-indigo-400" />
+                      <p className="text-sm font-bold text-slate-700">Click to upload spreadsheet</p>
+                      <p className="text-[10px] text-slate-400 uppercase font-black">Columns: Name, Email</p>
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Candidate Name <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input type="text" value={candidateName} onChange={e => setCandidateName(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-gray-50 focus:bg-white border border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-xl text-sm font-medium transition-all" placeholder="John Doe" />
+                  {bulkCandidates.length > 0 && (
+                    <div className="mt-4 border-t border-indigo-100 pt-4">
+                      <div className="flex justify-between items-center mb-4">
+                        <label className="text-[10px] font-black text-slate-400 uppercase">Preview ({bulkCandidates.length} Selected)</label>
+                        <button type="button" onClick={() => setBulkCandidates([])} className="text-rose-500 font-bold text-[10px] uppercase">Clear All</button>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                        {bulkCandidates.map((c, i) => (
+                          <div key={i} className="flex justify-between items-center bg-white p-3 rounded-xl border border-indigo-50 shadow-sm">
+                            <div className="flex items-center gap-3">
+                              <div className="w-7 h-7 bg-indigo-50 rounded-full flex items-center justify-center text-[10px] font-black text-indigo-500">{c.name.charAt(0)}</div>
+                              <div>
+                                <p className="text-xs font-black text-slate-800">{c.name}</p>
+                                <p className="text-[10px] text-slate-400 font-medium">{c.email}</p>
+                              </div>
+                            </div>
+                            <Trash2 className="w-3.5 h-3.5 text-slate-300 hover:text-rose-500 cursor-pointer" onClick={() => setBulkCandidates(prev => prev.filter((_, idx) => idx !== i))} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Select Existing Candidate (Optional)</label>
+                    <select
+                      value={selectedCandidateId}
+                      onChange={(e) => handleSelectCandidate(e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-50 focus:bg-white border border-gray-200 focus:border-indigo-500 rounded-xl text-sm font-medium transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="">-- Select Candidate --</option>
+                      {(allCandidates || []).map(c => (
+                        <option key={c._id || c.id} value={c._id || c.id}>{c.name} ({c.email})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Candidate Name <span className="text-red-500">*</span></label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input type="text" value={candidateName} onChange={e => setCandidateName(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-gray-50 focus:bg-white border border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-xl text-sm font-medium transition-all" placeholder="John Doe" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Candidate Email <span className="text-red-500">*</span></label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input type="email" value={candidateEmail} onChange={e => setCandidateEmail(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-gray-50 focus:bg-white border border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-xl text-sm font-medium transition-all" placeholder="john@example.com" />
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Candidate Email <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input type="email" value={candidateEmail} onChange={e => setCandidateEmail(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-gray-50 focus:bg-white border border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-xl text-sm font-medium transition-all" placeholder="john@example.com" />
-                  </div>
-                </div>
-              </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -975,6 +1169,25 @@ export default function MockInterviewsDashboard() {
                       <input type="time" value={scheduledTime} onChange={e => setScheduledTime(e.target.value)} className="w-full px-4 py-3 bg-gray-50 focus:bg-white border border-gray-200 focus:border-indigo-500 rounded-xl text-sm font-medium transition-all" />
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* Issue 3: Video Recording Option */}
+              <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 flex items-center justify-between group">
+                <div className="flex items-center gap-4">
+                  <div className={`p-3 rounded-2xl transition-all ${recordVideo ? 'bg-indigo-500 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-100'}`}>
+                    <Video className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-slate-800">Record Interview Video</h4>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Candidate will be asked for camera permission</p>
+                  </div>
+                </div>
+                <div 
+                  onClick={() => setRecordVideo(!recordVideo)}
+                  className={`w-14 h-8 rounded-full p-1 cursor-pointer transition-all flex items-center ${recordVideo ? 'bg-indigo-500' : 'bg-slate-200'}`}
+                >
+                  <div className={`bg-white w-6 h-6 rounded-full shadow-sm transition-transform ${recordVideo ? 'translate-x-6' : 'translate-x-0'}`} />
                 </div>
               </div>
 

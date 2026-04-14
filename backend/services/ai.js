@@ -553,22 +553,33 @@ async function analyzeAnswer(question, answer, context = "") {
   }
 
   const prompt = `
-You are an expert interview coach and evaluator.
+You are an expert technical interviewer and performance analyst. 
+Your task is to accurately score the candidate's response on a scale of 0-100 based on the following criteria:
+1. Technical Correctness (60%): How accurate is the technical information provided?
+2. Relevance (20%): Does the answer directly address the question?
+3. Clarity and Professionalism (20%): Is the communication clear and structured?
 
-Context (Resume/Job Description):
+Context (Job Description/Resume):
 ${context}
 
-Question: "${question}"
-Candidate's Answer: "${answer}"
+Interview Question: "${question}"
+Candidate's Response: "${answer}"
+
+SCORING RULES:
+- If the answer is completely wrong or nonsensical, score 0-10.
+- If the answer is partially correct but lacks depth, score 40-55.
+- If the answer is technically sound but poorly explained, score 60-70.
+- If the answer is excellent and technically perfect, score 85-100.
+- Heavier penalty for circular reasoning or "fluff" without technical substance.
 
 Return VALID JSON ONLY:
 {
-  "corrected_answer": "Suggested Answer: ...",
+  "corrected_answer": "Model Answer: ...",
   "grammar_score": 0,
   "relevance_score": 0,
   "clarity_score": 0,
-  "overall_score": 0, // This MUST be a number between 0 and 100 representing the accuracy percentage of the user's answer
-  "feedback": "Feedback...",
+  "overall_score": 0, 
+  "feedback": "Detailed feedback focusing on what was missing or correct...",
   "keywords": ["key1", "key2"]
 }
 `;
@@ -577,7 +588,7 @@ Return VALID JSON ONLY:
     const raw = await chatCompletion({
       model: "openai/gpt-4o-mini",
       messages: [
-        { role: "system", content: "You are a stringent interviewer. Grade the user's answer on a scale from 0 to 100 heavily weighting technical correctness." },
+        { role: "system", content: "You are a stringent, expert technical evaluator. You produce objective, data-driven scores for interview responses." },
         { role: "user", content: prompt }
       ]
     });
